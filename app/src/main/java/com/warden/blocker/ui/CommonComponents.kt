@@ -31,7 +31,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
-import java.util.concurrent.TimeUnit
 
 @Composable
 internal fun FocusCard(focusEndsAt: Long, strict: Boolean, onStart: (Int, Boolean) -> Unit, onCancel: () -> Unit) {
@@ -95,26 +94,10 @@ internal fun SubScreenTopBar(title: String, onBack: () -> Unit, showDone: Boolea
     )
 }
 
-@Composable
-internal fun StatCard(label: String, value: String, modifier: Modifier = Modifier) {
-    ElevatedCard(modifier) {
-        Column(Modifier.padding(16.dp)) {
-            Text(value, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
-            Text(label, style = MaterialTheme.typography.bodySmall)
-        }
-    }
-}
-
 // --- small formatting helpers ---
 internal fun fmt(minute: Int) = "%02d:%02d".format(minute / 60, minute % 60)
 
 internal fun daysLabel(mask: Int): String {
     val names = listOf("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
     return names.filterIndexed { i, _ -> (mask shr i) and 1 == 1 }.joinToString(" ")
-}
-
-internal fun fmtDuration(ms: Long): String {
-    val h = TimeUnit.MILLISECONDS.toHours(ms)
-    val m = TimeUnit.MILLISECONDS.toMinutes(ms) % 60
-    return if (h > 0) "${h}h ${m}m" else "${m}m"
 }

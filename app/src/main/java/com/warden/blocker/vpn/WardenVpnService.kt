@@ -12,6 +12,7 @@ import com.warden.blocker.MainActivity
 import com.warden.blocker.R
 import com.warden.blocker.WardenApp
 import com.warden.blocker.hosts.DomainMatcher
+import com.warden.blocker.stats.StatsRecorder
 import com.warden.blocker.wardenContainer
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -123,6 +124,8 @@ class WardenVpnService : VpnService() {
                 if (isBlocked(name)) {
                     // Never log the domain — that would leak browsing history into logcat.
                     runCatching { output.write(DnsPacket.buildSinkholeResponse(packet, read, parsed)) }
+                    // Only a per-day count, no domain; covers manual entries and hosts lists alike.
+                    StatsRecorder.get(this@WardenVpnService).recordDomainBlocked()
                 } else {
                     forward(packet, parsed, output)
                 }

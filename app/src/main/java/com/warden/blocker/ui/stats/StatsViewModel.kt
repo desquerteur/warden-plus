@@ -69,7 +69,10 @@ data class StatsUiState(
     val blocks: BlockStats? = null,
     val streak: Int = 0,
     val longestStreak: Int = 0,
+    val focusSessions: Int = 0,
 )
+
+private data class FocusStats(val streak: Int, val longest: Int, val sessions: Int)
 
 /** Loads the stats dashboard off the main thread; keeps the last result per period while refreshing. */
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -95,11 +98,13 @@ class StatsViewModel(app: Application) : AndroidViewModel(app) {
         BlockStats(current, UsageAggregator.percentChange(current.total.toLong(), previous.total.toLong()))
     }.flowOn(Dispatchers.Default)
 
-    val state: StateFlow<StatsUiState> = combine(
-        period, usage, blocks,
-        app.wardenContainer.settings.currentStreak,
-        app.wardenContainer.settings.longestStreak,
-    ) { p, u, b, streak, longest -> StatsUiState(p, u, b, streak, longest) }
+    private val focus = app.wardenContainer.settings.let { s ->
+        combine(s.currentStreak, s.longestStreak, s.focusSessionsDone, ::FocusStats)
+    }
+
+    val state: StateFlow<StatsUiState> = combine(period, usage, blocks, focus) { p, u, b, f ->
+        StatsUiState(p, u, b, f.streak, f.longest, f.sessions)
+    }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), StatsUiState())
 
     fun selectPeriod(p: StatsPeriod) { period.value = p }

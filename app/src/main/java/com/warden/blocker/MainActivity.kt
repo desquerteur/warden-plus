@@ -41,8 +41,9 @@ import com.warden.blocker.ui.HomeScreen
 import com.warden.blocker.ui.SchedulesScreen
 import com.warden.blocker.ui.SettingsScreen
 import com.warden.blocker.ui.SetupScreen
-import com.warden.blocker.ui.StatsScreen
 import com.warden.blocker.ui.WardenViewModel
+import com.warden.blocker.ui.hosts.HostsListsScreen
+import com.warden.blocker.ui.stats.StatsDashboard
 import com.warden.blocker.ui.theme.WardenTheme
 import com.warden.blocker.vpn.VpnController
 
@@ -126,7 +127,7 @@ private fun WardenScaffold(
                     NavigationBarItem(
                         selected = dest?.hierarchy?.any { it.route == tab.route } == true,
                         onClick = {
-                            // Leave a sub-screen (app picker, feeds, setup) first. Otherwise it is
+                            // Leave a sub-screen (app picker, feeds, hosts lists, setup) first. Otherwise it is
                             // saved into the tab's state and restored, so tapping "Blocklist" from
                             // the app picker would land right back in the app picker.
                             if (dest != null && Tab.entries.none { it.route == dest.route }) navController.popBackStack()
@@ -157,12 +158,14 @@ private fun WardenScaffold(
                     vm,
                     onOpenAppPicker = { navController.navigate("apppicker") },
                     onOpenFeatures = { navController.navigate("features") },
+                    onOpenHostsLists = { navController.navigate("hostslists") },
                 )
             }
             composable("apppicker") { AppPickerScreen(vm, onBack = { leave("apppicker") }) }
             composable("features") { FeaturesScreen(vm, onBack = { leave("features") }) }
+            composable("hostslists") { HostsListsScreen(onBack = { leave("hostslists") }) }
             composable(Tab.SCHEDULES.route) { SchedulesScreen(vm) }
-            composable(Tab.STATS.route) { StatsScreen(vm) }
+            composable(Tab.STATS.route) { StatsDashboard() }
             composable(Tab.SETTINGS.route) { SettingsScreen(vm, onOpenSetup = { navController.navigate("setup") }) }
         }
     }

@@ -36,9 +36,15 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.warden.blocker.data.BlockType
 import com.warden.blocker.data.BlockedItem
 import com.warden.blocker.data.InterceptMode
+import com.warden.blocker.ui.hosts.HostsListsEntryButton
 
 @Composable
-fun BlocklistScreen(vm: WardenViewModel, onOpenAppPicker: () -> Unit, onOpenFeatures: () -> Unit) {
+fun BlocklistScreen(
+    vm: WardenViewModel,
+    onOpenAppPicker: () -> Unit,
+    onOpenFeatures: () -> Unit,
+    onOpenHostsLists: () -> Unit,
+) {
     val items by vm.items.collectAsStateWithLifecycle()
     var input by remember { mutableStateOf("") }
     var editing by remember { mutableStateOf<BlockedItem?>(null) }
@@ -60,6 +66,8 @@ fun BlocklistScreen(vm: WardenViewModel, onOpenAppPicker: () -> Unit, onOpenFeat
         OutlinedButton(onClick = onOpenAppPicker, modifier = Modifier.fillMaxWidth()) { Text("+ Add apps to block") }
         Spacer(Modifier.height(8.dp))
         OutlinedButton(onClick = onOpenFeatures, modifier = Modifier.fillMaxWidth()) { Text("Block in-app feeds (Reels, Shorts…)") }
+        Spacer(Modifier.height(8.dp))
+        HostsListsEntryButton(onClick = onOpenHostsLists)
         Spacer(Modifier.height(16.dp))
         if (items.isEmpty()) {
             Text("Nothing blocked yet — add a website above or tap “Add apps”.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.outline)

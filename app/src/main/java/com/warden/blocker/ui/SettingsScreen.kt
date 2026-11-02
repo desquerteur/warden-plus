@@ -34,6 +34,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.warden.blocker.system.AdminManager
+import com.warden.blocker.ui.update.UpdateSection
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -164,6 +165,8 @@ fun SettingsScreen(vm: WardenViewModel, onOpenSetup: () -> Unit) {
                 }
             }
         }
+
+        UpdateSection()
 
         HorizontalDivider()
         OutlinedButton(onClick = onOpenSetup, modifier = Modifier.fillMaxWidth()) {

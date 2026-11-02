@@ -9,6 +9,7 @@ import com.warden.blocker.data.BlockRepository
 import com.warden.blocker.data.SettingsStore
 import com.warden.blocker.data.WardenDatabase
 import com.warden.blocker.hosts.HostsListRepository
+import com.warden.blocker.update.UpdateCheckWorker
 import com.warden.blocker.usage.UsageStatsHelper
 
 /**
@@ -25,6 +26,7 @@ class WardenApp : Application() {
         super.onCreate()
         container = AppContainer(this)
         createNotificationChannel()
+        UpdateCheckWorker.sync(this)
     }
 
     private fun createNotificationChannel() {

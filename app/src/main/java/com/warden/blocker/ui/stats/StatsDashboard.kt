@@ -205,7 +205,8 @@ private fun Tiles(state: StatsUiState) {
         icon = Icons.Outlined.LocalFireDepartment,
         label = "Focus streak",
         value = "${state.streak} ${if (state.streak == 1) "day" else "days"}",
-        detail = "Best ${state.longestStreak} ${if (state.longestStreak == 1) "day" else "days"}",
+        detail = "Best ${state.longestStreak} ${if (state.longestStreak == 1) "day" else "days"} · " +
+            "${state.focusSessions} ${if (state.focusSessions == 1) "session" else "sessions"}",
         tone = Tone.Neutral,
     )
 

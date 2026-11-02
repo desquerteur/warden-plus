@@ -67,6 +67,14 @@ class TourLogicTest {
         assertEquals(steps.size, TourLogic.progress(run, steps.size).second)
     }
 
+    @Test fun aGuideNeverEndsOnASingleBackOrStrayTap() {
+        // S2/N13: Back on the first step asks first; Back again keeps going; elsewhere it steps back.
+        assertEquals(BackPress.ASK_END, TourLogic.backPress(TourRun("t", 0), askingToEnd = false))
+        assertEquals(BackPress.KEEP_GOING, TourLogic.backPress(TourRun("t", 0), askingToEnd = true))
+        assertEquals(BackPress.STEP_BACK, TourLogic.backPress(TourRun("t", 3), askingToEnd = false))
+        assertEquals(BackPress.ASK_END, TourLogic.backPress(TourRun("t", 2, missing = setOf(0, 1)), askingToEnd = false))
+    }
+
     @Test fun progressIsStableForTheWholeTour() {
         assertEquals(1 to 8, TourLogic.progress(TourRun("t", 0), 8))
         assertEquals(3 to 8, TourLogic.progress(TourRun("t", 2), 8))

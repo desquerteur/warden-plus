@@ -128,6 +128,16 @@ object TourLogic {
             s.route == route && s.target != null && s.ifMissing == MissingTarget.SKIP && !isOnScreen(s.target)
         }.toSet()
 
+    /**
+     * System Back during a guide: a step back where there is one; on the first step it asks
+     * whether to end the guide (never ends it at once); Back again while asking keeps going.
+     */
+    fun backPress(run: TourRun, askingToEnd: Boolean): BackPress = when {
+        askingToEnd -> BackPress.KEEP_GOING
+        back(run) != null -> BackPress.STEP_BACK
+        else -> BackPress.ASK_END
+    }
+
     /** Routes behind the Settings PIN lock: Settings itself and the pages opened from it. */
     private val pinLockedRoutes = setOf(TourRoutes.SETTINGS, TourRoutes.PROTECTION)
 
@@ -232,3 +242,5 @@ fun placeCard(target: Rect?, screen: Size, card: Size, wide: Boolean, margin: Fl
     }
     return CardPlacement(CardMode.FLOATING, offset)
 }
+
+enum class BackPress { STEP_BACK, ASK_END, KEEP_GOING }

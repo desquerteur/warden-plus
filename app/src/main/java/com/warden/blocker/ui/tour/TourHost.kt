@@ -259,8 +259,15 @@ private fun TourOverlay(
         if (target != null && targetId != null) snapshotFlow { registry.rect(targetId) }.filterNotNull().collect { moveSpot(it) }
     }
 
+    // Ending a guide is always asked first: one stray tap on "Skip" (its touch area reaches past
+    // the title) used to end it silently, and the next taps then landed in the app (S2, N13).
+    var confirmEnd by remember(run.tourId, run.index) { mutableStateOf(false) }
     BackHandler {
-        if (TourLogic.back(run) != null) controller.back() else controller.skip()
+        when (TourLogic.backPress(run, confirmEnd)) {
+            BackPress.KEEP_GOING -> confirmEnd = false
+            BackPress.STEP_BACK -> controller.back()
+            BackPress.ASK_END -> confirmEnd = true
+        }
     }
 
     val scrim = Color.Black.copy(alpha = 0.62f)
@@ -320,7 +327,10 @@ private fun TourOverlay(
                 canGoBack = TourLogic.back(run) != null,
                 onBack = controller::back,
                 onNext = controller::next,
-                onSkip = controller::skip,
+                confirmingEnd = confirmEnd,
+                onSkip = { confirmEnd = true },
+                onKeepGoing = { confirmEnd = false },
+                onEnd = controller::skip,
                 onReplay = { replayRequested = true; replays++ },
             )
         }
@@ -367,7 +377,10 @@ private fun TourCard(
     canGoBack: Boolean,
     onBack: () -> Unit,
     onNext: () -> Unit,
+    confirmingEnd: Boolean,
     onSkip: () -> Unit,
+    onKeepGoing: () -> Unit,
+    onEnd: () -> Unit,
     onReplay: () -> Unit,
 ) {
     val context = LocalContext.current
@@ -389,7 +402,7 @@ private fun TourCard(
                     color = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.weight(1f),
                 )
-                TextButton(onClick = onSkip) { Text("Skip") }
+                if (!confirmingEnd) TextButton(onClick = onSkip) { Text("Skip") }
             }
             Column(
                 Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState()),
@@ -399,13 +412,17 @@ private fun TourCard(
                     Modifier.padding(end = 8.dp).semantics { liveRegion = LiveRegionMode.Polite },
                     verticalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
-                    when (phase) {
-                        is Phase.Path -> {
+                    when {
+                        confirmingEnd -> {
+                            Text("End this guide?", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, modifier = Modifier.semantics { heading() })
+                            Text("You can start it again any time in Settings › Help.", style = MaterialTheme.typography.bodyMedium)
+                        }
+                        phase is Phase.Path -> {
                             Text("This is how you get there", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, modifier = Modifier.semantics { heading() })
                             Text(phase.hop.hint, style = MaterialTheme.typography.bodyMedium)
                         }
-                        Phase.Finding -> Text("…", style = MaterialTheme.typography.titleMedium)
-                        Phase.Locked -> {
+                        phase == Phase.Finding -> Text("…", style = MaterialTheme.typography.titleMedium)
+                        phase == Phase.Locked -> {
                             Text(step.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, modifier = Modifier.semantics { heading() })
                             Text(
                                 "Settings are locked with your PIN, so this part can't be shown now. Unlock Settings, " +
@@ -413,13 +430,13 @@ private fun TourCard(
                                 style = MaterialTheme.typography.bodyMedium,
                             )
                         }
-                        is Phase.Showing -> {
+                        phase is Phase.Showing -> {
                             Text(step.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, modifier = Modifier.semantics { heading() })
                             Text(step.text, style = MaterialTheme.typography.bodyMedium)
                         }
                     }
                 }
-                if (phase is Phase.Showing) {
+                if (phase is Phase.Showing && !confirmingEnd) {
                     step.guide?.let { guide ->
                         SettingsPathAnimation(guide, animate, Modifier.fillMaxWidth().padding(end = 8.dp))
                         guide.note?.let {
@@ -436,11 +453,15 @@ private fun TourCard(
                 }
             }
             // The way into Android settings is the point of such a step: always in sight.
-            val openLabel = step.guide?.openLabel?.takeIf { phase is Phase.Showing }
+            val openLabel = step.guide?.openLabel?.takeIf { phase is Phase.Showing && !confirmingEnd }
             if (openLabel != null) {
                 Button(onClick = { openSettingsGuide(context, step.guide) }, modifier = Modifier.fillMaxWidth().padding(end = 8.dp)) { Text(openLabel) }
             }
-            Row(Modifier.fillMaxWidth().padding(end = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            if (confirmingEnd) Row(Modifier.fillMaxWidth().padding(end = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(onClick = onEnd) { Text("End guide") }
+                Spacer(Modifier.weight(1f))
+                Button(onClick = onKeepGoing) { Text("Keep going") }
+            } else Row(Modifier.fillMaxWidth().padding(end = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 val ready = phase is Phase.Showing || phase is Phase.Locked
                 if (canGoBack) OutlinedButton(onClick = onBack, enabled = ready) { Text("Back") }
                 Spacer(Modifier.weight(1f))

@@ -44,6 +44,13 @@ class InstalledAppsInfo(private val context: Context) {
             CriticalApps.isCritical(context, packageName) ||
             packageName in runtimeDefaults(config)
 
+    /** Packages with a launcher icon (not Warden+), without labels — cheap. Call off the main thread. */
+    fun launchablePackages(): Set<String> {
+        val intent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
+        return context.packageManager.queryIntentActivities(intent, PackageManager.MATCH_ALL)
+            .mapTo(HashSet()) { it.activityInfo.packageName } - context.packageName
+    }
+
     /** Launchable apps (critical ones included), sorted by name. Call off the main thread. */
     fun launchableApps(): List<CategorizedApp> {
         val pm = context.packageManager

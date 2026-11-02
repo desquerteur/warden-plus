@@ -34,8 +34,7 @@ class AllowGate(
         val config = store.current()
         if (!config.affectsApps) return null
         val allowOnly = allowOnlyNow(config.appMode, config.scope)
-        val facts = apps.facts(packageName, config)
-        return when (val verdict = AllowPolicy.decideApp(packageName, config, facts, allowOnly, item?.enabled == true)) {
+        return when (val verdict = verdict(packageName, item, config, allowOnly)) {
             AppVerdict.FollowBlocklist -> null
             AppVerdict.NotAllowed -> AccessDecision.HardBlock(blockedItem(packageName, AllowBlockNotice.NOT_ALLOWED_ID, item))
             is AppVerdict.Category -> {
@@ -44,6 +43,22 @@ class AllowGate(
             }
         }
     }
+
+    /**
+     * The packages among [packageNames] that "Allow only" or a blocked category stops right now —
+     * [appDecision] for each, but the state is read once and the block screen's notice is left
+     * alone (the device-owner sync checks every app, not the one being opened). [items] are the
+     * blocklist entries in effect, by package. Call only while blocking is enforced.
+     */
+    suspend fun blockedAmong(packageNames: Collection<String>, items: Map<String, BlockedItem>): Set<String> {
+        val config = store.current()
+        if (!config.affectsApps) return emptySet()
+        val allowOnly = allowOnlyNow(config.appMode, config.scope)
+        return packageNames.filterTo(HashSet()) { verdict(it, items[it], config, allowOnly) != AppVerdict.FollowBlocklist }
+    }
+
+    private fun verdict(packageName: String, item: BlockedItem?, config: AllowConfig, allowOnly: Boolean): AppVerdict =
+        AllowPolicy.decideApp(packageName, config, apps.facts(packageName, config), allowOnly, item?.enabled == true)
 
     /** The VPN's filter for website "Allow only" right now, or null for the normal blocklist. */
     suspend fun webMatcher(): DomainMatcher? {

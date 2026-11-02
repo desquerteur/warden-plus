@@ -14,6 +14,8 @@ import com.warden.blocker.block.ProtectionState
 import com.warden.blocker.block.Verdict
 import com.warden.blocker.data.Schedule
 import com.warden.blocker.guard.SettingsGuardStore
+import com.warden.blocker.owner.OwnerPrefs
+import com.warden.blocker.owner.OwnerSync
 import com.warden.blocker.ui.whenLabel
 import com.warden.blocker.vpn.VpnController
 import kotlinx.coroutines.Dispatchers
@@ -177,6 +179,12 @@ class ProtectionGuard(private val context: Context, private val c: AppContainer)
                 }
             }
             is ProtectedChange.SetListSpan -> c.hostsLists.setActiveSpan(change.listId, change.from, change.until)
+            is ProtectedChange.OwnerPolicyOff -> {
+                val prefs = OwnerPrefs.get(context)
+                prefs.setPolicies(prefs.policies.value - change.policy)
+                OwnerSync.syncNow(context)
+            }
+            ProtectedChange.ConfirmOwnerExit -> OwnerPrefs.get(context).setExitReadyAt(System.currentTimeMillis())
             is ProtectedChange.SetProtection -> s.setProtection(change.settings)
             ProtectedChange.DisableUninstallProtection -> AdminManager.disable(context)
             is ProtectedChange.ChangePin -> s.setPin(change.hash, change.salt)

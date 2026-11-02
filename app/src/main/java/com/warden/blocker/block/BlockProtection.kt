@@ -27,6 +27,10 @@ enum class Loosening {
     LOOSEN_ALLOW,
     /** "Block until …" ended sooner, or a hosts list's "from … / until …" span shortened. */
     SHORTEN_TIMES,
+    /** A device-owner rule switched off (Settings → Maximum protection). */
+    OWNER_POLICY_OFF,
+    /** The device-owner emergency exit: its wait follows Block protection, capped at 24 h. */
+    REMOVE_DEVICE_OWNER,
 }
 
 /**

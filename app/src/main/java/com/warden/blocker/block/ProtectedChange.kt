@@ -5,6 +5,8 @@ import com.warden.blocker.data.BlockType
 import com.warden.blocker.data.BlockedItem
 import com.warden.blocker.data.InterceptMode
 import com.warden.blocker.data.Schedule
+import com.warden.blocker.owner.OwnerPolicy
+import com.warden.blocker.owner.title
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -37,6 +39,9 @@ sealed class ProtectedChange(val kind: Loosening) {
     /** A hosts list's "from … / until …" span made shorter (null = no limit). */
     data class SetListSpan(val listId: String, val name: String, val from: Long?, val until: Long?) :
         ProtectedChange(Loosening.SHORTEN_TIMES)
+    data class OwnerPolicyOff(val policy: OwnerPolicy) : ProtectedChange(Loosening.OWNER_POLICY_OFF)
+    /** PIN given for the device-owner emergency exit: it becomes ready (removal is then one tap). */
+    data object ConfirmOwnerExit : ProtectedChange(Loosening.REMOVE_DEVICE_OWNER)
 
     enum class Setting(val label: String) {
         ALWAYS_ON("Always on"), BLOCK_DOH("Block DNS-over-HTTPS"), BLOCK_NOTIFICATIONS("Block notifications"),
@@ -62,6 +67,8 @@ sealed class ProtectedChange(val kind: Loosening) {
         is LoosenAllow -> edit.describe()
         is ShortenBlockUntil -> "The block will end sooner"
         is SetListSpan -> "List “$name” will be blocked for less time"
+        is OwnerPolicyOff -> "“${policy.title}” will be switched off"
+        ConfirmOwnerExit -> "Device owner mode can then be removed"
     }
 
     /** Stable names (not class names, which a minified build would rename). */
@@ -83,11 +90,13 @@ sealed class ProtectedChange(val kind: Loosening) {
         is LoosenAllow -> "LoosenAllow"
         is ShortenBlockUntil -> "ShortenBlockUntil"
         is SetListSpan -> "SetListSpan"
+        is OwnerPolicyOff -> "OwnerPolicyOff"
+        ConfirmOwnerExit -> "ConfirmOwnerExit"
     }
 
     fun toJson(): JSONObject = JSONObject().put("type", typeName()).also { o ->
         when (this) {
-            TurnOffBlocking, EndFocus, DisableUninstallProtection, RemovePin -> Unit
+            TurnOffBlocking, EndFocus, DisableUninstallProtection, RemovePin, ConfirmOwnerExit -> Unit
             is RemoveItem -> o.put("id", itemId).put("label", label)
             is UpdateItem -> o.put("item", itemJson(item)).put("disables", disables)
             is RemoveSchedule -> o.put("id", scheduleId).put("name", name)
@@ -102,6 +111,7 @@ sealed class ProtectedChange(val kind: Loosening) {
             is LoosenAllow -> o.put("edit", edit.toJson())
             is ShortenBlockUntil -> o.put("endsAt", endsAt)
             is SetListSpan -> o.put("id", listId).put("name", name).putOpt("from", from).putOpt("until", until)
+            is OwnerPolicyOff -> o.put("policy", policy.name)
         }
     }
 
@@ -113,6 +123,7 @@ sealed class ProtectedChange(val kind: Loosening) {
                 "EndFocus" -> EndFocus
                 "DisableUninstallProtection" -> DisableUninstallProtection
                 "RemovePin" -> RemovePin
+                "ConfirmOwnerExit" -> ConfirmOwnerExit
                 "RemoveItem" -> RemoveItem(o.getLong("id"), o.getString("label"))
                 "UpdateItem" -> UpdateItem(itemFrom(o.getJSONObject("item")), o.getBoolean("disables"))
                 "RemoveSchedule" -> RemoveSchedule(o.getLong("id"), o.getString("name"))
@@ -128,6 +139,7 @@ sealed class ProtectedChange(val kind: Loosening) {
                 "LoosenAllow" -> LoosenAllow(AllowEdit.fromJson(o.getJSONObject("edit")))
                 "ShortenBlockUntil" -> ShortenBlockUntil(o.getLong("endsAt"))
                 "SetListSpan" -> SetListSpan(o.getString("id"), o.getString("name"), o.optLongOrNull("from"), o.optLongOrNull("until"))
+                "OwnerPolicyOff" -> OwnerPolicyOff(OwnerPolicy.valueOf(o.getString("policy")))
                 else -> null
             }
         }.getOrNull()

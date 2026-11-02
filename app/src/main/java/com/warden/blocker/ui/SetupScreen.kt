@@ -63,7 +63,7 @@ fun SetupScreen(onBack: () -> Unit) {
     Column(Modifier.fillMaxSize()) {
         SubScreenTopBar("Setup", onBack = onBack)
         Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(start = 20.dp, end = 20.dp, bottom = 20.dp)) {
-            Text("Grant these so Warden can do its job. Only accessibility is required.", style = MaterialTheme.typography.bodyMedium)
+            Text("Grant these so Warden+ can do its job. Only accessibility is required.", style = MaterialTheme.typography.bodyMedium)
             Spacer(Modifier.height(16.dp))
 
             SetupRow(

@@ -138,7 +138,7 @@ fun SettingsScreen(vm: WardenViewModel, onOpenSetup: () -> Unit) {
             Column(Modifier.fillMaxWidth().padding(16.dp)) {
                 Text("Uninstall protection", style = MaterialTheme.typography.titleMedium)
                 Text(
-                    if (adminActive) "On — Warden can't be uninstalled until you turn this off." else "Off — Warden can be uninstalled anytime.",
+                    if (adminActive) "On — Warden+ can't be uninstalled until you turn this off." else "Off — Warden+ can be uninstalled anytime.",
                     style = MaterialTheme.typography.bodySmall,
                 )
                 Spacer(Modifier.height(8.dp))

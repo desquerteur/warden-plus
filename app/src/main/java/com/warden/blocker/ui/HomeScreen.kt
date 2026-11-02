@@ -56,12 +56,12 @@ fun HomeScreen(
         Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        Text("Warden", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+        Text(stringResource(R.string.app_name), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
         if (needsSetup) {
             ElevatedCard(Modifier.fillMaxWidth().clickable { onOpenSetup() }) {
                 Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text("Finish setup", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                    Text("Grant accessibility so Warden can block apps and feeds. Tap to fix.", style = MaterialTheme.typography.bodySmall)
+                    Text("Grant accessibility so Warden+ can block apps and feeds. Tap to fix.", style = MaterialTheme.typography.bodySmall)
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                         Text(stringResource(R.string.accessibility_help_hint), style = MaterialTheme.typography.bodySmall)
                     }
@@ -96,7 +96,7 @@ fun HomeScreen(
                     )
                 }
                 Text(
-                    "Turning this on starts a local, on-device VPN that filters DNS. Warden adds no " +
+                    "Turning this on starts a local, on-device VPN that filters DNS. Warden+ adds no " +
                         "servers of its own — allowed lookups go to your normal DNS resolver.",
                     style = MaterialTheme.typography.bodySmall,
                 )
@@ -110,7 +110,7 @@ fun HomeScreen(
                     Spacer(Modifier.height(0.dp))
                     Column(Modifier.padding(start = 16.dp)) {
                         Text("$streak-day focus streak", style = MaterialTheme.typography.titleLarge)
-                        Text("Keep Warden on each day to grow it.", style = MaterialTheme.typography.bodySmall)
+                        Text("Keep Warden+ on each day to grow it.", style = MaterialTheme.typography.bodySmall)
                     }
                 }
             }

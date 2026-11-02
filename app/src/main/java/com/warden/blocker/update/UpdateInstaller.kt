@@ -129,7 +129,7 @@ object UpdateInstaller {
         val pm = context.packageManager
         val archive = archiveInfo(pm, apk) ?: throw UpdateException("The downloaded file isn't a valid app.")
         if (archive.packageName != context.packageName) {
-            throw UpdateException("The downloaded app isn't Warden (${archive.packageName}).")
+            throw UpdateException("The downloaded app isn't Warden+ (${archive.packageName}).")
         }
         val installed = installedInfo(pm, context.packageName)
         if (PackageInfoCompat.getLongVersionCode(archive) < PackageInfoCompat.getLongVersionCode(installed)) {
@@ -140,7 +140,7 @@ object UpdateInstaller {
         if (newSigners != signerDigests(installed)) {
             throw UpdateException(
                 "This update is signed with a different key than the installed app (for example a debug " +
-                    "build). Uninstall Warden once, then install the new version from GitHub. " +
+                    "build). Uninstall Warden+ once, then install the new version from GitHub. " +
                     "After that, updates work from here.",
                 needsUninstall = true,
             )
@@ -185,7 +185,7 @@ object UpdateInstaller {
     /** Human-readable text for a failed install session. */
     fun failureMessage(status: Int, systemMessage: String?): String = when (status) {
         PackageInstaller.STATUS_FAILURE_CONFLICT ->
-            "The update conflicts with the installed app (different signature?). Uninstall Warden once, then install the new version from GitHub."
+            "The update conflicts with the installed app (different signature?). Uninstall Warden+ once, then install the new version from GitHub."
         PackageInstaller.STATUS_FAILURE_STORAGE -> "Not enough storage space to install the update."
         PackageInstaller.STATUS_FAILURE_INCOMPATIBLE -> "This update isn't compatible with your device."
         PackageInstaller.STATUS_FAILURE_INVALID -> "The update file is invalid. Try downloading it again."

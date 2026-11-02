@@ -114,7 +114,7 @@ fun UpdateSection(modifier: Modifier = Modifier, vm: UpdateViewModel = viewModel
                 }
                 is UpdateUiState.NeedsPermission -> {
                     Text(
-                        "To install updates, allow Warden to install apps. Turn on “Allow from this source”, then come back.",
+                        "To install updates, allow Warden+ to install apps. Turn on “Allow from this source”, then come back.",
                         style = MaterialTheme.typography.bodyMedium,
                     )
                     Button(
@@ -143,7 +143,7 @@ fun UpdateSection(modifier: Modifier = Modifier, vm: UpdateViewModel = viewModel
                 }
                 is UpdateUiState.Installing -> {
                     Text(
-                        "Installing ${s.release.version}… Confirm in the system dialog. Warden restarts when it's done.",
+                        "Installing ${s.release.version}… Confirm in the system dialog. Warden+ restarts when it's done.",
                         style = MaterialTheme.typography.bodyMedium,
                     )
                     LinearProgressIndicator(Modifier.fillMaxWidth())

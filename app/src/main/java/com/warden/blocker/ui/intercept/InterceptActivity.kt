@@ -137,7 +137,7 @@ class InterceptActivity : ComponentActivity() {
 private fun FeatureBlockScreen(featureLabel: String?, onHome: () -> Unit) {
     CenteredMessage(
         title = "${featureLabel ?: "That feed"} is off-limits",
-        body = "Warden is keeping you out of ${featureLabel ?: "this feed"}. The rest of the app still works — just not the endless scroll.",
+        body = "Warden+ is keeping you out of ${featureLabel ?: "this feed"}. The rest of the app still works — just not the endless scroll.",
         onHome = onHome,
     )
 }
@@ -203,8 +203,8 @@ private fun PauseScreen(item: BlockedItem, onContinue: (Int) -> Unit, onCancel: 
 @Composable
 private fun HardBlockScreen(item: BlockedItem?, onHome: () -> Unit) {
     CenteredMessage(
-        title = "Blocked by Warden",
-        body = item?.let { "You asked Warden to keep you off ${it.label}. The urge passes — you've got this." }
+        title = "Blocked by Warden+",
+        body = item?.let { "You asked Warden+ to keep you off ${it.label}. The urge passes — you've got this." }
             ?: "This is blocked right now.",
         onHome = onHome,
     )

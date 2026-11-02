@@ -533,7 +533,7 @@ private fun PermissionCard() {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text("See where your time goes", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
             Text(
-                "Warden needs \"Usage access\" to show screen time, unlocks and your top apps. " +
+                "Warden+ needs \"Usage access\" to show screen time, unlocks and your top apps. " +
                     "Everything stays on this phone.",
                 style = MaterialTheme.typography.bodyMedium,
             )

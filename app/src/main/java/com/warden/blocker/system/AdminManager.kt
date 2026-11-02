@@ -19,7 +19,7 @@ object AdminManager {
             .putExtra(DevicePolicyManager.EXTRA_DEVICE_ADMIN, component(context))
             .putExtra(
                 DevicePolicyManager.EXTRA_ADD_EXPLANATION,
-                "Warden uses device admin only to stop itself being uninstalled while blocking " +
+                "Warden+ uses device admin only to stop itself being uninstalled while blocking " +
                     "is active. It cannot read your data, messages, or control your device.",
             )
 

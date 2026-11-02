@@ -6,6 +6,7 @@ import android.os.Build
 import android.service.quicksettings.Tile
 import android.service.quicksettings.TileService
 import com.warden.blocker.MainActivity
+import com.warden.blocker.R
 import com.warden.blocker.vpn.VpnController
 import com.warden.blocker.wardenContainer
 import kotlinx.coroutines.CoroutineScope
@@ -74,7 +75,7 @@ class WardenTileService : TileService() {
         val enabled = applicationContext.wardenContainer.settings.masterEnabled.first()
         qsTile?.apply {
             state = if (enabled) Tile.STATE_ACTIVE else Tile.STATE_INACTIVE
-            label = "Warden"
+            label = getString(R.string.app_name)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 subtitle = if (enabled) "Blocking on" else "Off"
             }

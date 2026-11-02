@@ -86,6 +86,8 @@ android {
         compose = true
         buildConfig = true // for BuildConfig.DEBUG (FLAG_SECURE only in release)
     }
+    // The exported Room schemas, for MigrationTestHelper in androidTest.
+    sourceSets.getByName("androidTest").assets.srcDir("$projectDir/schemas")
 }
 
 // Every release must be signed with the same key, or installed apps can't be updated. Fail
@@ -136,6 +138,7 @@ dependencies {
 
     testImplementation(libs.junit)
     testImplementation(libs.json) // real org.json for JVM tests (android.jar only has stubs)
+    androidTestImplementation(libs.androidx.room.testing) // MigrationTestHelper for the Room migration tests
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
 }

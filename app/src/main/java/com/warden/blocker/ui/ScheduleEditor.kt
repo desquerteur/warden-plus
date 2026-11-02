@@ -43,6 +43,8 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogProperties
 import com.warden.blocker.data.Schedule
+import com.warden.blocker.ui.times.DateRangeSection
+import com.warden.blocker.ui.times.dateRangeValid
 
 // Two letters so Tue/Thu and Sat/Sun are distinguishable.
 private val DAY_SHORT = listOf("Mo", "Tu", "We", "Th", "Fr", "Sa", "Su")
@@ -63,6 +65,9 @@ fun ScheduleEditorDialog(initial: Schedule?, onSave: (Schedule) -> Unit, onDismi
     var endPicked by remember { mutableStateOf(initial != null) }
     var picking by remember { mutableStateOf<String?>(null) } // "start" | "end" | null
     val is24Hour = DateFormat.is24HourFormat(LocalContext.current)
+    // Optional "valid from … until …" dates (epoch days).
+    var fromDay by remember { mutableStateOf(initial?.validFromDay) }
+    var untilDay by remember { mutableStateOf(initial?.validUntilDay) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -72,11 +77,12 @@ fun ScheduleEditorDialog(initial: Schedule?, onSave: (Schedule) -> Unit, onDismi
         modifier = Modifier.padding(horizontal = 16.dp).fillMaxWidth(),
         confirmButton = {
             TextButton(
-                enabled = name.isNotBlank() && daysMask != 0,
+                enabled = name.isNotBlank() && daysMask != 0 && dateRangeValid(fromDay, untilDay),
                 onClick = {
                     onSave(
                         (initial ?: Schedule(name = "", daysMask = 0, startMinute = 0, endMinute = 0)).copy(
                             name = name.trim(), daysMask = daysMask, startMinute = start, endMinute = end,
+                            validFromDay = fromDay, validUntilDay = untilDay,
                         ),
                     )
                     onDismiss()
@@ -127,6 +133,7 @@ fun ScheduleEditorDialog(initial: Schedule?, onSave: (Schedule) -> Unit, onDismi
                 if (end <= start) {
                     Text("Ends next day (overnight window)", style = MaterialTheme.typography.bodySmall)
                 }
+                DateRangeSection(fromDay, untilDay) { f, u -> fromDay = f; untilDay = u }
             }
         },
     )

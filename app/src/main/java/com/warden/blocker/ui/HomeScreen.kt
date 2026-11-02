@@ -46,6 +46,7 @@ import com.warden.blocker.data.BlockType
 import com.warden.blocker.data.Schedule
 import com.warden.blocker.system.AccessibilityAlert
 import com.warden.blocker.ui.stats.shownFocusStreak
+import com.warden.blocker.ui.times.BlockUntilCard
 import com.warden.blocker.util.PermissionsHelper
 import com.warden.blocker.vpn.VpnController
 import com.warden.blocker.vpn.WardenVpnService
@@ -178,6 +179,8 @@ fun HomeScreen(
         }
         PendingChangesCard(vm)
         FocusCard(focusEndsAt = focusEndsAt, strict = focusStrict, onStart = onStartFocus, onCancel = onCancelFocus)
+        // "Block until …" — saved first, then the same VPN start (and consent) as a retry.
+        BlockUntilCard(focusEndsAt = focusEndsAt, focusStrict = focusStrict, onStarted = onRetryVpn)
         if (shownFocusStreak(streak, focusSessions) > 0) {
             ElevatedCard(Modifier.fillMaxWidth()) {
                 Row(Modifier.fillMaxWidth().padding(20.dp), verticalAlignment = Alignment.CenterVertically) {

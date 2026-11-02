@@ -24,6 +24,10 @@ enum class InterceptMode { BLOCK, PAUSE }
  * - [openLimitPerDay]: max temporary-access grants per day (0 = unlimited).
  * - [dailyLimitMinutes]: max foreground minutes/day before it hard-blocks (0 = unlimited).
  * - [cooldownMinutes]: minimum minutes between grants (0 = none).
+ *
+ * [activeFrom]/[activeUntil] (epoch millis, null = open-ended) limit when the entry blocks at
+ * all: "block until Sunday 18:00" or "only from Monday 08:00". Outside that span it counts as
+ * switched off, without touching [enabled].
  */
 @Entity(tableName = "blocked_items")
 data class BlockedItem(
@@ -39,6 +43,8 @@ data class BlockedItem(
     val openLimitPerDay: Int = 0,
     val dailyLimitMinutes: Int = 0,
     val cooldownMinutes: Int = 0,
+    val activeFrom: Long? = null,
+    val activeUntil: Long? = null,
 )
 
 /**
@@ -46,6 +52,11 @@ data class BlockedItem(
  * [daysMask] is a 7-bit mask, bit 0 = Monday … bit 6 = Sunday.
  * [startMinute]/[endMinute] are minutes-since-midnight. If end <= start the window
  * wraps past midnight.
+ *
+ * A one-time block sets [onceStartAt]/[onceEndAt] (epoch millis, may span several days); the
+ * weekly fields are then ignored (days 0). A weekly schedule may be limited to the local dates
+ * [validFromDay]..[validUntilDay] (epoch days, inclusive, null = open-ended); a window that
+ * wraps past midnight belongs to the day it starts on.
  */
 @Entity(tableName = "schedules")
 data class Schedule(
@@ -55,6 +66,10 @@ data class Schedule(
     val daysMask: Int,
     val startMinute: Int,
     val endMinute: Int,
+    val onceStartAt: Long? = null,
+    val onceEndAt: Long? = null,
+    val validFromDay: Long? = null,
+    val validUntilDay: Long? = null,
 )
 
 /**

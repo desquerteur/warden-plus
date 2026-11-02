@@ -18,7 +18,7 @@ class Converters {
 
 @Database(
     entities = [BlockedItem::class, Schedule::class, AccessGrant::class],
-    version = 2,
+    version = 3,
     exportSchema = true,
 )
 @TypeConverters(Converters::class)
@@ -52,6 +52,26 @@ abstract class WardenDatabase : RoomDatabase() {
             }
         }
 
+        /**
+         * v2 → v3: optional times — a validity span per blocklist entry, one-time blocks and a
+         * date range for weekly schedules. Every new column is nullable (null = no limit), so
+         * existing entries and schedules keep working exactly as before.
+         */
+        val MIGRATION_2_3_SQL = listOf(
+            "ALTER TABLE blocked_items ADD COLUMN activeFrom INTEGER",
+            "ALTER TABLE blocked_items ADD COLUMN activeUntil INTEGER",
+            "ALTER TABLE schedules ADD COLUMN onceStartAt INTEGER",
+            "ALTER TABLE schedules ADD COLUMN onceEndAt INTEGER",
+            "ALTER TABLE schedules ADD COLUMN validFromDay INTEGER",
+            "ALTER TABLE schedules ADD COLUMN validUntilDay INTEGER",
+        )
+
+        val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                MIGRATION_2_3_SQL.forEach { db.execSQL(it) }
+            }
+        }
+
         fun get(context: Context): WardenDatabase =
             instance ?: synchronized(this) {
                 instance ?: Room.databaseBuilder(
@@ -59,7 +79,7 @@ abstract class WardenDatabase : RoomDatabase() {
                     WardenDatabase::class.java,
                     "warden.db",
                 )
-                    .addMigrations(MIGRATION_1_2)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
                     // Only wipe on a downgrade (dev rollback); real upgrades migrate cleanly.
                     .fallbackToDestructiveMigrationOnDowngrade()
                     .build()

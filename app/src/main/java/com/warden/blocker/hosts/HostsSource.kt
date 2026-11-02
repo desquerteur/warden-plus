@@ -5,6 +5,7 @@ package com.warden.blocker.hosts
  * (`filesDir/hostlists/<id>.txt`, one per line); this is just the metadata.
  *
  * @param url https source for downloadable lists, null for files picked from the phone.
+ * @param activeFrom/activeUntil epoch millis the list blocks from / until (null = no limit).
  */
 data class HostsSource(
     val id: String,
@@ -14,6 +15,8 @@ data class HostsSource(
     val domainCount: Int = 0,
     val updatedAt: Long = 0L,
     val lastError: String? = null,
+    val activeFrom: Long? = null,
+    val activeUntil: Long? = null,
 )
 
 /** Progress of a running import, for the UI. [totalBytes] is -1 when unknown. */

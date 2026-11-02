@@ -155,6 +155,8 @@ class WardenVpnService : VpnService() {
         while (true) {
             val focusEndsAt = runCatching { c.settings.focusEndsAt.first() }.getOrDefault(0L)
             delay(BlockStateClock.delayUntilNextCheck(System.currentTimeMillis(), focusEndsAt))
+            // An entry or hosts list with a "from … / until …" span started or stopped blocking.
+            if (runCatching { c.blockEngine.timedContentChanged() }.getOrDefault(false)) refreshBlocklist()
             val active = runCatching { c.blockEngine.isBlockingActiveNow() }.getOrNull() ?: continue
             // Website "Allow only" limited to schedules/focus can start or end while blocking stays on.
             val allowOnlyFlipped = active && runCatching { c.allowGate.webModeStale() }.getOrDefault(false)

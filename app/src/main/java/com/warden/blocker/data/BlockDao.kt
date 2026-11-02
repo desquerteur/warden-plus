@@ -18,6 +18,9 @@ interface BlockDao {
     @Query("SELECT * FROM blocked_items WHERE type = :type AND enabled = 1")
     suspend fun enabledItemsOfType(type: BlockType): List<BlockedItem>
 
+    @Query("SELECT * FROM blocked_items WHERE enabled = 1 AND (activeFrom IS NOT NULL OR activeUntil IS NOT NULL) ORDER BY id")
+    suspend fun enabledTimedItems(): List<BlockedItem>
+
     @Query("SELECT * FROM blocked_items WHERE type = :type AND value = :value LIMIT 1")
     suspend fun itemByValue(type: BlockType, value: String): BlockedItem?
 

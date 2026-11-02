@@ -161,6 +161,19 @@ class ProtectionGuard(private val context: Context, private val c: AppContainer)
                 ProtectedChange.Setting.BLOCK_NOTIFICATIONS -> s.setBlockNotifications(false)
             }
             is ProtectedChange.LoosenAllow -> c.allowStore.update(change.edit::applyTo)
+            is ProtectedChange.ShortenBlockUntil -> {
+                val now = System.currentTimeMillis()
+                // Only while that block still runs; queued in "Delay", it may have ended (or been replaced) by now.
+                val endsAt = s.focusEndsAt.first()
+                if (endsAt > now && change.endsAt < endsAt) {
+                    if (change.endsAt <= now) apply(ProtectedChange.EndFocus)
+                    else {
+                        s.startFocus(change.endsAt, s.focusStrict.first())
+                        FocusEndWorker.schedule(context, change.endsAt - now)
+                    }
+                }
+            }
+            is ProtectedChange.SetListSpan -> c.hostsLists.setActiveSpan(change.listId, change.from, change.until)
             is ProtectedChange.SetProtection -> s.setProtection(change.settings)
             ProtectedChange.DisableUninstallProtection -> AdminManager.disable(context)
             is ProtectedChange.ChangePin -> s.setPin(change.hash, change.salt)

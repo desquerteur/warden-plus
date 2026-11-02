@@ -175,7 +175,7 @@ class WardenViewModel(app: Application) : AndroidViewModel(app) {
 
     /** New apps default to a mindful PAUSE (ScreenZen-style), not a hard block. */
     fun addApp(packageName: String, label: String) = viewModelScope.launch {
-        if (container.repository.appItem(packageName) != null) return@launch
+        if (container.repository.findApp(packageName) != null) return@launch
         _justAdded.value = container.repository.addItem(
             BlockedItem(
                 type = BlockType.APP,

@@ -25,6 +25,8 @@ enum class Loosening {
     REMOVE_PIN,
     /** "Allow only" back to the block list, adding to an allow list, a category off, "not a game" … */
     LOOSEN_ALLOW,
+    /** "Block until …" ended sooner, or a hosts list's "from … / until …" span shortened. */
+    SHORTEN_TIMES,
 }
 
 /**
@@ -106,6 +108,7 @@ object BlockProtection {
     /** True when [updated] blocks [old] less: on → off, hard block → pause, a shorter pause or looser limits. */
     fun itemEditLoosens(old: BlockedItem, updated: BlockedItem): Boolean {
         if (old.enabled && !updated.enabled) return true
+        if (TimeWindows.itemTimesLoosen(old, updated)) return true // a later "from" or an earlier "until"
         if (old.interceptMode == InterceptMode.BLOCK && updated.interceptMode != InterceptMode.BLOCK) return true
         if (updated.interceptMode == InterceptMode.BLOCK) return false // limits don't apply to a hard block
         return updated.pauseSeconds < old.pauseSeconds ||
@@ -119,11 +122,15 @@ object BlockProtection {
         old > 0 && (new == 0 || new > old)
 
     /**
-     * True when [updated] could block less than [old]: switched off, a day dropped or the times
-     * moved. Renaming or adding days is fine.
+     * True when [updated] could block less than [old]: switched off, a day dropped, the times
+     * moved, a one-time block shortened or a date range narrowed (see [TimeWindows.scheduleTimesLoosen]).
+     * Renaming, adding days or extending is fine.
      */
-    fun scheduleEditLoosens(old: Schedule, updated: Schedule): Boolean {
+    fun scheduleEditLoosens(old: Schedule, updated: Schedule, now: Long = System.currentTimeMillis()): Boolean {
         if (old.enabled && !updated.enabled) return true
+        if (TimeWindows.scheduleTimesLoosen(old, updated, now)) return true
+        // A one-time block only has its start and end; its weekday/clock fields mean nothing.
+        if (TimeWindows.isOnce(old)) return false
         if (old.daysMask and updated.daysMask.inv() != 0) return true
         return old.startMinute != updated.startMinute || old.endMinute != updated.endMinute
     }

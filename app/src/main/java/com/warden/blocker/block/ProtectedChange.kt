@@ -32,6 +32,11 @@ sealed class ProtectedChange(val kind: Loosening) {
     data object RemovePin : ProtectedChange(Loosening.REMOVE_PIN)
     /** A loosening of "Allow only" or the category blocks (see [com.warden.blocker.allow.AllowPolicy.loosenings]). */
     data class LoosenAllow(val edit: AllowEdit) : ProtectedChange(Loosening.LOOSEN_ALLOW)
+    /** "Block until …" moved to an earlier end ([endsAt] in the past or now ends it). */
+    data class ShortenBlockUntil(val endsAt: Long) : ProtectedChange(Loosening.SHORTEN_TIMES)
+    /** A hosts list's "from … / until …" span made shorter (null = no limit). */
+    data class SetListSpan(val listId: String, val name: String, val from: Long?, val until: Long?) :
+        ProtectedChange(Loosening.SHORTEN_TIMES)
 
     enum class Setting(val label: String) { ALWAYS_ON("Always on"), BLOCK_DOH("Block DNS-over-HTTPS"), BLOCK_NOTIFICATIONS("Block notifications") }
 
@@ -52,6 +57,8 @@ sealed class ProtectedChange(val kind: Loosening) {
         is ChangePin -> "Your PIN will change"
         RemovePin -> "Your PIN will be removed"
         is LoosenAllow -> edit.describe()
+        is ShortenBlockUntil -> "The block will end sooner"
+        is SetListSpan -> "List “$name” will be blocked for less time"
     }
 
     /** Stable names (not class names, which a minified build would rename). */
@@ -71,6 +78,8 @@ sealed class ProtectedChange(val kind: Loosening) {
         is ChangePin -> "ChangePin"
         RemovePin -> "RemovePin"
         is LoosenAllow -> "LoosenAllow"
+        is ShortenBlockUntil -> "ShortenBlockUntil"
+        is SetListSpan -> "SetListSpan"
     }
 
     fun toJson(): JSONObject = JSONObject().put("type", typeName()).also { o ->
@@ -88,6 +97,8 @@ sealed class ProtectedChange(val kind: Loosening) {
                 .put("delay", settings.delayMinutes).put("until", settings.lockedUntil)
             is ChangePin -> o.put("hash", hash).put("salt", salt)
             is LoosenAllow -> o.put("edit", edit.toJson())
+            is ShortenBlockUntil -> o.put("endsAt", endsAt)
+            is SetListSpan -> o.put("id", listId).put("name", name).putOpt("from", from).putOpt("until", until)
         }
     }
 
@@ -112,6 +123,8 @@ sealed class ProtectedChange(val kind: Loosening) {
                 )
                 "ChangePin" -> ChangePin(o.getString("hash"), o.getString("salt"))
                 "LoosenAllow" -> LoosenAllow(AllowEdit.fromJson(o.getJSONObject("edit")))
+                "ShortenBlockUntil" -> ShortenBlockUntil(o.getLong("endsAt"))
+                "SetListSpan" -> SetListSpan(o.getString("id"), o.getString("name"), o.optLongOrNull("from"), o.optLongOrNull("until"))
                 else -> null
             }
         }.getOrNull()
@@ -121,6 +134,7 @@ sealed class ProtectedChange(val kind: Loosening) {
             .put("enabled", i.enabled).put("createdAt", i.createdAt).put("mode", i.interceptMode.name)
             .put("pause", i.pauseSeconds).put("prompt", i.customPrompt ?: JSONObject.NULL)
             .put("opens", i.openLimitPerDay).put("minutes", i.dailyLimitMinutes).put("cooldown", i.cooldownMinutes)
+            .putOpt("from", i.activeFrom).putOpt("until", i.activeUntil)
 
         private fun itemFrom(o: JSONObject) = BlockedItem(
             id = o.getLong("id"), type = BlockType.valueOf(o.getString("type")), value = o.getString("value"),
@@ -128,16 +142,25 @@ sealed class ProtectedChange(val kind: Loosening) {
             interceptMode = InterceptMode.valueOf(o.getString("mode")), pauseSeconds = o.getInt("pause"),
             customPrompt = if (o.isNull("prompt")) null else o.getString("prompt"),
             openLimitPerDay = o.getInt("opens"), dailyLimitMinutes = o.getInt("minutes"), cooldownMinutes = o.getInt("cooldown"),
+            // Missing in changes queued by 0.2.4: no span.
+            activeFrom = o.optLongOrNull("from"), activeUntil = o.optLongOrNull("until"),
         )
 
         private fun scheduleJson(s: Schedule) = JSONObject()
             .put("id", s.id).put("name", s.name).put("enabled", s.enabled)
             .put("days", s.daysMask).put("start", s.startMinute).put("end", s.endMinute)
+            .putOpt("onceStart", s.onceStartAt).putOpt("onceEnd", s.onceEndAt)
+            .putOpt("validFrom", s.validFromDay).putOpt("validUntil", s.validUntilDay)
 
         private fun scheduleFrom(o: JSONObject) = Schedule(
             id = o.getLong("id"), name = o.getString("name"), enabled = o.getBoolean("enabled"),
             daysMask = o.getInt("days"), startMinute = o.getInt("start"), endMinute = o.getInt("end"),
+            onceStartAt = o.optLongOrNull("onceStart"), onceEndAt = o.optLongOrNull("onceEnd"),
+            validFromDay = o.optLongOrNull("validFrom"), validUntilDay = o.optLongOrNull("validUntil"),
         )
+
+        /** putOpt skips nulls, so absent = null (also for entries written before the field existed). */
+        private fun JSONObject.optLongOrNull(key: String): Long? = if (has(key) && !isNull(key)) getLong(key) else null
     }
 }
 

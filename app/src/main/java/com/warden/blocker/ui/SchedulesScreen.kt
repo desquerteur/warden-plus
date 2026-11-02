@@ -33,15 +33,22 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.warden.blocker.block.TimeWindows
 import com.warden.blocker.data.Schedule
+import com.warden.blocker.ui.times.OnceBlockDialog
+import com.warden.blocker.ui.times.scheduleLine
+import java.time.ZoneId
 
 @Composable
 fun SchedulesScreen(vm: WardenViewModel) {
     val schedules by vm.schedules.collectAsStateWithLifecycle()
     var editing by remember { mutableStateOf<Schedule?>(null) }
     var creating by remember { mutableStateOf(false) }
+    var creatingOnce by remember { mutableStateOf(false) }
     val listState = rememberLazyListState()
     val is24Hour = DateFormat.is24HourFormat(LocalContext.current)
+    val zone = ZoneId.systemDefault()
+    val now = System.currentTimeMillis()
     ScrollToTopOnReselect(listState)
 
     Column(Modifier.fillMaxSize().padding(20.dp)) {
@@ -50,6 +57,8 @@ fun SchedulesScreen(vm: WardenViewModel) {
         Text("With 'always-on' off, the blocklist is only enforced during these windows.", style = MaterialTheme.typography.bodyMedium)
         Spacer(Modifier.height(12.dp))
         OutlinedButton(onClick = { creating = true }, modifier = Modifier.fillMaxWidth()) { Text("+ New schedule") }
+        Spacer(Modifier.height(8.dp))
+        OutlinedButton(onClick = { creatingOnce = true }, modifier = Modifier.fillMaxWidth()) { Text("+ One-time block (date & time)") }
         Spacer(Modifier.height(16.dp))
         if (schedules.isEmpty()) {
             Text("No schedules yet. Add one, then turn off “Always on” in Settings to use them.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.outline)
@@ -60,7 +69,7 @@ fun SchedulesScreen(vm: WardenViewModel) {
                     Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
                         Column(Modifier.weight(1f)) {
                             Text(s.name, style = MaterialTheme.typography.titleMedium)
-                            Text("${clockTime(s.startMinute, is24Hour)}–${clockTime(s.endMinute, is24Hour)}  •  ${daysLabel(s.daysMask)}", style = MaterialTheme.typography.bodySmall)
+                            Text(scheduleLine(s, now, zone, is24Hour, daysLabel(s.daysMask)), style = MaterialTheme.typography.bodySmall)
                         }
                         Switch(checked = s.enabled, onCheckedChange = { vm.addSchedule(s.copy(enabled = it)) })
                         IconButton(onClick = { vm.removeSchedule(s) }) { Icon(Icons.Filled.Delete, contentDescription = "Remove") }
@@ -73,7 +82,16 @@ fun SchedulesScreen(vm: WardenViewModel) {
     if (creating) {
         ScheduleEditorDialog(initial = null, onSave = { vm.addSchedule(it) }, onDismiss = { creating = false })
     }
+    if (creatingOnce) {
+        OnceBlockDialog(initial = null, onSave = { vm.addSchedule(it) }, onDismiss = { creatingOnce = false })
+    }
     editing?.let { current ->
-        ScheduleEditorDialog(initial = current, onSave = { vm.addSchedule(it) }, onDismiss = { editing = null })
+        // Shorter one-time blocks or narrower dates ask Block protection first (in addSchedule).
+        val save: (Schedule) -> Unit = { vm.addSchedule(it) }
+        if (TimeWindows.isOnce(current)) {
+            OnceBlockDialog(initial = current, onSave = save, onDismiss = { editing = null })
+        } else {
+            ScheduleEditorDialog(initial = current, onSave = save, onDismiss = { editing = null })
+        }
     }
 }

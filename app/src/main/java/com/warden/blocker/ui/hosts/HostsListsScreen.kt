@@ -25,6 +25,7 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.FileOpen
 import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -60,6 +61,9 @@ import com.warden.blocker.hosts.HostsSource
 import com.warden.blocker.hosts.HostsTemplates
 import com.warden.blocker.hosts.ImportProgress
 import com.warden.blocker.ui.SubScreenTopBar
+import com.warden.blocker.ui.times.ListSpanDialog
+import com.warden.blocker.ui.times.SpanLabel
+import com.warden.blocker.ui.times.TimesViewModel
 import kotlinx.coroutines.launch
 import java.text.DateFormat
 import java.util.Date
@@ -76,13 +80,14 @@ fun HostsListsEntryButton(onClick: () -> Unit, modifier: Modifier = Modifier.fil
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun HostsListsScreen(onBack: () -> Unit, vm: HostsViewModel = viewModel()) {
+fun HostsListsScreen(onBack: () -> Unit, vm: HostsViewModel = viewModel(), timesVm: TimesViewModel = viewModel()) {
     val sources by vm.sources.collectAsStateWithLifecycle()
     val progress by vm.progress.collectAsStateWithLifecycle()
     val message by vm.message.collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }
     var showUrlDialog by remember { mutableStateOf(false) }
     var confirmDelete by remember { mutableStateOf<HostsSource?>(null) }
+    var timing by remember { mutableStateOf<HostsSource?>(null) }
     val busy = progress != null
 
     val pickFile = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
@@ -175,6 +180,7 @@ fun HostsListsScreen(onBack: () -> Unit, vm: HostsViewModel = viewModel()) {
                         onToggle = { vm.setEnabled(source, it) },
                         onRefresh = { vm.refresh(source) },
                         onDelete = { confirmDelete = source },
+                        onTime = { timing = source },
                     )
                 }
             }
@@ -188,6 +194,10 @@ fun HostsListsScreen(onBack: () -> Unit, vm: HostsViewModel = viewModel()) {
             onAdd = { url -> showUrlDialog = false; vm.addUrl(url) },
             onDismiss = { showUrlDialog = false },
         )
+    }
+
+    timing?.let { source ->
+        ListSpanDialog(source, onSave = { from, until -> timesVm.setListSpan(source, from, until) }, onDismiss = { timing = null })
     }
 
     confirmDelete?.let { source ->
@@ -232,6 +242,7 @@ private fun SourceCard(
     onToggle: (Boolean) -> Unit,
     onRefresh: () -> Unit,
     onDelete: () -> Unit,
+    onTime: () -> Unit,
 ) {
     Card(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(start = 16.dp, end = 8.dp, top = 12.dp, bottom = 4.dp)) {
@@ -243,6 +254,7 @@ private fun SourceCard(
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.outline,
                     )
+                    SpanLabel(source.activeFrom, source.activeUntil)
                 }
                 Switch(checked = source.enabled, onCheckedChange = onToggle)
             }
@@ -261,6 +273,9 @@ private fun SourceCard(
                     color = MaterialTheme.colorScheme.outline,
                     modifier = Modifier.weight(1f),
                 )
+                IconButton(onClick = onTime) {
+                    Icon(Icons.Filled.Schedule, contentDescription = "Time limit for ${source.name}")
+                }
                 if (source.url != null) {
                     IconButton(onClick = onRefresh, enabled = !busy) {
                         Icon(Icons.Filled.Refresh, contentDescription = "Update ${source.name}")

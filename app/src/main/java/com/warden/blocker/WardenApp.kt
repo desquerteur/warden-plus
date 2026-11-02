@@ -8,6 +8,7 @@ import com.warden.blocker.block.BlockEngine
 import com.warden.blocker.data.BlockRepository
 import com.warden.blocker.data.SettingsStore
 import com.warden.blocker.data.WardenDatabase
+import com.warden.blocker.hosts.HostsListRepository
 import com.warden.blocker.usage.UsageStatsHelper
 
 /**
@@ -43,7 +44,8 @@ class WardenApp : Application() {
 class AppContainer(app: Application) {
     val settings = SettingsStore(app)
     val repository = BlockRepository(WardenDatabase.get(app).blockDao())
-    val blockEngine = BlockEngine(repository, settings)
+    val hostsLists = HostsListRepository(app)
+    val blockEngine = BlockEngine(repository, settings) { hostsLists.activeDomainSet() }
     val accessController = AccessController(repository, blockEngine) { pkg ->
         UsageStatsHelper.todayUsageMinutesFor(app, pkg)
     }

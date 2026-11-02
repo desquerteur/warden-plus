@@ -2,6 +2,8 @@ package com.warden.blocker.block
 
 import com.warden.blocker.data.BlockRepository
 import com.warden.blocker.data.SettingsStore
+import com.warden.blocker.hosts.DomainHashSet
+import com.warden.blocker.hosts.DomainMatcher
 import kotlinx.coroutines.flow.first
 import java.util.Calendar
 
@@ -12,6 +14,8 @@ import java.util.Calendar
 class BlockEngine(
     private val repo: BlockRepository,
     private val settings: SettingsStore,
+    /** Domains from enabled imported hosts lists (see HostsListRepository), null if none. */
+    private val listDomains: suspend () -> DomainHashSet? = { null },
 ) {
     /**
      * True when blocking is enforced right now. A focus session forces it on for its
@@ -29,5 +33,11 @@ class BlockEngine(
         val domains = repo.enabledDomains().toMutableList()
         if (settings.blockDoh.first()) domains += DohHosts.ALL
         return domains
+    }
+
+    /** Everything the VPN should sinkhole right now: manual domains, DoH hosts and lists. */
+    suspend fun blocklist(): DomainMatcher {
+        if (!isBlockingActiveNow()) return DomainMatcher.EMPTY
+        return DomainMatcher(blockedDomains(), listDomains())
     }
 }

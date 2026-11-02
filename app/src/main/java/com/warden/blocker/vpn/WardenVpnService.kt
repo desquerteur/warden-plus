@@ -11,10 +11,15 @@ import androidx.core.app.NotificationCompat
 import com.warden.blocker.MainActivity
 import com.warden.blocker.R
 import com.warden.blocker.WardenApp
+import com.warden.blocker.hosts.DomainMatcher
 import com.warden.blocker.wardenContainer
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.isActive
@@ -37,7 +42,9 @@ class WardenVpnService : VpnService() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var loopJob: Job? = null
 
-    @Volatile private var blockedDomains: Set<String> = emptySet()
+    private var watchJob: Job? = null
+
+    @Volatile private var blocklist: DomainMatcher = DomainMatcher.EMPTY
 
     /** The device's real DNS resolvers, captured before the tunnel takes over the active
      *  network. We forward non-blocked queries here so Warden never redirects your DNS to a
@@ -78,10 +85,24 @@ class WardenVpnService : VpnService() {
             refreshBlocklist()
             runPacketLoop(tunnel!!)
         }
+        watchJob = scope.launch { watchBlocklistChanges() }
     }
 
     private suspend fun refreshBlocklist() {
-        blockedDomains = wardenContainer.blockEngine.blockedDomains().toSet()
+        blocklist = runCatching { wardenContainer.blockEngine.blocklist() }
+            .onFailure { Log.e(TAG, "Blocklist refresh failed", it) }
+            .getOrDefault(blocklist)
+    }
+
+    /** Reload when the manual list, an imported hosts list or the DoH switch changes, so
+     *  edits take effect immediately without restarting the tunnel. */
+    @OptIn(FlowPreview::class)
+    private suspend fun watchBlocklistChanges() {
+        val c = wardenContainer
+        combine(c.repository.items, c.hostsLists.activeKey, c.settings.blockDoh) { _, _, _ -> }
+            .drop(1) // the initial values are covered by the refresh before the packet loop
+            .debounce(300)
+            .collect { refreshBlocklist() }
     }
 
     private fun runPacketLoop(pfd: ParcelFileDescriptor) {
@@ -112,8 +133,7 @@ class WardenVpnService : VpnService() {
     }
 
     /** A domain is blocked if it equals or is a subdomain of any blocked entry. */
-    private fun isBlocked(host: String): Boolean =
-        blockedDomains.any { host == it || host.endsWith(".$it") }
+    private fun isBlocked(host: String): Boolean = blocklist.isBlocked(host)
 
     /**
      * Forward one DNS query to the device's resolver and write the reply back into the tun.
@@ -192,8 +212,11 @@ class WardenVpnService : VpnService() {
     private fun stopTunnel() {
         running = false
         loopJob?.cancel()
+        watchJob?.cancel()
         runCatching { tunnel?.close() }
         tunnel = null
+        blocklist = DomainMatcher.EMPTY
+        wardenContainer.hostsLists.releaseCache()
     }
 
     private fun buildNotification(): Notification {
@@ -214,6 +237,7 @@ class WardenVpnService : VpnService() {
         running = false
         scope.cancel()
         runCatching { tunnel?.close() }
+        wardenContainer.hostsLists.releaseCache()
         super.onDestroy()
     }
 

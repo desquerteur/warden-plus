@@ -74,7 +74,7 @@ fun BlockUntilCard(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Checkbox(checked = strict, onCheckedChange = null)
-                    Text("Strict (no early end)", style = MaterialTheme.typography.bodyMedium)
+                    Text("Strict (no early end)", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(start = 8.dp))
                 }
                 // Wraps on narrow screens (320dp fold cover display) instead of cutting buttons off.
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {

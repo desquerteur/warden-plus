@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -54,7 +55,8 @@ fun ItemEditorSheet(item: BlockedItem, onSave: (BlockedItem) -> Unit, onDismiss:
     // Fully open at once: half open, "Save" sat below the screen edge on a 344 dp cover display
     // and Back threw the change away unnoticed (M2).
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
+    // Fully open it would reach under the status bar, drag handle and all (N12): stop below it.
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState, modifier = Modifier.statusBarsPadding()) {
         Column(Modifier.fillMaxWidth()) {
             Column(
                 // Scrolls: with the time limit the sheet is taller than a fold cover display. The

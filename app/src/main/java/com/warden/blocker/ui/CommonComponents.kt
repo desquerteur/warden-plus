@@ -62,7 +62,7 @@ internal fun FocusCard(focusEndsAt: Long, strict: Boolean, onStart: (Int, Boolea
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Checkbox(checked = strictChoice, onCheckedChange = null)
-                    Text("Strict (no early exit)", style = MaterialTheme.typography.bodyMedium)
+                    Text("Strict (no early exit)", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(start = 8.dp))
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     listOf(25, 50).forEach { m ->

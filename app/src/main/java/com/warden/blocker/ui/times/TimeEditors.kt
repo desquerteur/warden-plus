@@ -117,7 +117,7 @@ fun DateRangeSection(fromDay: Long?, untilDay: Long?, onChange: (Long?, Long?) -
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Checkbox(checked = on, onCheckedChange = null)
-        Text("Only on certain dates", style = MaterialTheme.typography.bodyMedium)
+        Text("Only on certain dates", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(start = 8.dp))
     }
     if (!on) return
     DateBound("Valid from", fromDay, onSet = { onChange(it, untilDay) }, onClear = { onChange(null, untilDay) })

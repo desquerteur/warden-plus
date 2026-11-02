@@ -18,7 +18,6 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
-import java.io.BufferedReader
 import java.io.File
 import java.io.FilterInputStream
 import java.io.IOException
@@ -216,7 +215,7 @@ class HostsListRepository(private val context: Context) {
                 val counted = LimitedInputStream(raw, MAX_BYTES, System.currentTimeMillis() + MAX_DURATION_MS)
                 val seen = DomainHashSet(4096)
                 var lines = 0
-                BufferedReader(InputStreamReader(counted, Charsets.UTF_8), 64 * 1024).use { reader ->
+                BoundedLineReader(InputStreamReader(counted, Charsets.UTF_8)).use { reader ->
                     tmp.bufferedWriter().use { out ->
                         while (true) {
                             val line = reader.readLine() ?: break

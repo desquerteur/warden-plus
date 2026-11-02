@@ -13,6 +13,7 @@ import com.warden.blocker.block.LimitReason
 import com.warden.blocker.feature.AppFeature
 import com.warden.blocker.feature.FeatureCatalog
 import com.warden.blocker.feature.FeatureDetector
+import com.warden.blocker.guard.SettingsGuardHook
 import com.warden.blocker.system.AccessibilityAlert
 import com.warden.blocker.system.BlockLoopAlert
 import com.warden.blocker.ui.intercept.InterceptActivity
@@ -45,6 +46,7 @@ import kotlinx.coroutines.withContext
 class AppBlockAccessibilityService : AccessibilityService() {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    private val settingsGuard by lazy { SettingsGuardHook(this) }
     private val handler = Handler(Looper.getMainLooper())
     private val gate = ForegroundGate.shared
     private val activityCache = HashMap<String, Boolean>()
@@ -65,11 +67,14 @@ class AppBlockAccessibilityService : AccessibilityService() {
         // Remembered so Home and the after-update check can say when Android switched us off.
         scope.launch { runCatching { wardenContainer.settings.markAccessibilityUsed() } }
         AccessibilityAlert.cancel(this)
+        settingsGuard.start()
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         val type = event?.eventType ?: return
         val pkg = event.packageName?.toString() ?: return
+        // Settings guard (warn only): before the foreground logic, which never looks at Settings (critical).
+        settingsGuard.onEvent(event)
 
         // Only a window *state* change can mean "another app came to the front". Content
         // changes fire constantly — also from widgets on the home screen — and never block.
@@ -226,6 +231,7 @@ class AppBlockAccessibilityService : AccessibilityService() {
     override fun onInterrupt() {}
 
     override fun onDestroy() {
+        settingsGuard.stop()
         handler.removeCallbacksAndMessages(null)
         scope.cancel()
         super.onDestroy()

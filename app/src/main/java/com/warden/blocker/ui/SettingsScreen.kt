@@ -33,6 +33,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.warden.blocker.block.ProtectionMode
+import com.warden.blocker.ui.guard.SettingsGuardSection
 import com.warden.blocker.ui.update.UpdateSection
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -140,6 +141,8 @@ fun SettingsScreen(vm: WardenViewModel, onOpenSetup: () -> Unit, onOpenProtectio
                 }
             }
         }
+
+        SettingsGuardSection()
 
         UpdateSection()
 

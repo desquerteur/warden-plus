@@ -13,6 +13,7 @@ import com.warden.blocker.block.ProtectionSettings
 import com.warden.blocker.block.ProtectionState
 import com.warden.blocker.block.Verdict
 import com.warden.blocker.data.Schedule
+import com.warden.blocker.guard.SettingsGuardStore
 import com.warden.blocker.ui.whenLabel
 import com.warden.blocker.vpn.VpnController
 import kotlinx.coroutines.Dispatchers
@@ -159,6 +160,8 @@ class ProtectionGuard(private val context: Context, private val c: AppContainer)
                 ProtectedChange.Setting.ALWAYS_ON -> s.setAlwaysOn(false)
                 ProtectedChange.Setting.BLOCK_DOH -> s.setBlockDoh(false)
                 ProtectedChange.Setting.BLOCK_NOTIFICATIONS -> s.setBlockNotifications(false)
+                ProtectedChange.Setting.SETTINGS_GUARD -> SettingsGuardStore.get(context).setEnabled(false)
+                ProtectedChange.Setting.GUARD_DATE_TIME -> SettingsGuardStore.get(context).setWatchDateTime(false)
             }
             is ProtectedChange.LoosenAllow -> c.allowStore.update(change.edit::applyTo)
             is ProtectedChange.ShortenBlockUntil -> {

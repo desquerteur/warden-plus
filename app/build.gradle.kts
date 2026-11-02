@@ -1,8 +1,37 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.ksp)
+}
+
+// Release signing: CI passes WARDEN_* environment variables (see .github/workflows/release.yml);
+// locally the values come from keystore.properties in the project root (created by
+// scripts/create-signing-key.ps1, gitignored). Debug builds never need them.
+val keystoreProperties = Properties().apply {
+    val file = rootProject.file("keystore.properties")
+    if (file.isFile) file.inputStream().use { load(it) }
+}
+
+fun signingValue(env: String, key: String): String? =
+    providers.environmentVariable(env).orNull?.takeIf { it.isNotBlank() }
+        ?: keystoreProperties.getProperty(key)?.takeIf { it.isNotBlank() }
+
+val releaseStoreFile = signingValue("WARDEN_KEYSTORE_FILE", "storeFile")?.let { rootProject.file(it) }
+val releaseStorePassword = signingValue("WARDEN_KEYSTORE_PASSWORD", "storePassword")
+val releaseKeyAlias = signingValue("WARDEN_KEY_ALIAS", "keyAlias")
+val releaseKeyPassword = signingValue("WARDEN_KEY_PASSWORD", "keyPassword")
+
+val releaseSigningProblems: List<String> = buildList {
+    when {
+        releaseStoreFile == null -> add("keystore file (WARDEN_KEYSTORE_FILE / storeFile)")
+        !releaseStoreFile.isFile -> add("keystore file not found at $releaseStoreFile")
+    }
+    if (releaseStorePassword == null) add("keystore password (WARDEN_KEYSTORE_PASSWORD / storePassword)")
+    if (releaseKeyAlias == null) add("key alias (WARDEN_KEY_ALIAS / keyAlias)")
+    if (releaseKeyPassword == null) add("key password (WARDEN_KEY_PASSWORD / keyPassword)")
 }
 
 android {
@@ -13,18 +42,37 @@ android {
         applicationId = "com.warden.blocker"
         minSdk = 26
         targetSdk = 34
-        versionCode = 1
-        versionName = "0.1.0"
+        // CI overrides both from the git tag: v1.2.3 -> versionName 1.2.3, versionCode 10203
+        // (major*10000 + minor*100 + patch). The defaults follow the same scheme.
+        versionCode = providers.gradleProperty("versionCode").orNull?.toInt() ?: 200
+        versionName = providers.gradleProperty("versionName").orNull ?: "0.2.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        // GitHub repository ("owner/name") the in-app updater checks for new releases.
+        val updateRepo = providers.gradleProperty("updateRepo").orNull ?: "desquerteur/warden-plus"
+        buildConfigField("String", "UPDATE_REPO", "\"$updateRepo\"")
+    }
+
+    signingConfigs {
+        if (releaseSigningProblems.isEmpty()) {
+            create("release") {
+                storeFile = releaseStoreFile
+                storePassword = releaseStorePassword
+                keyAlias = releaseKeyAlias
+                keyPassword = releaseKeyPassword
+            }
+        }
     }
 
     buildTypes {
         release {
-            isMinifyEnabled = true
+            // R8 is off until the minified build has been tested on devices (Room, WorkManager,
+            // reflection in the accessibility/VPN services). Re-enable once verified.
+            isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            signingConfig = signingConfigs.findByName("release")
         }
     }
     compileOptions {
@@ -40,11 +88,28 @@ android {
     }
 }
 
+// Every release must be signed with the same key, or installed apps can't be updated. Fail
+// release builds early with a clear message instead of producing an unsigned APK.
+val verifyReleaseSigning by tasks.registering {
+    // Plain String: the configuration cache can't restore Kotlin's buildList implementation.
+    val problems = releaseSigningProblems.joinToString("; ")
+    doLast {
+        if (problems.isNotEmpty()) {
+            throw GradleException(
+                "Release signing is not configured. Missing: $problems.\n" +
+                    "Run scripts/create-signing-key.ps1 (creates keystore.properties) or set the " +
+                    "WARDEN_* environment variables. See docs/RELEASING.md. Debug builds " +
+                    "(assembleDebug) don't need a key."
+            )
+        }
+    }
+}
+tasks.matching { it.name == "preReleaseBuild" }.configureEach { dependsOn(verifyReleaseSigning) }
+
 // Export Room schemas so migrations can be reviewed and (later) tested with MigrationTestHelper.
 ksp {
     arg("room.schemaLocation", "$projectDir/schemas")
 }
-
 dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
@@ -70,6 +135,7 @@ dependencies {
     debugImplementation(libs.androidx.ui.tooling)
 
     testImplementation(libs.junit)
+    testImplementation(libs.json) // real org.json for JVM tests (android.jar only has stubs)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
 }

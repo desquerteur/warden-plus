@@ -56,7 +56,7 @@ import kotlinx.coroutines.delay
 
 // Fixed geometry of the mini phone, in dp, so the finger knows where each row is.
 private const val W = 150f
-private const val H = 190f
+private const val H = 172f
 private const val BAR = 28f
 private const val ROW = 26f
 private const val DIALOG_TOP = 44f

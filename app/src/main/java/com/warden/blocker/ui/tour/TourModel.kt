@@ -116,6 +116,16 @@ object TourLogic {
         return position to (size - run.missing.count { it < size })
     }
 
+    /**
+     * Later steps on the screen that is open now whose target isn't on it: known to be missing
+     * already, so "1/4" is right from the start instead of shrinking from "1/7".
+     */
+    fun missingAhead(steps: List<TourStep>, from: Int, route: String?, isOnScreen: (String) -> Boolean): Set<Int> =
+        ((from + 1) until steps.size).filter { i ->
+            val s = steps[i]
+            s.route == route && s.target != null && s.ifMissing == MissingTarget.SKIP && !isOnScreen(s.target)
+        }.toSet()
+
     /** Where to start a tour: a half-done tour continues, anything else starts over. */
     fun startIndex(record: TourRecord, size: Int, resume: Boolean): Int =
         if (resume && record.status == TourStatus.IN_PROGRESS && record.step in 0 until size) record.step else 0

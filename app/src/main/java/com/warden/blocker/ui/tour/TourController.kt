@@ -85,6 +85,12 @@ class TourController(private val store: TourStore, private val scope: CoroutineS
         }
     }
 
+    /** Steps found missing before reaching them (see [TourLogic.missingAhead]). */
+    fun markMissing(indices: Set<Int>) {
+        val run = _run.value ?: return
+        if (!run.missing.containsAll(indices)) _run.value = run.copy(missing = run.missing + indices)
+    }
+
     fun skip() = finish(TourStatus.SKIPPED)
 
     fun dismissEmptyNotice() { _emptyNotice.value = null }

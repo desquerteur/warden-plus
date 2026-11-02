@@ -182,6 +182,9 @@ private fun TourOverlay(
 
     LaunchedEffect(run.tourId, run.index, replays) {
         phase = Phase.Finding
+        // Right after rotating/folding the NavHost hasn't restored its screen yet (route null):
+        // planning then would replay the way to a screen that is already open.
+        withTimeoutOrNull(1500) { snapshotFlow { route.value }.first { it != null } }
         val isReplay = replayRequested.also { replayRequested = false }
         if (isReplay) {
             // Back to where the way started, without animation, then show it again.
@@ -210,8 +213,14 @@ private fun TourOverlay(
         val target = step.target?.let { registry.find(it, 1500) }
         when (val display = TourLogic.display(step, target != null)) {
             StepDisplay.SKIP -> { controller.targetMissing(); return@LaunchedEffect }
-            StepDisplay.SPOTLIGHT -> { moveSpot(target!!); phase = Phase.Showing(display) }
+            // Text first, so it changes while the spotlight is still gliding over.
+            StepDisplay.SPOTLIGHT -> { phase = Phase.Showing(display); moveSpot(target!!) }
             StepDisplay.CENTER -> { spotOn = false; placeFor = null; phase = Phase.Showing(display) }
+        }
+        if (target != null) {
+            // Only once this screen has really drawn (its own target is there), and settled.
+            delay(500)
+            controller.markMissing(TourLogic.missingAhead(tour.steps, run.index, route.value, registry::isComposed))
         }
         // Keep up with the target while it moves (scrolling into view, folding, rotating).
         if (target != null) snapshotFlow { registry.rect(step.target) }.filterNotNull().collect { moveSpot(it) }
@@ -265,7 +274,7 @@ private fun TourOverlay(
             )
         }
         val (position, total) = TourLogic.progress(run, tour.steps.size)
-        CardLayout(placeFor) {
+        CardLayout(placeFor, roomy = step.guide != null && phase is Phase.Showing) {
             TourCard(
                 tour = tour,
                 step = step,
@@ -286,14 +295,18 @@ private fun TourOverlay(
 
 /** Places the guide card: a sheet on narrow screens, next to [target] on wide ones. */
 @Composable
-private fun CardLayout(target: Rect?, content: @Composable () -> Unit) {
+private fun CardLayout(target: Rect?, roomy: Boolean, content: @Composable () -> Unit) {
     Layout(content, Modifier.fillMaxSize()) { measurables, constraints ->
         val w = constraints.maxWidth
         val h = constraints.maxHeight
         val margin = 12.dp.roundToPx()
         val wide = w.toDp() >= 600.dp
+        val gap = 14.dp.toPx()
         val cardWidth = if (wide) minOf(400.dp.roundToPx(), w - 2 * margin) else w - 2 * margin
-        val maxHeight = (h * if (wide) 0.8f else 0.62f).roundToInt()
+        // A sheet takes the roomier side of the target, so it doesn't cover it; it scrolls inside.
+        // A mini settings animation needs room even if the sheet then overlaps a tall target.
+        val freeBeside = target?.let { maxOf(it.top, h - it.bottom) - gap - margin } ?: (h * 0.62f)
+        val maxHeight = if (wide) (h * 0.8f).roundToInt() else freeBeside.coerceIn(h * (if (roomy) 0.56f else 0.36f), h * 0.7f).roundToInt()
         val card = measurables.first().measure(Constraints(minWidth = cardWidth, maxWidth = cardWidth, maxHeight = maxHeight))
         val placement = placeCard(
             target,
@@ -301,7 +314,7 @@ private fun CardLayout(target: Rect?, content: @Composable () -> Unit) {
             Size(card.width.toFloat(), card.height.toFloat()),
             wide,
             margin.toFloat(),
-            gap = 14.dp.toPx(),
+            gap,
         )
         layout(w, h) { card.place(placement.offset.x.roundToInt(), placement.offset.y.roundToInt()) }
     }
@@ -329,8 +342,9 @@ private fun TourCard(
         shadowElevation = 10.dp,
         modifier = Modifier.semantics { paneTitle = "Guide: ${tour.title}" },
     ) {
+        // Header and buttons stay put; only the middle scrolls when space is short.
         Column(
-            Modifier.verticalScroll(rememberScrollState()).padding(start = 16.dp, end = 8.dp, top = 6.dp, bottom = 12.dp),
+            Modifier.padding(start = 16.dp, end = 8.dp, top = 6.dp, bottom = 12.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -343,38 +357,45 @@ private fun TourCard(
                 TextButton(onClick = onSkip) { Text("Skip") }
             }
             Column(
-                Modifier.padding(end = 8.dp).semantics { liveRegion = LiveRegionMode.Polite },
-                verticalArrangement = Arrangement.spacedBy(6.dp),
+                Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                when (phase) {
-                    is Phase.Path -> {
-                        Text("This is how you get there", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, modifier = Modifier.semantics { heading() })
-                        Text(phase.hop.hint, style = MaterialTheme.typography.bodyMedium)
+                Column(
+                    Modifier.padding(end = 8.dp).semantics { liveRegion = LiveRegionMode.Polite },
+                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    when (phase) {
+                        is Phase.Path -> {
+                            Text("This is how you get there", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, modifier = Modifier.semantics { heading() })
+                            Text(phase.hop.hint, style = MaterialTheme.typography.bodyMedium)
+                        }
+                        Phase.Finding -> Text("…", style = MaterialTheme.typography.titleMedium)
+                        is Phase.Showing -> {
+                            Text(step.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, modifier = Modifier.semantics { heading() })
+                            Text(step.text, style = MaterialTheme.typography.bodyMedium)
+                        }
                     }
-                    Phase.Finding -> Text("…", style = MaterialTheme.typography.titleMedium)
-                    is Phase.Showing -> {
-                        Text(step.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, modifier = Modifier.semantics { heading() })
-                        Text(step.text, style = MaterialTheme.typography.bodyMedium)
+                }
+                if (phase is Phase.Showing) {
+                    step.guide?.let { guide ->
+                        SettingsPathAnimation(guide, animate, Modifier.fillMaxWidth().padding(end = 8.dp))
+                        guide.note?.let {
+                            Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(end = 8.dp))
+                        }
+                    }
+                    if (canReplay) {
+                        TextButton(onClick = onReplay) {
+                            Icon(Icons.Filled.Replay, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text("Show me again")
+                        }
                     }
                 }
             }
-            if (phase is Phase.Showing) {
-                step.guide?.let { guide ->
-                    SettingsPathAnimation(guide, animate, Modifier.fillMaxWidth().padding(end = 8.dp))
-                    guide.note?.let {
-                        Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(end = 8.dp))
-                    }
-                    guide.openLabel?.let { label ->
-                        Button(onClick = { openSettingsGuide(context, guide) }, modifier = Modifier.fillMaxWidth().padding(end = 8.dp)) { Text(label) }
-                    }
-                }
-                if (canReplay) {
-                    TextButton(onClick = onReplay) {
-                        Icon(Icons.Filled.Replay, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(Modifier.width(6.dp))
-                        Text("Show me again")
-                    }
-                }
+            // The way into Android settings is the point of such a step: always in sight.
+            val openLabel = step.guide?.openLabel?.takeIf { phase is Phase.Showing }
+            if (openLabel != null) {
+                Button(onClick = { openSettingsGuide(context, step.guide) }, modifier = Modifier.fillMaxWidth().padding(end = 8.dp)) { Text(openLabel) }
             }
             Row(Modifier.fillMaxWidth().padding(end = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 if (position > 1) OutlinedButton(onClick = onBack, enabled = phase is Phase.Showing) { Text("Back") }

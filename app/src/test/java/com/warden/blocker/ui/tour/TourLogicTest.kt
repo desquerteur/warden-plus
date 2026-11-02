@@ -61,6 +61,23 @@ class TourLogicTest {
         assertEquals(1 to 6, TourLogic.progress(TourRun("t", 2, missing = setOf(0, 1)), 8))
     }
 
+    @Test fun missingAheadOnlyJudgesStepsOnTheOpenScreen() {
+        val steps = listOf(
+            step("s.a", TourRoutes.SETTINGS, "A", "a"),
+            step("s.future", TourRoutes.SETTINGS, "F", "f"),
+            step("h.x", TourRoutes.HOME, "X", "x"),
+            step("s.b", TourRoutes.SETTINGS, "B", "b"),
+            step("s.center", TourRoutes.SETTINGS, "C", "c", ifMissing = MissingTarget.CENTER),
+        )
+        val onScreen = setOf("s.a", "s.b")
+        // The Home step can't be judged from Settings; a CENTER step is never missing.
+        assertEquals(setOf(1), TourLogic.missingAhead(steps, 0, TourRoutes.SETTINGS) { it in onScreen })
+        assertEquals(emptySet<Int>(), TourLogic.missingAhead(steps, 3, TourRoutes.SETTINGS) { it in onScreen })
+        val run = TourRun("t", index = 0, missing = setOf(1))
+        assertEquals(1 to 4, TourLogic.progress(run, steps.size))
+        assertEquals(2, TourLogic.next(run, steps.size)!!.index)
+    }
+
     @Test fun startIndexResumesOnlyUnfinishedTours() {
         assertEquals(4, TourLogic.startIndex(TourRecord(TourStatus.IN_PROGRESS, 4), 8, resume = true))
         assertEquals(0, TourLogic.startIndex(TourRecord(TourStatus.IN_PROGRESS, 4), 8, resume = false))

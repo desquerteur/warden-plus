@@ -3,6 +3,8 @@ package com.warden.blocker.ui
 import android.content.Intent
 import android.provider.Settings
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -26,7 +28,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.Lifecycle
@@ -35,7 +36,7 @@ import androidx.compose.runtime.DisposableEffect
 import com.warden.blocker.util.PermissionsHelper
 
 @Composable
-fun SetupScreen() {
+fun SetupScreen(onBack: () -> Unit) {
     val context = LocalContext.current
     // Re-check statuses whenever we come back to the foreground (e.g. from system settings).
     var refresh by remember { mutableIntStateOf(0) }
@@ -53,36 +54,37 @@ fun SetupScreen() {
     val usage = PermissionsHelper.hasUsageAccess(context)
     val notifications = PermissionsHelper.hasNotifications(context)
 
-    Column(Modifier.fillMaxSize().padding(20.dp)) {
-        Text("Setup", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
-        Spacer(Modifier.height(8.dp))
-        Text("Grant these so Warden can do its job. Only accessibility is required.", style = MaterialTheme.typography.bodyMedium)
-        Spacer(Modifier.height(16.dp))
-
-        SetupRow(
-            title = "App blocking (Accessibility)",
-            subtitle = "Required — detects blocked apps and in-app feeds.",
-            granted = accessibility,
-            actionLabel = "Open",
-        ) { context.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)) }
-
-        SetupRow(
-            title = "Usage access",
-            subtitle = "For screen-time and daily time limits.",
-            granted = usage,
-            actionLabel = "Open",
-        ) { context.startActivity(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS)) }
-
-        SetupRow(
-            title = "Notifications",
-            subtitle = "Shows the ongoing 'blocking active' notice.",
-            granted = notifications,
-            actionLabel = "Open",
-        ) {
-            context.startActivity(
-                Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
-                    .putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName),
-            )
+    Column(Modifier.fillMaxSize()) {
+        SubScreenTopBar("Setup", onBack = onBack)
+        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(start = 20.dp, end = 20.dp, bottom = 20.dp)) {
+            Text("Grant these so Warden can do its job. Only accessibility is required.", style = MaterialTheme.typography.bodyMedium)
+            Spacer(Modifier.height(16.dp))
+    
+            SetupRow(
+                title = "App blocking (Accessibility)",
+                subtitle = "Required — detects blocked apps and in-app feeds.",
+                granted = accessibility,
+                actionLabel = "Open",
+            ) { context.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)) }
+    
+            SetupRow(
+                title = "Usage access",
+                subtitle = "For screen-time and daily time limits.",
+                granted = usage,
+                actionLabel = "Open",
+            ) { context.startActivity(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS)) }
+    
+            SetupRow(
+                title = "Notifications",
+                subtitle = "Shows the ongoing 'blocking active' notice.",
+                granted = notifications,
+                actionLabel = "Open",
+            ) {
+                context.startActivity(
+                    Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                        .putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName),
+                )
+            }
         }
     }
 }

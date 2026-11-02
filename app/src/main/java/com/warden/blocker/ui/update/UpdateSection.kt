@@ -53,7 +53,9 @@ fun UpdateSection(modifier: Modifier = Modifier, vm: UpdateViewModel = viewModel
     val context = LocalContext.current
     val state by vm.state.collectAsStateWithLifecycle()
     val autoCheck by vm.autoCheck.collectAsStateWithLifecycle()
-    // Collected only while visible, so the system dialog is launched from the foreground.
+    // Set only if the confirmation arrived while Warden was in the background (otherwise
+    // InstallResultReceiver opens it directly). Collected only while visible, so the system
+    // dialog is launched from the foreground.
     val confirmation by vm.pendingConfirmation.collectAsStateWithLifecycle()
 
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { vm.onResume() }

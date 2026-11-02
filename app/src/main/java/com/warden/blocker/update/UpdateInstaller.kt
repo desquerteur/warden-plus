@@ -153,7 +153,12 @@ object UpdateInstaller {
         val params = PackageInstaller.SessionParams(PackageInstaller.SessionParams.MODE_FULL_INSTALL).apply {
             setAppPackageName(context.packageName)
             setSize(apk.length())
-            if (Build.VERSION.SDK_INT >= 33) setPackageSource(PackageInstaller.PACKAGE_SOURCE_DOWNLOADED_FILE)
+            // Warden is the update channel for itself (only same-signature updates, see verify()),
+            // so it declares itself a store. With DOWNLOADED_FILE Android re-applied "restricted
+            // settings" on every update and switched the accessibility service off (emulator,
+            // Android 14: enabled_accessibility_services emptied, ACCESS_RESTRICTED_SETTINGS back
+            // to deny); with STORE both stay as they were.
+            if (Build.VERSION.SDK_INT >= 33) setPackageSource(PackageInstaller.PACKAGE_SOURCE_STORE)
         }
         val sessionId = try {
             installer.createSession(params)

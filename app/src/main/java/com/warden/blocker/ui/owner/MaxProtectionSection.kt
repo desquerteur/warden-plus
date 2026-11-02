@@ -1,9 +1,6 @@
 package com.warden.blocker.ui.owner
 
-import android.content.ActivityNotFoundException
 import android.content.Context
-import android.content.Intent
-import android.net.Uri
 import android.text.format.DateFormat
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -37,7 +34,6 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.warden.blocker.BuildConfig
 import com.warden.blocker.owner.DeviceOwnerManager
 import com.warden.blocker.owner.EmergencyExit
 import com.warden.blocker.owner.ExitStatus
@@ -45,8 +41,6 @@ import com.warden.blocker.owner.OwnerPolicy
 import com.warden.blocker.owner.title
 import kotlinx.coroutines.delay
 import java.util.Date
-
-private val GUIDE_URL = "https://github.com/${BuildConfig.UPDATE_REPO}/blob/main/docs/DEVICE_OWNER.md"
 
 /**
  * Settings card for device-owner mode ("Maximum protection"): how to set it up, a switch per
@@ -78,9 +72,12 @@ fun MaxProtectionSection(modifier: Modifier = Modifier, vm: OwnerViewModel = vie
                         fontFamily = FontFamily.Monospace,
                     )
                 }
-                OutlinedButton(onClick = { openUrl(context, GUIDE_URL) }, modifier = Modifier.fillMaxWidth()) {
+                // Inside the app: a browser link could itself be blocked by Warden+ (S3).
+                var showGuide by remember { mutableStateOf(false) }
+                OutlinedButton(onClick = { showGuide = true }, modifier = Modifier.fillMaxWidth()) {
                     Text("Step-by-step guide")
                 }
+                if (showGuide) DeviceOwnerGuideScreen(onClose = { showGuide = false })
             } else {
                 Text(
                     "On — Warden+ is the device owner. Pick the rules Android should enforce:",
@@ -219,11 +216,4 @@ private fun formatWait(ms: Long): String {
     val h = minutes / 60
     val m = minutes % 60
     return if (h > 0) "$h h $m min" else "$m min"
-}
-
-private fun openUrl(context: Context, url: String) {
-    try {
-        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
-    } catch (_: ActivityNotFoundException) {
-    }
 }

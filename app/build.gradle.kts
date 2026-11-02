@@ -108,6 +108,27 @@ val verifyReleaseSigning by tasks.registering {
 }
 tasks.matching { it.name == "preReleaseBuild" }.configureEach { dependsOn(verifyReleaseSigning) }
 
+// The device-owner guide is read inside the app (Settings › Protection › Maximum protection ›
+// Step-by-step guide), not on GitHub in a browser that may well be blocked. docs/DEVICE_OWNER.md
+// is copied into the APK's assets at build time, so app and docs never drift apart.
+abstract class DeviceOwnerGuideAsset : DefaultTask() {
+    @get:InputFile abstract val guide: RegularFileProperty
+    @get:OutputDirectory abstract val outputDir: DirectoryProperty
+
+    @TaskAction fun copy() {
+        val out = outputDir.get().asFile.apply { mkdirs() }
+        guide.get().asFile.copyTo(File(out, "DEVICE_OWNER.md"), overwrite = true)
+    }
+}
+val deviceOwnerGuideAsset = tasks.register<DeviceOwnerGuideAsset>("deviceOwnerGuideAsset") {
+    guide.set(rootProject.layout.projectDirectory.file("docs/DEVICE_OWNER.md"))
+}
+androidComponents {
+    onVariants { variant ->
+        variant.sources.assets?.addGeneratedSourceDirectory(deviceOwnerGuideAsset, DeviceOwnerGuideAsset::outputDir)
+    }
+}
+
 // Export Room schemas so migrations can be reviewed and (later) tested with MigrationTestHelper.
 ksp {
     arg("room.schemaLocation", "$projectDir/schemas")

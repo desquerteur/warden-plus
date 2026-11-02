@@ -1,5 +1,6 @@
 package com.warden.blocker.ui
 
+import android.os.Build
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -24,9 +25,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.warden.blocker.R
 import com.warden.blocker.util.PermissionsHelper
 import com.warden.blocker.vpn.WardenVpnService
 
@@ -59,6 +62,9 @@ fun HomeScreen(
                 Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text("Finish setup", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                     Text("Grant accessibility so Warden can block apps and feeds. Tap to fix.", style = MaterialTheme.typography.bodySmall)
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                        Text(stringResource(R.string.accessibility_help_hint), style = MaterialTheme.typography.bodySmall)
+                    }
                 }
             }
         } else if (enabled && !WardenVpnService.running) {

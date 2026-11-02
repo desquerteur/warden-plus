@@ -59,7 +59,7 @@ fun AppPickerScreen(vm: WardenViewModel, onBack: () -> Unit) {
                 modifier = Modifier.fillMaxWidth(),
             )
             Spacer(Modifier.height(12.dp))
-    
+
             val list = apps
             if (list == null) {
                 Row(Modifier.fillMaxWidth().padding(24.dp), horizontalArrangement = Arrangement.Center) {

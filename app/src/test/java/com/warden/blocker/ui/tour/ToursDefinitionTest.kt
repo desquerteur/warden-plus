@@ -51,11 +51,6 @@ class ToursDefinitionTest {
         }
     }
 
-    @Test fun setupTourCoversEveryAndroidSettingsGuide() {
-        val used = Tours.setup.steps.mapNotNull { it.guide }.toSet()
-        assertEquals(SettingsGuide.entries.toSet(), used)
-    }
-
     @Test fun settingsGuidesDescribeEveryTap() {
         SettingsGuide.entries.forEach { g ->
             val lines = g.instructions()

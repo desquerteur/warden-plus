@@ -1,6 +1,5 @@
 package com.warden.blocker.ui.tour
 
-import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -8,19 +7,15 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.withTimeoutOrNull
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
-import org.junit.Rule
 import org.junit.Test
-import org.junit.rules.TemporaryFolder
 
 class TourControllerTest {
-
-    @get:Rule val folder = TemporaryFolder()
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
@@ -33,14 +28,18 @@ class TourControllerTest {
         ),
     )
 
-    private fun newStore(name: String = "tours") =
-        TourStore(PreferenceDataStoreFactory.create(scope = scope) { folder.root.resolve("$name.preferences_pb") })
+    private fun newStore() = TourStore(MemoryDataStore())
 
     private fun controller(store: TourStore) = TourController(store, scope) { id -> if (id == tour.id) tour else null }
 
     @After fun tearDown() = scope.cancel()
 
-    private fun <T> await(flow: Flow<T>, until: (T) -> Boolean): T = runBlocking { withTimeout(5_000) { flow.first(until) } }
+    // Says what it saw last when the expected value never comes.
+    private fun <T> await(flow: Flow<T>, until: (T) -> Boolean): T = runBlocking {
+        var last: Any? = "nothing"
+        val found = withTimeoutOrNull(5_000) { flow.first { last = it; until(it) }.let { listOf(it) } }
+        (found ?: throw AssertionError("Timed out; last value: $last")).single()
+    }
 
     @Test fun completingSavesTheStatus() {
         val store = newStore()
@@ -107,8 +106,10 @@ class TourControllerTest {
         await(store.records) { it.isNotEmpty() }
         c.resetAll()
         await(store.pagesSeen) { it.isEmpty() }
-        assertTrue(await(store.records) { it.isEmpty() }.isEmpty())
-        await(c.records) { it != null && it.isEmpty() }
+        // Page tips follow a skipped "Getting started", so they show again.
+        val records = await(store.records) { it[Tours.GETTING_STARTED]?.status == TourStatus.SKIPPED }
+        assertNull(records["demo"])
+        await(c.records) { it?.get("demo") == null }
         assertEquals(TourStatus.NEW, c.status("demo"))
     }
 

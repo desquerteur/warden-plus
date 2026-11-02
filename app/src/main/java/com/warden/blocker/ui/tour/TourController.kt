@@ -4,14 +4,12 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
-import kotlinx.coroutines.launch
 
 /**
  * Runs one tour at a time and saves what happened (seen, skipped, how far). Plain class so the
@@ -19,14 +17,9 @@ import kotlinx.coroutines.launch
  */
 class TourController(private val store: TourStore, private val scope: CoroutineScope, private val tours: (String) -> Tour? = Tours::byId) {
 
-    // Saves run one after another, in order: "skipped" must never be overwritten by an older "in progress".
-    private val writes = Channel<suspend () -> Unit>(Channel.UNLIMITED)
+    private val writer = SerialWriter(scope)
 
-    init {
-        scope.launch { for (write in writes) write() }
-    }
-
-    private fun write(block: suspend () -> Unit) { writes.trySend(block) }
+    private fun write(block: suspend () -> Unit) = writer.write(block)
 
     private val _run = MutableStateFlow<TourRun?>(null)
     val run: StateFlow<TourRun?> = _run.asStateFlow()
@@ -93,13 +86,24 @@ class TourController(private val store: TourStore, private val scope: CoroutineS
 
     fun skip() = finish(TourStatus.SKIPPED)
 
+    /** Declined without starting it (e.g. "Finish" in the setup wizard): page tips take over. */
+    fun markSkippedIfNew(tourId: String) = write {
+        if ((store.records.first()[tourId]?.status ?: TourStatus.NEW) == TourStatus.NEW) {
+            store.save(tourId, TourRecord(TourStatus.SKIPPED))
+        }
+    }
+
     fun dismissEmptyNotice() { _emptyNotice.value = null }
 
     fun markPageSeen(route: String) = write { store.markPageSeen(route) }
 
+    /** Every guide as new, with page tips offered again (they follow a skipped "Getting started"). */
     fun resetAll() {
         _run.value = null
-        write { store.resetAll() }
+        write {
+            store.resetAll()
+            store.save(Tours.GETTING_STARTED, TourRecord(TourStatus.SKIPPED))
+        }
     }
 
     private fun move(next: TourRun) {

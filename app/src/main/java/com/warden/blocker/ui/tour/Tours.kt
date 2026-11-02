@@ -4,7 +4,6 @@ import com.warden.blocker.ui.tour.TourRoutes.BLOCKLIST
 import com.warden.blocker.ui.tour.TourRoutes.HOME
 import com.warden.blocker.ui.tour.TourRoutes.SCHEDULES
 import com.warden.blocker.ui.tour.TourRoutes.SETTINGS
-import com.warden.blocker.ui.tour.TourRoutes.SETUP
 import com.warden.blocker.ui.tour.TourRoutes.STATS
 
 /**
@@ -38,16 +37,10 @@ object TourIds {
     const val SETTINGS_PROTECTION_CHECKLIST = "settings.protection_checklist"
     const val SETTINGS_GUARD_SYSTEM = "settings.guard_system_settings"
     const val SETTINGS_DEVICE_OWNER = "settings.device_owner"
-
-    const val SETUP_GUIDE = "setup.guide"
-    const val SETUP_ACCESSIBILITY = "setup.accessibility"
-    const val SETUP_RESTRICTED = "setup.restricted"
-    const val SETUP_USAGE = "setup.usage"
 }
 
 object Tours {
     const val GETTING_STARTED = "getting_started"
-    const val SETUP_ID = "setup"
     const val PROTECTION = "protection"
 
     private val T = TourIds
@@ -56,7 +49,7 @@ object Tours {
         GETTING_STARTED, "Getting started",
         listOf(
             step(null, HOME, "Welcome to Warden+", "A one-minute tour of the main parts. You can skip it and restart it later in Settings."),
-            step(T.HOME_SETUP, HOME, "Finish setup first", "Warden+ needs Accessibility to block apps. Tap this card — the setup guide shows each Android step."),
+            step(T.HOME_SETUP, HOME, "Finish setup first", "Warden+ needs Accessibility to block apps. Tap this card — the setup wizard shows each Android step."),
             step(T.HOME_MASTER, HOME, "The main switch", "Turns blocking on or off. The first time, Android asks to allow a VPN: tap OK. It stays on your phone."),
             step(T.HOME_FOCUS, HOME, "Focus session", "Forces blocking on for 25 or 50 minutes. Tick Strict and it can't be ended early."),
             step(T.BLOCKLIST_ADD_SITE, BLOCKLIST, "Block websites", "Type a site like instagram.com and tap Add."),
@@ -65,19 +58,6 @@ object Tours {
             step(T.SCHEDULES_NEW, SCHEDULES, "Schedules", "Block only at set times, like work hours. Then turn off “Always on” in Settings."),
             step(T.STATS_HEADER, STATS, "Usage", "Your screen time, app opens and how often Warden+ stepped in."),
             step(T.SETTINGS_UPDATES, SETTINGS, "Settings & updates", "Strict mode, PIN and app updates live in Settings. “Restart guides” below shows these tours again."),
-        ),
-    )
-
-    val setup = Tour(
-        SETUP_ID, "Setup & permissions",
-        listOf(
-            step(T.SETUP_ACCESSIBILITY, SETUP, "Turn on Accessibility", "Required: it lets Warden+ notice a blocked app. Watch the path, then tap the button to go there.", SettingsGuide.ACCESSIBILITY, MissingTarget.CENTER),
-            step(T.SETUP_RESTRICTED, SETUP, "Switch greyed out?", "Android 13+ locks it for apps from an APK file. Allow restricted settings first, then turn Accessibility on.", SettingsGuide.RESTRICTED, MissingTarget.CENTER),
-            step(T.SETUP_USAGE, SETUP, "Usage access", "Optional. Needed for screen time and daily time limits."),
-            step(null, SETUP, "Allow the VPN", "When you switch blocking on, Android asks once to allow a VPN. Tap OK — it only filters on your phone.", SettingsGuide.VPN_CONSENT),
-            step(null, SETUP, "Tailscale or another VPN?", "Android allows one VPN at a time. Turn the other one off, and its “Always-on VPN” too.", SettingsGuide.OTHER_VPN),
-            step(null, SETUP, "Keep Warden+ awake", "Samsung puts apps to sleep. Add Warden+ to “Never sleeping apps” so blocking keeps running.", SettingsGuide.BATTERY),
-            step(T.SETTINGS_UNINSTALL, SETTINGS, "Uninstall protection", "Makes Warden+ a device admin, so it can't be removed on impulse.", SettingsGuide.DEVICE_ADMIN),
         ),
     )
 
@@ -124,7 +104,7 @@ object Tours {
         ),
     )
 
-    val all: List<Tour> = listOf(gettingStarted, setup, protection) + pageTours.values
+    val all: List<Tour> = listOf(gettingStarted, protection) + pageTours.values
 
     fun byId(id: String): Tour? = all.firstOrNull { it.id == id }
 

@@ -115,7 +115,7 @@ fun TourHost(currentRoute: String?, navigate: (String) -> Unit, content: @Compos
             PageTipsOffer(controller, currentRoute, running = run != null)
         }
     }
-    AutoStartGettingStarted(controller, route)
+    ResumeGettingStarted(controller, route)
 
     val notice by controller.emptyNotice.collectAsState()
     notice?.let { text ->
@@ -406,18 +406,17 @@ private fun TourCard(
     }
 }
 
-/** Starts "Getting started" once, the first time Home is on screen (and continues it if it was left half-way). */
+/** Continues "Getting started" if the app was closed half-way through it. (It is offered at the end of the setup wizard.) */
 @Composable
-private fun AutoStartGettingStarted(controller: TourController, route: State<String?>) {
+private fun ResumeGettingStarted(controller: TourController, route: State<String?>) {
     val records by controller.records.collectAsState()
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     val loaded = records != null
     LaunchedEffect(loaded) {
         if (!loaded) return@LaunchedEffect
         val status = controller.status(Tours.GETTING_STARTED)
-        if (status != TourStatus.NEW && status != TourStatus.IN_PROGRESS) return@LaunchedEffect
+        if (status != TourStatus.IN_PROGRESS) return@LaunchedEffect
         snapshotFlow { route.value }.first { it == TourRoutes.HOME }
-        // Not over Android's notification prompt; give it a moment after it closes.
         lifecycle.currentStateFlow.first { it.isAtLeast(Lifecycle.State.RESUMED) }
         delay(1200)
         lifecycle.currentStateFlow.first { it.isAtLeast(Lifecycle.State.RESUMED) }

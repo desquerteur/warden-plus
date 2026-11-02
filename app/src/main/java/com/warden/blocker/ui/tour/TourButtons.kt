@@ -49,17 +49,17 @@ fun RestartGuidesButton(modifier: Modifier = Modifier.fillMaxWidth()) {
         title = { Text("Guides") },
         text = {
             Column {
-                listOf(Tours.gettingStarted, Tours.setup, Tours.protection).forEach { tour ->
+                listOf(Tours.gettingStarted, Tours.protection).forEach { tour ->
                     TextButton(onClick = { open = false; controller.start(tour.id) }, modifier = Modifier.fillMaxWidth()) {
                         Text(tour.title, modifier = Modifier.fillMaxWidth())
                     }
                 }
                 HorizontalDivider()
                 TextButton(onClick = { open = false; controller.resetAll() }, modifier = Modifier.fillMaxWidth()) {
-                    Text("Reset all — like a fresh install", modifier = Modifier.fillMaxWidth())
+                    Text("Show page tips again", modifier = Modifier.fillMaxWidth())
                 }
                 Text(
-                    "“Getting started” then opens by itself next time.",
+                    "A small hint then appears the next time you open each page.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )

@@ -50,6 +50,7 @@ import com.warden.blocker.system.AccessibilityAlert
 import com.warden.blocker.ui.stats.shownFocusStreak
 import com.warden.blocker.ui.tour.TourIds
 import com.warden.blocker.ui.tour.tourTarget
+import com.warden.blocker.ui.wizard.SetupProgressCard
 import com.warden.blocker.util.PermissionsHelper
 import com.warden.blocker.vpn.VpnController
 import com.warden.blocker.vpn.WardenVpnService
@@ -135,6 +136,7 @@ fun HomeScreen(
                 }
             }
         }
+        SetupProgressCard(vm, onOpen = onOpenSetup)
         if (protecting && showPaused && otherVpn) {
             // Android allows one VPN at a time; another app (Tailscale & co.) holds it, often as
             // "Always-on VPN", which makes Android close our consent dialog without showing it.

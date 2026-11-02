@@ -204,7 +204,7 @@ fun SettingsScreen(vm: WardenViewModel, onOpenSetup: () -> Unit) {
 
         HorizontalDivider()
         OutlinedButton(onClick = onOpenSetup, modifier = Modifier.fillMaxWidth().tourTarget(TourIds.SETTINGS_SETUP)) {
-            Text("Setup & permissions")
+            Text("Setup wizard")
         }
         RestartGuidesButton()
     }

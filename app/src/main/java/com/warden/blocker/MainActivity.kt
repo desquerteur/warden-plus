@@ -3,7 +3,6 @@ package com.warden.blocker
 import android.app.Activity
 import android.content.Context
 import android.content.Intent
-import android.os.Build
 import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
@@ -57,7 +56,6 @@ import com.warden.blocker.ui.HomeScreen
 import com.warden.blocker.ui.LocalTabReselected
 import com.warden.blocker.ui.SchedulesScreen
 import com.warden.blocker.ui.SettingsScreen
-import com.warden.blocker.ui.SetupScreen
 import com.warden.blocker.ui.WardenViewModel
 import com.warden.blocker.ui.hosts.HostsListsScreen
 import com.warden.blocker.ui.stats.StatsDashboard
@@ -65,6 +63,8 @@ import com.warden.blocker.ui.theme.WardenTheme
 import com.warden.blocker.ui.tour.TourHost
 import com.warden.blocker.ui.tour.TourPath
 import com.warden.blocker.ui.tour.tourTarget
+import com.warden.blocker.ui.wizard.AutoOpenSetupWizard
+import com.warden.blocker.ui.wizard.SetupWizardScreen
 import com.warden.blocker.vpn.VpnController
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -93,18 +93,8 @@ class MainActivity : ComponentActivity() {
             WardenTheme {
                 val vm: WardenViewModel = viewModel()
 
-                val notifPermLauncher = rememberLauncherForActivityResult(
-                    ActivityResultContracts.RequestPermission(),
-                ) { /* result ignored; the app still works without it */ }
-                LaunchedEffect(Unit) {
-                    vm.onAppOpened()
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
-                        checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) !=
-                        android.content.pm.PackageManager.PERMISSION_GRANTED
-                    ) {
-                        notifPermLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
-                    }
-                }
+                // Notifications are asked for in the setup wizard (and its Home card), not at once.
+                LaunchedEffect(Unit) { vm.onAppOpened() }
 
                 fun runAfterConsent(action: AfterConsent) {
                     VpnController.start(this@MainActivity)
@@ -289,6 +279,11 @@ private fun WardenScaffold(
             if (navController.currentDestination?.route != "setup") navController.navigate("setup")
         }
     }
+    // First start after installing: straight into the setup wizard.
+    AutoOpenSetupWizard {
+        navController.currentBackStackEntryFlow.first()
+        if (navController.currentDestination?.route != "setup") navController.navigate("setup")
+    }
     fun openTab(route: String) {
         val dest = navController.currentDestination
         // Tapping the tab that is already open scrolls it back to the top.
@@ -351,7 +346,14 @@ private fun WardenScaffold(
                     HomeScreen(vm, onToggleBlocking, onStartFocus, onCancelFocus, onOpenSetup = { navController.navigate("setup") }, onRetryVpn = onRetryVpn)
                 }
             }
-            composable("setup") { SetupScreen(onBack = { leave("setup") }) }
+            composable("setup") {
+                SetupWizardScreen(
+                    vm,
+                    onClose = { leave("setup") },
+                    onOpenAppPicker = { navController.navigate("apppicker") },
+                    onEnableBlocking = { onToggleBlocking(true) },
+                )
+            }
             composable(Tab.BLOCKLIST.route) {
                 TabContent(Tab.BLOCKLIST, reselected) {
                     BlocklistScreen(

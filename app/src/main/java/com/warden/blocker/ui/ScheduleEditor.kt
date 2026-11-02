@@ -90,6 +90,8 @@ fun ScheduleEditorDialog(initial: Schedule?, onSave: (Schedule) -> Unit, onDismi
                 OutlinedTextField(
                     value = name, onValueChange = { name = it },
                     label = { Text("Name") }, singleLine = true, modifier = Modifier.fillMaxWidth(),
+                    // Explains why "Save" is greyed out.
+                    supportingText = if (name.isBlank()) { { Text("Enter a name to save") } } else null,
                 )
                 Text("Days", style = MaterialTheme.typography.labelLarge)
                 // Wraps onto a second line when 7 circles don't fit, so every day stays tappable.
@@ -105,6 +107,13 @@ fun ScheduleEditorDialog(initial: Schedule?, onSave: (Schedule) -> Unit, onDismi
                             onToggle = { daysMask = daysMask xor (1 shl i) },
                         )
                     }
+                }
+                if (daysMask == 0) {
+                    Text(
+                        "Pick at least one day to save",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error,
+                    )
                 }
                 OutlinedButton(onClick = { picking = "start" }, modifier = Modifier.fillMaxWidth()) {
                     Text("Start ${fmtTime(start)}")

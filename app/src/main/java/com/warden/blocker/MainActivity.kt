@@ -7,7 +7,13 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.defaultMinSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Block
 import androidx.compose.material.icons.filled.Home
@@ -15,9 +21,11 @@ import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Timeline
 import androidx.compose.material3.Icon
-import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.NavigationBarDefaults
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -25,8 +33,11 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
@@ -110,6 +121,26 @@ private enum class Tab(val route: String, val label: String, val icon: ImageVect
     SETTINGS("settings", "Settings", Icons.Filled.Settings),
 }
 
+/**
+ * Same look as Material 3's NavigationBar, but without its fixed 8dp gaps between items. With
+ * five tabs those gaps leave each item narrower than the 64dp selection pill below ~360dp, so
+ * the pill of the last tab stuck out past the screen edge on 320–344dp fold cover displays.
+ */
+@Composable
+private fun CompactNavigationBar(content: @Composable RowScope.() -> Unit) {
+    Surface(color = NavigationBarDefaults.containerColor, tonalElevation = NavigationBarDefaults.Elevation) {
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .windowInsetsPadding(NavigationBarDefaults.windowInsets)
+                .defaultMinSize(minHeight = 80.dp)
+                .selectableGroup(),
+            verticalAlignment = Alignment.CenterVertically,
+            content = content,
+        )
+    }
+}
+
 @Composable
 private fun WardenScaffold(
     vm: WardenViewModel,
@@ -120,7 +151,7 @@ private fun WardenScaffold(
     val navController = rememberNavController()
     Scaffold(
         bottomBar = {
-            NavigationBar {
+            CompactNavigationBar {
                 val current by navController.currentBackStackEntryAsState()
                 val dest = current?.destination
                 Tab.entries.forEach { tab ->
@@ -138,7 +169,17 @@ private fun WardenScaffold(
                             }
                         },
                         icon = { Icon(tab.icon, contentDescription = tab.label) },
-                        label = { Text(tab.label) },
+                        // One line, never wrapped ("Schedules" broke onto two lines at 344dp);
+                        // ellipsis is only a fallback for very large font scales.
+                        label = {
+                            Text(
+                                tab.label,
+                                style = MaterialTheme.typography.labelSmall,
+                                maxLines = 1,
+                                softWrap = false,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        },
                     )
                 }
             }

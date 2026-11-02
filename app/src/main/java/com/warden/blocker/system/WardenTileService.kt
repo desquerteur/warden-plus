@@ -44,7 +44,9 @@ class WardenTileService : TileService() {
 
     private suspend fun turnOn() {
         if (VpnController.consentIntent(this) != null) {
-            openApp() // consent not granted yet; enable once from the app
+            // Consent not granted yet: the app asks for it and then turns blocking on by itself
+            // (it used to just open, so nothing seemed to happen).
+            openApp(enableBlocking = true)
             return
         }
         VpnController.start(this)
@@ -60,10 +62,19 @@ class WardenTileService : TileService() {
         applicationContext.wardenContainer.settings.setMasterEnabled(false)
     }
 
-    private fun openApp() {
+    private fun openApp(enableBlocking: Boolean = false) {
         val intent = Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        if (enableBlocking) {
+            // CLEAR_TOP + SINGLE_TOP: an already open app gets the request via onNewIntent.
+            intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                .putExtra(MainActivity.EXTRA_ENABLE_BLOCKING, true)
+        }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-            val pi = PendingIntent.getActivity(this, 0, intent, PendingIntent.FLAG_IMMUTABLE)
+            // Own request code per variant: PendingIntents that differ only in extras are shared.
+            val pi = PendingIntent.getActivity(
+                this, if (enableBlocking) 1 else 0, intent,
+                PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+            )
             startActivityAndCollapse(pi)
         } else {
             @Suppress("DEPRECATION")

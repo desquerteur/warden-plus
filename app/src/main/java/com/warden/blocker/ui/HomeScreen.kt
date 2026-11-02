@@ -18,6 +18,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -32,6 +33,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.warden.blocker.R
 import com.warden.blocker.util.PermissionsHelper
 import com.warden.blocker.vpn.WardenVpnService
+import kotlinx.coroutines.delay
 
 @Composable
 fun HomeScreen(
@@ -52,6 +54,15 @@ fun HomeScreen(
     val hostsLists by vm.hostsLists.collectAsStateWithLifecycle()
     val summary = protectedSummary(items.count { it.enabled }, hostsLists)
     var showVerify by remember { mutableStateOf(false) }
+    // Observed, not read once: the card used to keep whatever the tunnel state was at the last
+    // recomposition (e.g. "paused" right after switching on, before the VPN was up).
+    val vpnRunning by WardenVpnService.runningState.collectAsStateWithLifecycle()
+    var showPaused by remember { mutableStateOf(false) }
+    LaunchedEffect(enabled, vpnRunning) {
+        showPaused = false
+        // Give a just-started tunnel a moment, so switching on doesn't flash the warning.
+        if (enabled && !vpnRunning) { delay(1500); showPaused = true }
+    }
     val scroll = rememberScrollState()
     ScrollToTopOnReselect(scroll)
 
@@ -70,7 +81,7 @@ fun HomeScreen(
                     }
                 }
             }
-        } else if (enabled && !WardenVpnService.running) {
+        } else if (enabled && showPaused) {
             // Blocking is on but the filter isn't running (OS killed it). Never leave the user
             // silently unprotected — surface it and offer a one-tap re-arm.
             ElevatedCard(

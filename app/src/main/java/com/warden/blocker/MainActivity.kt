@@ -1,8 +1,10 @@
 package com.warden.blocker
 
 import android.app.Activity
+import android.content.Intent
 import android.os.Build
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
@@ -33,6 +35,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -66,8 +69,13 @@ import kotlinx.coroutines.flow.map
 
 class MainActivity : ComponentActivity() {
 
+    /** Set when opened with [EXTRA_ENABLE_BLOCKING]; Compose turns blocking on and clears it. */
+    private var enableRequested by mutableStateOf(false)
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Only for a fresh start: after a recreation the request was already handled.
+        if (savedInstanceState == null) enableRequested = intent.getBooleanExtra(EXTRA_ENABLE_BLOCKING, false)
         setContent {
             WardenTheme {
                 val vm: WardenViewModel = viewModel()
@@ -85,27 +93,51 @@ class MainActivity : ComponentActivity() {
                     }
                 }
 
-                var pendingAfterConsent by remember { mutableStateOf<(() -> Unit)?>(null) }
+                fun runAfterConsent(action: AfterConsent) {
+                    VpnController.start(this@MainActivity)
+                    if (action == AfterConsent.ENABLE_BLOCKING) vm.setMasterEnabled(true)
+                }
+
+                // What waits for the system VPN dialog. Saved (it used to be a lambda in plain
+                // `remember`), so it survives the activity being recreated while the dialog is
+                // open — folding/unfolding, rotating or a theme switch did that, and tapping
+                // "OK" then silently did nothing: blocking stayed off.
+                var pendingAfterConsent by rememberSaveable { mutableStateOf<AfterConsent?>(null) }
                 val consentLauncher = rememberLauncherForActivityResult(
                     ActivityResultContracts.StartActivityForResult(),
                 ) { result ->
-                    if (result.resultCode == Activity.RESULT_OK) pendingAfterConsent?.invoke()
+                    val action = pendingAfterConsent
                     pendingAfterConsent = null
+                    if (action == null) return@rememberLauncherForActivityResult
+                    if (result.resultCode == Activity.RESULT_OK) runAfterConsent(action) else showConsentMissing()
                 }
 
-                fun withVpn(action: () -> Unit) {
+                fun withVpn(action: AfterConsent) {
                     val consent = VpnController.consentIntent(this@MainActivity)
-                    if (consent == null) action() else { pendingAfterConsent = action; consentLauncher.launch(consent) }
+                    if (consent == null) { runAfterConsent(action); return }
+                    pendingAfterConsent = action
+                    runCatching { consentLauncher.launch(consent) }.onFailure {
+                        pendingAfterConsent = null
+                        showConsentMissing()
+                    }
                 }
 
                 fun toggleBlocking(enabled: Boolean) {
-                    if (enabled) withVpn { VpnController.start(this@MainActivity); vm.setMasterEnabled(true) }
+                    if (enabled) withVpn(AfterConsent.ENABLE_BLOCKING)
                     else { VpnController.stop(this@MainActivity); vm.setMasterEnabled(false) }
                 }
 
                 fun startFocus(minutes: Int, strict: Boolean) {
                     vm.startFocus(minutes, strict)
-                    withVpn { VpnController.start(this@MainActivity) }
+                    withVpn(AfterConsent.START_FOCUS)
+                }
+
+                // The Quick Settings tile sends people here when the VPN still needs consent.
+                LaunchedEffect(enableRequested) {
+                    if (enableRequested) {
+                        enableRequested = false
+                        toggleBlocking(true)
+                    }
                 }
 
                 fun cancelFocus() {
@@ -116,6 +148,29 @@ class MainActivity : ComponentActivity() {
                 WardenScaffold(vm, ::toggleBlocking, ::startFocus, ::cancelFocus)
             }
         }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        if (intent.getBooleanExtra(EXTRA_ENABLE_BLOCKING, false)) enableRequested = true
+    }
+
+    /** The VPN dialog was cancelled or couldn't be shown — say why blocking stayed off. */
+    private fun showConsentMissing() {
+        // Short: Android cuts toasts off after two lines.
+        Toast.makeText(
+            this,
+            "Blocking stays off: no VPN permission. Is another VPN app set to Always-on?",
+            Toast.LENGTH_LONG,
+        ).show()
+    }
+
+    /** What to do once the user has allowed the VPN. */
+    private enum class AfterConsent { ENABLE_BLOCKING, START_FOCUS }
+
+    companion object {
+        /** Intent extra: turn blocking on right away (asking for VPN consent if needed). */
+        const val EXTRA_ENABLE_BLOCKING = "com.warden.blocker.ENABLE_BLOCKING"
     }
 }
 

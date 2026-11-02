@@ -22,6 +22,9 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -88,12 +91,17 @@ class WardenVpnService : VpnService() {
             .setBlocking(true)
         runCatching { builder.addDisallowedApplication(packageName) } // never filter ourselves
 
-        tunnel = builder.establish() ?: run {
-            Log.e(TAG, "VPN establish() returned null (consent not granted?)")
-            stopSelf(); return
-        }
+        // establish() returns null without consent and throws when the system refuses the tunnel
+        // (e.g. another app holds "Always-on VPN"). Never crash for that: stop, and Home shows
+        // "Protection paused" because blocking is on but the filter isn't running.
+        tunnel = runCatching { builder.establish() }
+            .onFailure { Log.e(TAG, "VPN establish() failed", it) }
+            .getOrNull() ?: run {
+                Log.e(TAG, "VPN establish() returned no tunnel (consent not granted?)")
+                stopSelf(); return
+            }
 
-        running = true
+        _running.value = true
         loopJob = scope.launch {
             refreshBlocklist()
             runPacketLoop(tunnel!!)
@@ -250,7 +258,7 @@ class WardenVpnService : VpnService() {
     }
 
     private fun stopTunnel() {
-        running = false
+        _running.value = false
         loopJob?.cancel()
         watchJob?.cancel()
         runCatching { tunnel?.close() }
@@ -275,7 +283,7 @@ class WardenVpnService : VpnService() {
     }
 
     override fun onDestroy() {
-        running = false
+        _running.value = false
         scope.cancel()
         runCatching { tunnel?.close() }
         wardenContainer.hostsLists.releaseCache()
@@ -283,10 +291,12 @@ class WardenVpnService : VpnService() {
     }
 
     companion object {
-        /** Whether the filtering tunnel is currently up — read by the Home health indicator so
-         *  users are never *silently* unblocked when the OS kills the service. */
-        @Volatile var running = false
-            private set
+        private val _running = MutableStateFlow(false)
+
+        /** Whether the filtering tunnel is currently up — observed by the Home health indicator
+         *  so users are never *silently* unblocked when the OS kills the service. */
+        val runningState: StateFlow<Boolean> = _running.asStateFlow()
+        val running: Boolean get() = _running.value
 
         private const val TAG = "WardenVpn"
         const val ACTION_START = "com.warden.blocker.VPN_START"

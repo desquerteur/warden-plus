@@ -241,9 +241,11 @@ fun ProtectionScreen(vm: WardenViewModel, onBack: () -> Unit, onOpenSetup: () ->
             )
             Text(
                 "Honest limits: no app can fully stop this. Turning off accessibility or the VPN in Android " +
-                    "settings, or uninstalling without uninstall protection, stays possible — and some phones " +
-                    "(e.g. Samsung's \"Active apps → Stop\") can still stop Warden+. Warden+ notices, tells you, " +
-                    "and counts it here and in Usage. Phone, Settings and your home screen are never blocked.",
+                    "settings stays possible, uninstall protection only adds a \"Deactivate & uninstall\" step, " +
+                    "and some phones (e.g. Samsung's \"Active apps → Stop\") can still stop Warden+. After a stop, " +
+                    "Android also switches app blocking (accessibility) off until you turn it on again. Warden+ " +
+                    "notices, tells you, and counts it here and in Usage. Phone, Settings and your home screen " +
+                    "are never blocked.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

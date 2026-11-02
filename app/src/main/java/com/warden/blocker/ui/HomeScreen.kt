@@ -110,8 +110,8 @@ fun HomeScreen(
             // Warden+ was updated from an APK file. Make that impossible to miss.
             WarningCard(
                 title = "⚠ App blocking is off",
-                text = "Warden+ has no accessibility access, so apps aren't blocked. Android switches it " +
-                    "off after an update from an APK file. Tap to turn it on.",
+                text = "Warden+ has no accessibility access, so apps aren't blocked. Android switches it off " +
+                    "after an update from an APK file and after \"Force stop\". Tap to turn it on.",
                 onClick = onOpenSetup,
             )
         } else if (needsSetup) {

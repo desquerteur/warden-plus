@@ -19,7 +19,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Delete
@@ -50,7 +49,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
@@ -61,6 +59,7 @@ import com.warden.blocker.hosts.HostsListRepository
 import com.warden.blocker.hosts.HostsSource
 import com.warden.blocker.hosts.HostsTemplates
 import com.warden.blocker.hosts.ImportProgress
+import com.warden.blocker.ui.SubScreenTopBar
 import kotlinx.coroutines.launch
 import java.text.DateFormat
 import java.util.Date
@@ -100,95 +99,88 @@ fun HostsListsScreen(onBack: () -> Unit, vm: HostsViewModel = viewModel()) {
         }
     }
 
-    Box(Modifier.fillMaxSize()) {
-        LazyColumn(
-            Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 80.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            item {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-                    }
+    // Same top bar and 20dp side margins as the other sub-screens (app picker, feeds, setup).
+    Column(Modifier.fillMaxSize()) {
+        SubScreenTopBar("Import blocklists", onBack = onBack)
+        Box(Modifier.fillMaxSize()) {
+            LazyColumn(
+                Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 80.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                item {
                     Text(
-                        "Import blocklists",
-                        style = MaterialTheme.typography.headlineMedium,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.weight(1f),
+                        "Import hosts files or domain lists. Every domain in an enabled list — and its " +
+                            "subdomains — is blocked while blocking is on.",
+                        style = MaterialTheme.typography.bodyMedium,
                     )
                 }
-                Text(
-                    "Import hosts files or domain lists. Every domain in an enabled list — and its " +
-                        "subdomains — is blocked while blocking is on.",
-                    style = MaterialTheme.typography.bodyMedium,
-                )
-            }
 
-            item {
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Button(onClick = { pickFile.launch(arrayOf("text/*", "application/octet-stream")) }, enabled = !busy) {
-                        Icon(Icons.Filled.FileOpen, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(Modifier.width(8.dp))
-                        Text("Import file")
+                item {
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Button(onClick = { pickFile.launch(arrayOf("text/*", "application/octet-stream")) }, enabled = !busy) {
+                            Icon(Icons.Filled.FileOpen, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(8.dp))
+                            Text("Import file")
+                        }
+                        OutlinedButton(onClick = { showUrlDialog = true }, enabled = !busy) {
+                            Icon(Icons.Filled.Link, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(8.dp))
+                            Text("Add from URL")
+                        }
                     }
-                    OutlinedButton(onClick = { showUrlDialog = true }, enabled = !busy) {
-                        Icon(Icons.Filled.Link, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(Modifier.width(8.dp))
-                        Text("Add from URL")
+                }
+
+                progress?.let { p -> item { ProgressCard(p) } }
+
+                item {
+                    Text("Ready-made lists", style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        "From github.com/StevenBlack/hosts. The add-ons work on top of Unified.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.outline,
+                    )
+                    Spacer(Modifier.size(4.dp))
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        HostsTemplates.ALL.forEach { t ->
+                            val added = sources.any { it.url == t.url }
+                            FilterChip(
+                                selected = added,
+                                onClick = { if (!added) vm.addTemplate(t) },
+                                enabled = added || !busy,
+                                label = { Text(t.name) },
+                                leadingIcon = {
+                                    Icon(if (added) Icons.Filled.Check else Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+                                },
+                            )
+                        }
                     }
+                }
+
+                item {
+                    val active = sources.filter { it.enabled }
+                    Text("Your lists", style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        if (sources.isEmpty()) "No lists yet — import a file, add a link or tap a ready-made list."
+                        else "${active.size} of ${sources.size} enabled · ${formatCount(active.sumOf { it.domainCount })} domains",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.outline,
+                    )
+                }
+
+                items(sources, key = { it.id }) { source ->
+                    SourceCard(
+                        source = source,
+                        busy = busy,
+                        onToggle = { vm.setEnabled(source, it) },
+                        onRefresh = { vm.refresh(source) },
+                        onDelete = { confirmDelete = source },
+                    )
                 }
             }
 
-            progress?.let { p -> item { ProgressCard(p) } }
-
-            item {
-                Text("Ready-made lists", style = MaterialTheme.typography.titleMedium)
-                Text(
-                    "From github.com/StevenBlack/hosts. The add-ons work on top of Unified.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.outline,
-                )
-                Spacer(Modifier.size(4.dp))
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    HostsTemplates.ALL.forEach { t ->
-                        val added = sources.any { it.url == t.url }
-                        FilterChip(
-                            selected = added,
-                            onClick = { if (!added) vm.addTemplate(t) },
-                            enabled = added || !busy,
-                            label = { Text(t.name) },
-                            leadingIcon = {
-                                Icon(if (added) Icons.Filled.Check else Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(18.dp))
-                            },
-                        )
-                    }
-                }
-            }
-
-            item {
-                val active = sources.filter { it.enabled }
-                Text("Your lists", style = MaterialTheme.typography.titleMedium)
-                Text(
-                    if (sources.isEmpty()) "No lists yet — import a file, add a link or tap a ready-made list."
-                    else "${active.size} of ${sources.size} enabled · ${formatCount(active.sumOf { it.domainCount })} domains",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.outline,
-                )
-            }
-
-            items(sources, key = { it.id }) { source ->
-                SourceCard(
-                    source = source,
-                    busy = busy,
-                    onToggle = { vm.setEnabled(source, it) },
-                    onRefresh = { vm.refresh(source) },
-                    onDelete = { confirmDelete = source },
-                )
-            }
+            SnackbarHost(snackbar, Modifier.align(Alignment.BottomCenter).padding(8.dp))
         }
-
-        SnackbarHost(snackbar, Modifier.align(Alignment.BottomCenter).padding(8.dp))
     }
 
     if (showUrlDialog) {

@@ -103,7 +103,7 @@ class StatsViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     val state: StateFlow<StatsUiState> = combine(period, usage, blocks, focus) { p, u, b, f ->
-        StatsUiState(p, u, b, f.streak, f.longest, f.sessions)
+        StatsUiState(p, u, b, shownFocusStreak(f.streak, f.sessions), shownFocusStreak(f.longest, f.sessions), f.sessions)
     }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), StatsUiState())
 

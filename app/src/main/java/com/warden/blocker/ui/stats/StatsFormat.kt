@@ -53,6 +53,12 @@ internal fun bucketTitle(period: StatsPeriod, bucket: TimeRange, zone: ZoneId): 
     }
 }
 
+/**
+ * The focus streak to show: 0 until a focus session has actually run (the stored day count
+ * starts as soon as blocking is on, which read "1 day" next to "0 sessions").
+ */
+internal fun shownFocusStreak(days: Int, sessionsDone: Int): Int = if (sessionsDone > 0) days else 0
+
 /** "↑ 12%" / "↓ 8%" / "± 0%". */
 internal fun formatChange(pct: Int): String = when {
     pct > 0 -> "↑ $pct%"

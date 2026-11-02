@@ -5,6 +5,7 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import com.warden.blocker.block.AccessController
 import com.warden.blocker.block.BlockEngine
+import com.warden.blocker.block.StrictGuard
 import com.warden.blocker.data.BlockRepository
 import com.warden.blocker.data.SettingsStore
 import com.warden.blocker.data.WardenDatabase
@@ -51,6 +52,7 @@ class AppContainer(app: Application) {
     val repository = BlockRepository(WardenDatabase.get(app).blockDao())
     val hostsLists = HostsListRepository(app)
     val blockEngine = BlockEngine(repository, settings) { hostsLists.activeDomainSet() }
+    val strictGuard = StrictGuard(app, settings, blockEngine)
     val accessController = AccessController(repository, blockEngine) { pkg ->
         UsageStatsHelper.todayUsageMinutesFor(app, pkg)
     }

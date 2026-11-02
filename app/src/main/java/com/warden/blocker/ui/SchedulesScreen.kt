@@ -1,5 +1,6 @@
 package com.warden.blocker.ui
 
+import android.text.format.DateFormat
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -28,6 +29,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -39,6 +41,7 @@ fun SchedulesScreen(vm: WardenViewModel) {
     var editing by remember { mutableStateOf<Schedule?>(null) }
     var creating by remember { mutableStateOf(false) }
     val listState = rememberLazyListState()
+    val is24Hour = DateFormat.is24HourFormat(LocalContext.current)
     ScrollToTopOnReselect(listState)
 
     Column(Modifier.fillMaxSize().padding(20.dp)) {
@@ -57,7 +60,7 @@ fun SchedulesScreen(vm: WardenViewModel) {
                     Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
                         Column(Modifier.weight(1f)) {
                             Text(s.name, style = MaterialTheme.typography.titleMedium)
-                            Text("${fmt(s.startMinute)}–${fmt(s.endMinute)}  •  ${daysLabel(s.daysMask)}", style = MaterialTheme.typography.bodySmall)
+                            Text("${clockTime(s.startMinute, is24Hour)}–${clockTime(s.endMinute, is24Hour)}  •  ${daysLabel(s.daysMask)}", style = MaterialTheme.typography.bodySmall)
                         }
                         Switch(checked = s.enabled, onCheckedChange = { vm.addSchedule(s.copy(enabled = it)) })
                         IconButton(onClick = { vm.removeSchedule(s) }) { Icon(Icons.Filled.Delete, contentDescription = "Remove") }

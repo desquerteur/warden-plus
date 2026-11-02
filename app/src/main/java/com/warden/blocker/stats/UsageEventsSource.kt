@@ -46,13 +46,16 @@ object UsageEventsSource {
     /** True when the OS reports keyguard events, i.e. unlock counts are meaningful. */
     val supportsUnlocks: Boolean get() = Build.VERSION.SDK_INT >= Build.VERSION_CODES.P
 
-    /** Packages that are "the phone itself" rather than an app: launchers and the system UI. */
+    /**
+     * Packages that are "the phone itself" rather than an app: launchers and the system UI —
+     * and Warden+ itself, whose own screens (settings, the block screen) are not app use.
+     */
     fun excludedPackages(context: Context): Set<String> {
         val home = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME)
         val launchers = runCatching {
             context.packageManager.queryIntentActivities(home, PackageManager.MATCH_DEFAULT_ONLY)
                 .mapNotNull { it.activityInfo?.packageName }
         }.getOrDefault(emptyList())
-        return launchers.toSet() + "com.android.systemui"
+        return launchers.toSet() + "com.android.systemui" + context.packageName
     }
 }

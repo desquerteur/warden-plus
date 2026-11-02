@@ -15,10 +15,13 @@ import com.warden.blocker.util.CriticalApps
 import com.warden.blocker.wardenContainer
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /**
  * Watches the foreground app and asks [com.warden.blocker.block.AccessController] what to do,
@@ -34,7 +37,9 @@ import kotlinx.coroutines.launch
 class AppBlockAccessibilityService : AccessibilityService() {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    // Only touched on the main thread (accessibility events and the grant timer).
     private var lastPackage: String? = null
+    private var grantRecheck: Job? = null
 
     private var lastFeatureScan = 0L
     private var interceptedFeatureKey: String? = null
@@ -55,7 +60,12 @@ class AppBlockAccessibilityService : AccessibilityService() {
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         val type = event?.eventType ?: return
         val pkg = event.packageName?.toString() ?: return
-        if (pkg == packageName) return
+        if (pkg == packageName) {
+            // Our own screen (e.g. the pause screen) is in front: the app behind it gets decided
+            // again when it comes back — that's what starts the timer for a "Continue for 1 min".
+            if (type == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) lastPackage = pkg
+            return
+        }
 
         if (type == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
             handleAppBlock(pkg)
@@ -71,15 +81,35 @@ class AppBlockAccessibilityService : AccessibilityService() {
     private fun handleAppBlock(pkg: String) {
         if (pkg == lastPackage) return
         lastPackage = pkg
+        grantRecheck?.cancel() // another app in front: an earlier grant's timer is moot
         // Never lock the user out of their own phone (launcher, settings, dialer, us).
         if (CriticalApps.isCritical(this, pkg)) { interceptedFeatureKey = null; return }
         interceptedFeatureKey = null // new app in front; allow feature re-detection
         scope.launch {
             when (val decision = wardenContainer.accessController.decideForPackage(pkg)) {
-                is AccessDecision.Allow -> Unit
+                is AccessDecision.Allow -> recheckWhenGrantEnds(pkg)
                 is AccessDecision.Pause -> launchIntercept(InterceptActivity.KIND_PAUSE, decision.item.id, null, null)
                 is AccessDecision.HardBlock -> launchIntercept(InterceptActivity.KIND_BLOCK, decision.item.id, null, null)
                 is AccessDecision.LimitReached -> launchIntercept(InterceptActivity.KIND_LIMIT, decision.item.id, decision.reason, null)
+            }
+        }
+    }
+
+    /**
+     * [pkg] is let through on a timed grant ("Continue for 1 min"): when it runs out and the
+     * app is still in front, decide again, so staying in the app brings the pause back. One
+     * timer, no polling; it's cancelled as soon as another app comes to the front.
+     */
+    private suspend fun recheckWhenGrantEnds(pkg: String) {
+        val endsAt = wardenContainer.accessController.activeGrantEndsAt(pkg) ?: return
+        withContext(Dispatchers.Main) {
+            if (lastPackage != pkg) return@withContext
+            grantRecheck?.cancel()
+            grantRecheck = scope.launch(Dispatchers.Main) {
+                delay(endsAt - System.currentTimeMillis() + GRANT_RECHECK_MARGIN_MS)
+                if (lastPackage != pkg) return@launch
+                lastPackage = null
+                handleAppBlock(pkg)
             }
         }
     }
@@ -133,5 +163,8 @@ class AppBlockAccessibilityService : AccessibilityService() {
     private companion object {
         const val SCAN_THROTTLE_MS = 400L
         const val CACHE_TTL_MS = 2000L
+
+        /** Wake just after the grant's end, so it has surely expired. */
+        const val GRANT_RECHECK_MARGIN_MS = 500L
     }
 }

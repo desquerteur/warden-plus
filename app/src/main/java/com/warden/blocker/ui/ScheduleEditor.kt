@@ -58,8 +58,11 @@ fun ScheduleEditorDialog(initial: Schedule?, onSave: (Schedule) -> Unit, onDismi
     var name by remember { mutableStateOf(initial?.name ?: "") }
     var daysMask by remember { mutableIntStateOf(initial?.daysMask ?: 0b0011111) }
     var start by remember { mutableIntStateOf(initial?.startMinute ?: 9 * 60) }
-    var end by remember { mutableIntStateOf(initial?.endMinute ?: 17 * 60) }
+    var end by remember { mutableIntStateOf(initial?.endMinute ?: defaultEnd(9 * 60)) }
+    // A new schedule's end follows its start (start + 1 h) until the end is picked by hand.
+    var endPicked by remember { mutableStateOf(initial != null) }
     var picking by remember { mutableStateOf<String?>(null) } // "start" | "end" | null
+    val is24Hour = DateFormat.is24HourFormat(LocalContext.current)
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -116,10 +119,10 @@ fun ScheduleEditorDialog(initial: Schedule?, onSave: (Schedule) -> Unit, onDismi
                     )
                 }
                 OutlinedButton(onClick = { picking = "start" }, modifier = Modifier.fillMaxWidth()) {
-                    Text("Start ${fmtTime(start)}")
+                    Text("Start ${clockTime(start, is24Hour)}")
                 }
                 OutlinedButton(onClick = { picking = "end" }, modifier = Modifier.fillMaxWidth()) {
-                    Text("End ${fmtTime(end)}")
+                    Text("End ${clockTime(end, is24Hour)}")
                 }
                 if (end <= start) {
                     Text("Ends next day (overnight window)", style = MaterialTheme.typography.bodySmall)
@@ -130,8 +133,9 @@ fun ScheduleEditorDialog(initial: Schedule?, onSave: (Schedule) -> Unit, onDismi
 
     picking?.let { which ->
         val minutes = if (which == "start") start else end
-        val is24Hour = DateFormat.is24HourFormat(LocalContext.current)
         val state = rememberTimePickerState(initialHour = minutes / 60, initialMinute = minutes % 60, is24Hour = is24Hour)
+        // Typing the time is the default (the dial is fiddly for exact minutes); the dial is one tap away.
+        var dial by remember { mutableStateOf(false) }
         AlertDialog(
             onDismissRequest = { picking = null },
             properties = DialogProperties(usePlatformDefaultWidth = false),
@@ -139,7 +143,13 @@ fun ScheduleEditorDialog(initial: Schedule?, onSave: (Schedule) -> Unit, onDismi
             confirmButton = {
                 TextButton(onClick = {
                     val v = state.hour * 60 + state.minute
-                    if (which == "start") start = v else end = v
+                    if (which == "start") {
+                        start = v
+                        if (!endPicked) end = defaultEnd(v)
+                    } else {
+                        end = v
+                        endPicked = true
+                    }
                     picking = null
                 }) { Text("OK") }
             },
@@ -147,11 +157,17 @@ fun ScheduleEditorDialog(initial: Schedule?, onSave: (Schedule) -> Unit, onDismi
             title = { Text(if (which == "start") "Start time" else "End time") },
             text = {
                 BoxWithConstraints(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()), contentAlignment = Alignment.Center) {
-                    if (maxWidth >= CLOCK_DIAL_MIN_WIDTH) {
-                        TimePicker(state = state)
-                    } else {
-                        // Keyboard entry fits narrow screens; horizontal scroll is only a last-resort guard.
-                        TimeInput(state = state, modifier = Modifier.horizontalScroll(rememberScrollState()))
+                    val dialFits = maxWidth >= CLOCK_DIAL_MIN_WIDTH
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        if (dial && dialFits) {
+                            TimePicker(state = state)
+                        } else {
+                            // Horizontal scroll is only a last-resort guard for very narrow screens.
+                            TimeInput(state = state, modifier = Modifier.horizontalScroll(rememberScrollState()))
+                        }
+                        if (dialFits) {
+                            TextButton(onClick = { dial = !dial }) { Text(if (dial) "Type the time" else "Use clock dial") }
+                        }
                     }
                 }
             },
@@ -177,4 +193,5 @@ private fun DayToggle(label: String, description: String, selected: Boolean, onT
     }
 }
 
-private fun fmtTime(minute: Int) = "%02d:%02d".format(minute / 60, minute % 60)
+/** A new schedule's end: one hour after [startMinute], wrapping past midnight. */
+internal fun defaultEnd(startMinute: Int) = (startMinute + 60) % (24 * 60)

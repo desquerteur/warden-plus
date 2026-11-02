@@ -34,4 +34,29 @@ object ScheduleEvaluator {
 
     fun anyActive(schedules: List<Schedule>, cal: Calendar): Boolean =
         schedules.any { it.enabled && isActive(it, cal) }
+
+    /**
+     * The next moment (whole minute, after [now]) one of the enabled [schedules] starts, or
+     * null when none is enabled. Looks a week and a day ahead, which covers every weekday.
+     */
+    fun nextStart(schedules: List<Schedule>, now: Calendar): Calendar? {
+        val enabled = schedules.filter { it.enabled && it.daysMask and 0x7F != 0 }
+        if (enabled.isEmpty()) return null
+        val nowMinute = now.get(Calendar.HOUR_OF_DAY) * 60 + now.get(Calendar.MINUTE)
+        for (offset in 0..7) {
+            val day = (now.clone() as Calendar).apply {
+                add(Calendar.DAY_OF_YEAR, offset)
+                set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0)
+                set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0)
+            }
+            val dow = (day.get(Calendar.DAY_OF_WEEK) + 5) % 7 // Mon=0 … Sun=6
+            val start = enabled
+                .filter { (it.daysMask shr dow) and 1 == 1 }
+                .map { it.startMinute }
+                .filter { offset > 0 || it > nowMinute }
+                .minOrNull() ?: continue
+            return day.apply { set(Calendar.HOUR_OF_DAY, start / 60); set(Calendar.MINUTE, start % 60) }
+        }
+        return null
+    }
 }

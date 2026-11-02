@@ -44,6 +44,12 @@ class AccessController(
         return decide(item, hasGrant, opens, last, used, now)
     }
 
+    /** When [packageName]'s current timed grant ("Continue for 1 min") runs out, or null if none. */
+    suspend fun activeGrantEndsAt(packageName: String): Long? {
+        val item = repo.appItem(packageName) ?: return null
+        return repo.activeGrant(item.id, System.currentTimeMillis())?.expiresAt
+    }
+
     companion object {
         /**
          * Pure decision logic — no I/O — so it's exhaustively unit-testable. Assumes blocking

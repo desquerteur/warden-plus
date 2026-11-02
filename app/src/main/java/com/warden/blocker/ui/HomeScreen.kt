@@ -1,6 +1,7 @@
 package com.warden.blocker.ui
 
 import android.os.Build
+import android.text.format.DateFormat
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -25,8 +26,10 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -39,12 +42,17 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.warden.blocker.R
+import com.warden.blocker.block.Loosening
 import com.warden.blocker.data.BlockType
+import com.warden.blocker.data.Schedule
 import com.warden.blocker.system.AccessibilityAlert
+import com.warden.blocker.ui.stats.shownFocusStreak
 import com.warden.blocker.util.PermissionsHelper
 import com.warden.blocker.vpn.VpnController
 import com.warden.blocker.vpn.WardenVpnService
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import java.util.Calendar
 
 @Composable
 fun HomeScreen(
@@ -71,6 +79,10 @@ fun HomeScreen(
     val enabled by vm.masterEnabled.collectAsStateWithLifecycle()
     val hasPin by vm.hasPin.collectAsStateWithLifecycle()
     val streak by vm.currentStreak.collectAsStateWithLifecycle()
+    val focusSessions by vm.focusSessionsDone.collectAsStateWithLifecycle()
+    val alwaysOn by vm.alwaysOn.collectAsStateWithLifecycle()
+    val schedules by vm.schedules.collectAsStateWithLifecycle()
+    val scope = rememberCoroutineScope()
     val focusEndsAt by vm.focusEndsAt.collectAsStateWithLifecycle()
     val focusStrict by vm.focusStrict.collectAsStateWithLifecycle()
     val items by vm.items.collectAsStateWithLifecycle()
@@ -146,7 +158,7 @@ fun HomeScreen(
             Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
-                        Text(if (enabled) "Blocking is ON" else "Blocking is OFF", style = MaterialTheme.typography.titleLarge)
+                        BlockingHeadline(enabled, alwaysOn, focusEndsAt, schedules)
                         Text(summary, style = MaterialTheme.typography.bodyMedium)
                         if (protecting) {
                             Text(
@@ -159,8 +171,12 @@ fun HomeScreen(
                     Switch(
                         checked = enabled,
                         onCheckedChange = { turnOn ->
-                            // Disabling while a PIN is set requires the PIN (strict-mode friction).
-                            if (!turnOn && hasPin) showVerify = true else onToggleBlocking(turnOn)
+                            if (turnOn) onToggleBlocking(true) else scope.launch {
+                                // A strict focus session or strict mode keeps it on (and says until when).
+                                if (vm.refuseIfLocked(Loosening.TURN_OFF_BLOCKING)) return@launch
+                                // Disabling while a PIN is set requires the PIN.
+                                if (hasPin) showVerify = true else onToggleBlocking(false)
+                            }
                         },
                     )
                 }
@@ -172,7 +188,7 @@ fun HomeScreen(
             }
         }
         FocusCard(focusEndsAt = focusEndsAt, strict = focusStrict, onStart = onStartFocus, onCancel = onCancelFocus)
-        if (streak > 0) {
+        if (shownFocusStreak(streak, focusSessions) > 0) {
             ElevatedCard(Modifier.fillMaxWidth()) {
                 Row(Modifier.fillMaxWidth().padding(20.dp), verticalAlignment = Alignment.CenterVertically) {
                     Text("🔥", style = MaterialTheme.typography.headlineMedium)
@@ -195,6 +211,25 @@ fun HomeScreen(
             onDismiss = { showVerify = false },
         )
     }
+}
+
+/**
+ * "Blocking is ON/OFF", "Focus session – 23 min left" or "On – waiting for schedule (next: …)".
+ * Ticks on its own so only this line recomposes while a countdown or a schedule is due.
+ */
+@Composable
+private fun BlockingHeadline(enabled: Boolean, alwaysOn: Boolean, focusEndsAt: Long, schedules: List<Schedule>) {
+    val context = LocalContext.current
+    val is24Hour = DateFormat.is24HourFormat(context)
+    var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
+    LaunchedEffect(Unit) {
+        while (true) { delay(5_000); now = System.currentTimeMillis() }
+    }
+    val text = blockingHeadline(
+        enabled, alwaysOn, focusEndsAt, schedules,
+        Calendar.getInstance().apply { timeInMillis = now }, is24Hour,
+    )
+    Text(text, style = MaterialTheme.typography.titleLarge)
 }
 
 /** Red card for something that leaves the user less protected than the switch suggests. */

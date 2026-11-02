@@ -3,6 +3,8 @@ package com.warden.blocker.ui
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.warden.blocker.block.Loosening
+import com.warden.blocker.block.StrictLock
 import com.warden.blocker.data.BlockType
 import com.warden.blocker.data.BlockedItem
 import com.warden.blocker.data.DomainInput
@@ -45,17 +47,18 @@ class WardenViewModel(app: Application) : AndroidViewModel(app) {
     val alwaysOn: StateFlow<Boolean> =
         container.settings.alwaysOn.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
 
-    fun setAlwaysOn(value: Boolean) = viewModelScope.launch { container.settings.setAlwaysOn(value) }
+    fun setAlwaysOn(value: Boolean) = guarded(if (value) null else Loosening.SETTING_OFF) { container.settings.setAlwaysOn(value) }
 
     val blockDoh: StateFlow<Boolean> =
         container.settings.blockDoh.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
 
-    fun setBlockDoh(value: Boolean) = viewModelScope.launch { container.settings.setBlockDoh(value) }
+    fun setBlockDoh(value: Boolean) = guarded(if (value) null else Loosening.SETTING_OFF) { container.settings.setBlockDoh(value) }
 
     val blockNotifications: StateFlow<Boolean> =
         container.settings.blockNotifications.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
 
-    fun setBlockNotifications(value: Boolean) = viewModelScope.launch { container.settings.setBlockNotifications(value) }
+    fun setBlockNotifications(value: Boolean) =
+        guarded(if (value) null else Loosening.SETTING_OFF) { container.settings.setBlockNotifications(value) }
     val hasPin: StateFlow<Boolean> =
         container.settings.hasPin.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
     val currentStreak: StateFlow<Int> =
@@ -89,9 +92,21 @@ class WardenViewModel(app: Application) : AndroidViewModel(app) {
         FocusEndWorker.cancel(getApplication())
     }
 
-    fun setFeatureEnabled(key: String, enabled: Boolean) = viewModelScope.launch {
+    fun setFeatureEnabled(key: String, enabled: Boolean) = guarded(if (enabled) null else Loosening.DISABLE_FEED_BLOCK) {
         container.settings.setFeatureEnabled(key, enabled)
     }
+
+    /**
+     * Runs [block] unless [change] weakens blocking while a strict lock holds (see StrictLock);
+     * then a short message says why and nothing changes. A null [change] always runs.
+     */
+    private fun guarded(change: Loosening?, block: suspend () -> Unit) = viewModelScope.launch {
+        if (change != null && container.strictGuard.refuse(change)) return@launch
+        block()
+    }
+
+    /** True (and the user is told why) when [change] isn't allowed right now. */
+    suspend fun refuseIfLocked(change: Loosening): Boolean = container.strictGuard.refuse(change)
 
     /** Record a protected day for the focus streak, once per open while blocking is on. */
     fun onAppOpened() = viewModelScope.launch {
@@ -134,20 +149,50 @@ class WardenViewModel(app: Application) : AndroidViewModel(app) {
         )
     }
 
-    fun toggleItem(item: BlockedItem) = viewModelScope.launch {
+    fun toggleItem(item: BlockedItem) = guarded(if (item.enabled) Loosening.DISABLE_ITEM else null) {
         container.repository.updateItem(item.copy(enabled = !item.enabled))
     }
 
     /** Persist edits from the per-item config editor. */
-    fun saveItem(item: BlockedItem) = viewModelScope.launch { container.repository.updateItem(item) }
+    fun saveItem(item: BlockedItem) = viewModelScope.launch {
+        val old = container.repository.item(item.id)
+        if (old != null && StrictLock.itemEditLoosens(old, item) && container.strictGuard.refuse(Loosening.WEAKEN_ITEM)) {
+            return@launch
+        }
+        container.repository.updateItem(item)
+    }
 
-    fun removeItem(item: BlockedItem) = viewModelScope.launch { container.repository.removeItem(item) }
+    fun removeItem(item: BlockedItem) = guarded(Loosening.REMOVE_ITEM) { container.repository.removeItem(item) }
 
-    fun addSchedule(schedule: Schedule) = viewModelScope.launch { container.repository.addSchedule(schedule) }
-    fun removeSchedule(schedule: Schedule) = viewModelScope.launch { container.repository.removeSchedule(schedule) }
+    /** Adds a new schedule or saves an edited (or switched on/off) one. */
+    fun addSchedule(schedule: Schedule) = viewModelScope.launch {
+        val old = if (schedule.id == 0L) null else schedules.value.find { it.id == schedule.id }
+        val change = when {
+            old == null -> null
+            old.enabled && !schedule.enabled -> Loosening.DISABLE_SCHEDULE
+            StrictLock.scheduleEditLoosens(old, schedule) -> Loosening.CHANGE_SCHEDULE
+            else -> null
+        }
+        if (change != null && container.strictGuard.refuse(change)) return@launch
+        container.repository.addSchedule(schedule)
+    }
+
+    fun removeSchedule(schedule: Schedule) = guarded(Loosening.REMOVE_SCHEDULE) { container.repository.removeSchedule(schedule) }
 
     fun setMasterEnabled(enabled: Boolean) = viewModelScope.launch { container.settings.setMasterEnabled(enabled) }
-    fun setStrictMode(enabled: Boolean) = viewModelScope.launch { container.settings.setStrictMode(enabled) }
+
+    /** Strict mode only means something with a PIN (otherwise Settings could just switch it off). */
+    fun setStrictMode(enabled: Boolean) = guarded(if (enabled) null else Loosening.SETTING_OFF) {
+        if (enabled && !container.settings.hasPin.first()) return@guarded
+        container.settings.setStrictMode(enabled)
+    }
+
+    /** Sets the PIN and switches strict mode on (the "Strict mode needs a PIN" path). */
+    fun setPinAndStrictMode(pin: String) = viewModelScope.launch {
+        val salt = PinHasher.newSalt()
+        container.settings.setPin(PinHasher.hash(pin, salt), salt)
+        container.settings.setStrictMode(true)
+    }
 
     // --- PIN ---
     fun setPin(pin: String) = viewModelScope.launch {
@@ -155,7 +200,11 @@ class WardenViewModel(app: Application) : AndroidViewModel(app) {
         container.settings.setPin(PinHasher.hash(pin, salt), salt)
     }
 
-    fun clearPin() = viewModelScope.launch { container.settings.clearPin() }
+    /** Strict mode goes with it: without a PIN anyone could switch it off in Settings. */
+    fun clearPin() = guarded(Loosening.SETTING_OFF) {
+        container.settings.clearPin()
+        container.settings.setStrictMode(false)
+    }
 
     /** Verifies [pin], enforcing a compounding lockout after repeated failures. */
     suspend fun verifyPin(pin: String): PinResult {

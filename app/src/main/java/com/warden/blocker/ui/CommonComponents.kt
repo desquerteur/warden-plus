@@ -95,7 +95,6 @@ internal fun SubScreenTopBar(title: String, onBack: () -> Unit, showDone: Boolea
 }
 
 // --- small formatting helpers ---
-internal fun fmt(minute: Int) = "%02d:%02d".format(minute / 60, minute % 60)
 
 internal fun daysLabel(mask: Int): String {
     val names = listOf("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")

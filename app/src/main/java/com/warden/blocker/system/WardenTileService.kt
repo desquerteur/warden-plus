@@ -7,6 +7,7 @@ import android.service.quicksettings.Tile
 import android.service.quicksettings.TileService
 import com.warden.blocker.MainActivity
 import com.warden.blocker.R
+import com.warden.blocker.block.Loosening
 import com.warden.blocker.vpn.VpnController
 import com.warden.blocker.wardenContainer
 import kotlinx.coroutines.CoroutineScope
@@ -54,6 +55,8 @@ class WardenTileService : TileService() {
     }
 
     private suspend fun turnOff() {
+        // A strict focus session or strict mode: the tile stays on and says why.
+        if (applicationContext.wardenContainer.strictGuard.refuse(Loosening.TURN_OFF_BLOCKING)) return
         if (applicationContext.wardenContainer.settings.hasPin.first()) {
             openApp() // let the in-app PIN gate handle disabling
             return

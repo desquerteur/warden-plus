@@ -30,14 +30,21 @@ class BlockEngine(
 
     suspend fun blockedDomains(): List<String> {
         if (!isBlockingActiveNow()) return emptyList()
+        return manualAndDohDomains()
+    }
+
+    /**
+     * Everything the VPN should sinkhole right now: manual domains, DoH hosts and lists.
+     * Pass [active] when the caller has just evaluated [isBlockingActiveNow] itself.
+     */
+    suspend fun blocklist(active: Boolean? = null): DomainMatcher {
+        if (!(active ?: isBlockingActiveNow())) return DomainMatcher.EMPTY
+        return DomainMatcher(manualAndDohDomains(), listDomains())
+    }
+
+    private suspend fun manualAndDohDomains(): List<String> {
         val domains = repo.enabledDomains().toMutableList()
         if (settings.blockDoh.first()) domains += DohHosts.ALL
         return domains
-    }
-
-    /** Everything the VPN should sinkhole right now: manual domains, DoH hosts and lists. */
-    suspend fun blocklist(): DomainMatcher {
-        if (!isBlockingActiveNow()) return DomainMatcher.EMPTY
-        return DomainMatcher(blockedDomains(), listDomains())
     }
 }

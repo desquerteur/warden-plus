@@ -11,6 +11,7 @@ import androidx.core.app.NotificationCompat
 import com.warden.blocker.MainActivity
 import com.warden.blocker.R
 import com.warden.blocker.WardenApp
+import com.warden.blocker.block.BlockStateClock
 import com.warden.blocker.hosts.DomainMatcher
 import com.warden.blocker.stats.StatsRecorder
 import com.warden.blocker.wardenContainer
@@ -18,13 +19,20 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import java.io.FileInputStream
 import java.io.FileOutputStream
 import java.net.DatagramPacket
@@ -46,6 +54,10 @@ class WardenVpnService : VpnService() {
     private var watchJob: Job? = null
 
     @Volatile private var blocklist: DomainMatcher = DomainMatcher.EMPTY
+
+    /** Whether [blocklist] was built while blocking was enforced (null = not built yet). */
+    @Volatile private var builtForActive: Boolean? = null
+    private val refreshLock = Mutex()
 
     /** The device's real DNS resolvers, captured before the tunnel takes over the active
      *  network. We forward non-blocked queries here so Warden never redirects your DNS to a
@@ -89,21 +101,46 @@ class WardenVpnService : VpnService() {
         watchJob = scope.launch { watchBlocklistChanges() }
     }
 
-    private suspend fun refreshBlocklist() {
-        blocklist = runCatching { wardenContainer.blockEngine.blocklist() }
+    private suspend fun refreshBlocklist(): Unit = refreshLock.withLock {
+        val c = wardenContainer
+        val active = runCatching { c.blockEngine.isBlockingActiveNow() }
+            .onFailure { Log.e(TAG, "Blocklist refresh failed", it) }
+            .getOrNull() ?: return@withLock
+        blocklist = runCatching { c.blockEngine.blocklist(active).also { builtForActive = active } }
             .onFailure { Log.e(TAG, "Blocklist refresh failed", it) }
             .getOrDefault(blocklist)
+        // Outside a schedule, still load the hosts-list domains (cached until a list changes),
+        // so switching on when a schedule starts is instant.
+        if (!active) runCatching { c.hostsLists.activeDomainSet() }
     }
 
-    /** Reload when the manual list, an imported hosts list or the DoH switch changes, so
-     *  edits take effect immediately without restarting the tunnel. */
+    /** Reload when the manual list, an imported hosts list, the DoH switch or anything that
+     *  decides whether blocking is enforced changes, so edits take effect immediately without
+     *  restarting the tunnel — and when a schedule or focus session starts or ends. */
     @OptIn(FlowPreview::class)
-    private suspend fun watchBlocklistChanges() {
+    private suspend fun watchBlocklistChanges() = coroutineScope {
         val c = wardenContainer
-        combine(c.repository.items, c.hostsLists.activeKey, c.settings.blockDoh) { _, _, _ -> }
+        launch { watchScheduleClock() }
+        val inputs = listOf<Flow<Any?>>(
+            c.repository.items, c.repository.schedules, c.hostsLists.activeKey,
+            c.settings.blockDoh, c.settings.masterEnabled, c.settings.alwaysOn, c.settings.focusEndsAt,
+        ).map { it.distinctUntilChanged() } // settings flows re-emit on every unrelated pref write
+        combine(inputs) { }
             .drop(1) // the initial values are covered by the refresh before the packet loop
             .debounce(300)
             .collect { refreshBlocklist() }
+    }
+
+    /** Re-check at every minute boundary (and at a focus session's exact end) and rebuild
+     *  only when enforcement flipped, so a running VPN follows its schedules. */
+    private suspend fun watchScheduleClock() {
+        val c = wardenContainer
+        while (true) {
+            val focusEndsAt = runCatching { c.settings.focusEndsAt.first() }.getOrDefault(0L)
+            delay(BlockStateClock.delayUntilNextCheck(System.currentTimeMillis(), focusEndsAt))
+            val active = runCatching { c.blockEngine.isBlockingActiveNow() }.getOrNull() ?: continue
+            if (BlockStateClock.needsRebuild(builtForActive, active)) refreshBlocklist()
+        }
     }
 
     private fun runPacketLoop(pfd: ParcelFileDescriptor) {
@@ -219,6 +256,7 @@ class WardenVpnService : VpnService() {
         runCatching { tunnel?.close() }
         tunnel = null
         blocklist = DomainMatcher.EMPTY
+        builtForActive = null
         wardenContainer.hostsLists.releaseCache()
     }
 

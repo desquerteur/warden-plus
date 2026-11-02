@@ -30,11 +30,20 @@ object AppsHelper {
             .toList()
     }
 
-    /** Human-readable app name for a package, falling back to the package name. */
-    fun labelFor(context: Context, packageName: String): String = runCatching {
-        val pm = context.packageManager
-        pm.getApplicationLabel(pm.getApplicationInfo(packageName, 0)).toString()
-    }.getOrDefault(packageName)
+    /**
+     * Human-readable app name for a package. Also covers system apps and apps uninstalled
+     * since; if Android won't tell us (e.g. package visibility), a readable guess from the
+     * package name ([fallbackAppLabel]).
+     */
+    fun labelFor(context: Context, packageName: String): String {
+        val label = runCatching {
+            val pm = context.packageManager
+            val info = pm.getApplicationInfo(packageName, PackageManager.MATCH_UNINSTALLED_PACKAGES)
+            pm.getApplicationLabel(info).toString()
+        }.getOrNull()
+        // getApplicationLabel() returns the package name itself when the app has no label.
+        return if (label.isNullOrBlank() || label == packageName) fallbackAppLabel(packageName) else label
+    }
 
     /** Loads an app's launcher icon as an ImageBitmap (null if the package is gone). */
     fun loadIcon(context: Context, packageName: String): ImageBitmap? = runCatching {

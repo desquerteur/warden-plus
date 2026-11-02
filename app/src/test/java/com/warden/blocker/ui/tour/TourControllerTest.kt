@@ -88,7 +88,7 @@ class TourControllerTest {
         await(c.run) { it != null }
         c.targetMissing()
         assertEquals(1, c.run.value!!.index)
-        assertEquals(1 to 2, TourLogic.progress(c.run.value!!, 3))
+        assertEquals(2 to 3, TourLogic.progress(c.run.value!!, 3))
         c.targetMissing(); c.targetMissing()
         assertNull(c.run.value)
         assertNotNull("nothing was shown, so the user is told why", c.emptyNotice.value)

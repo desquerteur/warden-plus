@@ -40,6 +40,9 @@ object TourIds {
     const val PROTECTION_MODES = "protection.modes"
     const val SETTINGS_GUARD_SYSTEM = "settings.guard_system_settings"
     const val SETTINGS_DEVICE_OWNER = "settings.device_owner"
+
+    /** The "Settings are locked" screen (PIN): guides don't walk past it. */
+    const val SETTINGS_LOCKED = "settings.locked"
 }
 
 object Tours {

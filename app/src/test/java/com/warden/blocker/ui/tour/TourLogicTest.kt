@@ -54,11 +54,24 @@ class TourLogicTest {
         assertNull(TourLogic.back(TourRun("t", 2, missing = setOf(0, 1))))
     }
 
-    @Test fun progressCountsOnlyStepsThatShow() {
+    @Test fun oneLockedCardStandsForEveryStepBehindThePin() {
+        val steps = Tours.protection.steps
+        assertTrue(TourLogic.behindPin(TourRoutes.SETTINGS))
+        assertTrue(TourLogic.behindPin(TourRoutes.PROTECTION))
+        assertFalse(TourLogic.behindPin(TourRoutes.HOME))
+        // From the first (Settings) step: all later Settings / Protection steps are left out,
+        // the Home steps at the end still come, and the tour then ends normally (G3).
+        val run = TourRun(Tours.PROTECTION, 0, missing = TourLogic.lockedAhead(steps, 0))
+        val next = TourLogic.next(run, steps.size)!!
+        assertEquals(TourRoutes.HOME, steps[next.index].route)
+        assertEquals(steps.size, TourLogic.progress(run, steps.size).second)
+    }
+
+    @Test fun progressIsStableForTheWholeTour() {
         assertEquals(1 to 8, TourLogic.progress(TourRun("t", 0), 8))
         assertEquals(3 to 8, TourLogic.progress(TourRun("t", 2), 8))
-        // Steps 0 and 1 missing: step 2 is the first shown of 6.
-        assertEquals(1 to 6, TourLogic.progress(TourRun("t", 2, missing = setOf(0, 1)), 8))
+        // Steps found missing don't change the numbers of the others (G4: 1/9 → 4/9 → 5/7).
+        assertEquals(3 to 8, TourLogic.progress(TourRun("t", 2, missing = setOf(0, 1, 5)), 8))
     }
 
     @Test fun missingAheadOnlyJudgesStepsOnTheOpenScreen() {
@@ -74,7 +87,7 @@ class TourLogicTest {
         assertEquals(setOf(1), TourLogic.missingAhead(steps, 0, TourRoutes.SETTINGS) { it in onScreen })
         assertEquals(emptySet<Int>(), TourLogic.missingAhead(steps, 3, TourRoutes.SETTINGS) { it in onScreen })
         val run = TourRun("t", index = 0, missing = setOf(1))
-        assertEquals(1 to 4, TourLogic.progress(run, steps.size))
+        assertEquals(1 to 5, TourLogic.progress(run, steps.size))
         assertEquals(2, TourLogic.next(run, steps.size)!!.index)
     }
 

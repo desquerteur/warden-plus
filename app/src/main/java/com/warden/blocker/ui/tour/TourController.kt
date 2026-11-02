@@ -70,7 +70,7 @@ class TourController(private val store: TourStore, private val scope: CoroutineS
         val tour = tours(run.tourId) ?: return
         val next = TourLogic.skipMissing(run, tour.steps.size)
         if (next != null) { move(next); return }
-        val shown = TourLogic.progress(run.copy(missing = run.missing + run.index), tour.steps.size).second
+        val shown = tour.steps.size - (run.missing + run.index).size
         finish(TourStatus.COMPLETED)
         if (shown == 0) {
             _emptyNotice.value = "Couldn't find these parts on screen right now. If Settings is locked, " +

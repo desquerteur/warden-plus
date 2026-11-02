@@ -111,11 +111,12 @@ object TourLogic {
         return if (marked.forward) next(marked, size) else back(marked) ?: next(marked, size)
     }
 
-    /** "3/8": position among the steps not known to be missing, and their count. */
-    fun progress(run: TourRun, size: Int): Pair<Int, Int> {
-        val position = (0..run.index.coerceAtMost(size - 1)).count { it !in run.missing }
-        return position to (size - run.missing.count { it < size })
-    }
+    /**
+     * "3/8": the step's number and the tour's length, fixed for the whole tour. (Counting only the
+     * steps found so far made the numbers jump: 1/9 → 4/9 → 5/7.) A step left out because its
+     * part isn't on screen just isn't shown; the next one keeps its own number.
+     */
+    fun progress(run: TourRun, size: Int): Pair<Int, Int> = (run.index.coerceIn(0, size - 1) + 1) to size
 
     /**
      * Later steps on the screen that is open now whose target isn't on it: known to be missing
@@ -126,6 +127,18 @@ object TourLogic {
             val s = steps[i]
             s.route == route && s.target != null && s.ifMissing == MissingTarget.SKIP && !isOnScreen(s.target)
         }.toSet()
+
+    /** Routes behind the Settings PIN lock: Settings itself and the pages opened from it. */
+    private val pinLockedRoutes = setOf(TourRoutes.SETTINGS, TourRoutes.PROTECTION)
+
+    fun behindPin(route: String?): Boolean = route in pinLockedRoutes
+
+    /**
+     * With Settings locked by the PIN, one "Settings are locked" card stands for every later
+     * step behind the lock: they are left out instead of each showing an empty card.
+     */
+    fun lockedAhead(steps: List<TourStep>, from: Int): Set<Int> =
+        ((from + 1) until steps.size).filter { behindPin(steps[it].route) }.toSet()
 
     /** Where to start a tour: a half-done tour continues, anything else starts over. */
     fun startIndex(record: TourRecord, size: Int, resume: Boolean): Int =

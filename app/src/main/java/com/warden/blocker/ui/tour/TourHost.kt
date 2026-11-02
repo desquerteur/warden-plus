@@ -65,6 +65,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -108,8 +109,19 @@ fun TourHost(currentRoute: String?, navigate: (String) -> Unit, content: @Compos
 
     CompositionLocalProvider(LocalTourRegistry provides registry, LocalTourController provides controller) {
         Box(Modifier.fillMaxSize()) {
-            // While a guide runs, TalkBack reads only the guide, not the dimmed screen behind it.
-            Box(if (run != null) Modifier.clearAndSetSemantics { } else Modifier) { content() }
+            // While a guide runs, TalkBack reads only the guide, not the dimmed screen behind it,
+            // and no touch reaches the app: taken before any button or list below sees it, so
+            // tapping through the guide can't add apps or flip switches (only the guide reacts).
+            val guiding = run != null
+            Box(
+                (if (guiding) Modifier.clearAndSetSemantics { } else Modifier)
+                    .pointerInput(guiding) {
+                        if (!guiding) return@pointerInput
+                        awaitPointerEventScope {
+                            while (true) awaitPointerEvent(PointerEventPass.Initial).changes.forEach { it.consume() }
+                        }
+                    },
+            ) { content() }
             run?.let { TourOverlay(it, vm, registry, route) { r -> onNavigate(r) } }
             PageTipsOffer(controller, currentRoute, running = run != null)
         }
@@ -131,6 +143,8 @@ private sealed interface Phase {
     data object Finding : Phase
     data class Path(val hop: Hop) : Phase
     data class Showing(val display: StepDisplay) : Phase
+    /** The step is behind the Settings PIN lock: a card in the middle says so (G3/G4). */
+    data object Locked : Phase
 }
 
 @Composable
@@ -142,8 +156,13 @@ private fun TourOverlay(
     navigate: (String) -> Unit,
 ) {
     val controller = vm.controller
-    val tour = Tours.byId(run.tourId) ?: return
-    val step = tour.steps.getOrNull(run.index) ?: return
+    // A run that points nowhere would leave the app blocked with no card: end it.
+    val step = Tours.byId(run.tourId)?.steps?.getOrNull(run.index)
+    if (step == null) {
+        LaunchedEffect(run) { vm.controller.skip() }
+        return
+    }
+    val tour = Tours.byId(run.tourId)!!
     val context = LocalContext.current
     val animate = remember(run.tourId) { animationsEnabled(context) }
 
@@ -197,7 +216,13 @@ private fun TourOverlay(
             canReplay = showPath
             if (showPath) vm.pathOrigin = route.value
         }
+        var lockedOut = false
         for (hop in hops) {
+            // Settings locked with the PIN: never walk past the lock into the pages behind it.
+            if (route.value == TourRoutes.SETTINGS && !TourPath.isTab(hop.route) && registry.find(TourIds.SETTINGS_LOCKED, 300) != null) {
+                lockedOut = true
+                break
+            }
             if (showPath) {
                 phase = Phase.Path(hop)
                 registry.find(hop.target, 800)?.let { r ->
@@ -209,7 +234,15 @@ private fun TourOverlay(
             awaitRoute(route, hop.route)
         }
         fingerOn = false
-        val target = step.target?.let { registry.find(it, 1500) }
+        val target = if (lockedOut) null else step.target?.let { registry.find(it, 1500) }
+        if (target == null && TourLogic.behindPin(step.route) && (lockedOut || registry.isComposed(TourIds.SETTINGS_LOCKED))) {
+            // One card for all of them; the later steps behind the lock are left out.
+            controller.markMissing(TourLogic.lockedAhead(tour.steps, run.index))
+            spotOn = false
+            placeFor = null
+            phase = Phase.Locked
+            return@LaunchedEffect
+        }
         when (val display = TourLogic.display(step, target != null)) {
             StepDisplay.SKIP -> { controller.targetMissing(); return@LaunchedEffect }
             // Text first, so it changes while the spotlight is still gliding over.
@@ -222,7 +255,8 @@ private fun TourOverlay(
             controller.markMissing(TourLogic.missingAhead(tour.steps, run.index, route.value, registry::isComposed))
         }
         // Keep up with the target while it moves (scrolling into view, folding, rotating).
-        if (target != null) snapshotFlow { registry.rect(step.target) }.filterNotNull().collect { moveSpot(it) }
+        val targetId = step.target
+        if (target != null && targetId != null) snapshotFlow { registry.rect(targetId) }.filterNotNull().collect { moveSpot(it) }
     }
 
     BackHandler {
@@ -283,6 +317,7 @@ private fun TourOverlay(
                 animate = animate,
                 canReplay = canReplay,
                 isLast = TourLogic.next(run, tour.steps.size) == null,
+                canGoBack = TourLogic.back(run) != null,
                 onBack = controller::back,
                 onNext = controller::next,
                 onSkip = controller::skip,
@@ -329,6 +364,7 @@ private fun TourCard(
     animate: Boolean,
     canReplay: Boolean,
     isLast: Boolean,
+    canGoBack: Boolean,
     onBack: () -> Unit,
     onNext: () -> Unit,
     onSkip: () -> Unit,
@@ -369,6 +405,14 @@ private fun TourCard(
                             Text(phase.hop.hint, style = MaterialTheme.typography.bodyMedium)
                         }
                         Phase.Finding -> Text("…", style = MaterialTheme.typography.titleMedium)
+                        Phase.Locked -> {
+                            Text(step.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, modifier = Modifier.semantics { heading() })
+                            Text(
+                                "Settings are locked with your PIN, so this part can't be shown now. Unlock Settings, " +
+                                    "then start this guide again from Settings › Help.",
+                                style = MaterialTheme.typography.bodyMedium,
+                            )
+                        }
                         is Phase.Showing -> {
                             Text(step.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, modifier = Modifier.semantics { heading() })
                             Text(step.text, style = MaterialTheme.typography.bodyMedium)
@@ -397,9 +441,10 @@ private fun TourCard(
                 Button(onClick = { openSettingsGuide(context, step.guide) }, modifier = Modifier.fillMaxWidth().padding(end = 8.dp)) { Text(openLabel) }
             }
             Row(Modifier.fillMaxWidth().padding(end = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                if (position > 1) OutlinedButton(onClick = onBack, enabled = phase is Phase.Showing) { Text("Back") }
+                val ready = phase is Phase.Showing || phase is Phase.Locked
+                if (canGoBack) OutlinedButton(onClick = onBack, enabled = ready) { Text("Back") }
                 Spacer(Modifier.weight(1f))
-                Button(onClick = onNext, enabled = phase is Phase.Showing) { Text(if (isLast) "Done" else "Next") }
+                Button(onClick = onNext, enabled = ready) { Text(if (isLast) "Done" else "Next") }
             }
         }
     }

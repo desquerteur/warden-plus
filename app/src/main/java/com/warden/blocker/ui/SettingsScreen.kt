@@ -57,7 +57,7 @@ fun SettingsScreen(vm: WardenViewModel, onOpenSetup: () -> Unit, onOpenProtectio
 
     // PIN gate: settings are locked until the PIN is entered.
     if (hasPin && !unlocked) {
-        Column(Modifier.fillMaxSize().padding(20.dp), verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
+        Column(Modifier.fillMaxSize().tourTarget(TourIds.SETTINGS_LOCKED).padding(20.dp), verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
             Text("Settings are locked", style = MaterialTheme.typography.titleLarge)
             Spacer(Modifier.height(12.dp))
             Button(onClick = { showUnlock = true }) { Text("Unlock with PIN") }

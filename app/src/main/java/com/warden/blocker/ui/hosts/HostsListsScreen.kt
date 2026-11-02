@@ -21,11 +21,11 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.FileOpen
-import androidx.compose.material.icons.filled.Link
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Schedule
+import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.FileOpen
+import androidx.compose.material.icons.outlined.Link
+import androidx.compose.material.icons.outlined.Refresh
+import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -60,7 +60,12 @@ import com.warden.blocker.hosts.HostsListRepository
 import com.warden.blocker.hosts.HostsSource
 import com.warden.blocker.hosts.HostsTemplates
 import com.warden.blocker.hosts.ImportProgress
+import com.warden.blocker.ui.CardSpacing
+import com.warden.blocker.ui.IntroText
+import com.warden.blocker.ui.SectionHeader
 import com.warden.blocker.ui.SubScreenTopBar
+import com.warden.blocker.ui.SupportingText
+import com.warden.blocker.ui.pageGutter
 import com.warden.blocker.ui.times.ListSpanDialog
 import com.warden.blocker.ui.times.SpanLabel
 import com.warden.blocker.ui.times.TimesViewModel
@@ -68,11 +73,6 @@ import kotlinx.coroutines.launch
 import java.text.DateFormat
 import java.util.Date
 
-/** Entry point for the Blocklist page: opens [HostsListsScreen]. */
-@Composable
-fun HostsListsEntryButton(onClick: () -> Unit, modifier: Modifier = Modifier.fillMaxWidth()) {
-    OutlinedButton(onClick = onClick, modifier = modifier) { Text("Import blocklists (hosts files)") }
-}
 
 /**
  * Import hosts files / domain blocklists (e.g. StevenBlack) from a file, a link or a
@@ -104,84 +104,83 @@ fun HostsListsScreen(onBack: () -> Unit, vm: HostsViewModel = viewModel(), times
         }
     }
 
-    // Same top bar and 20dp side margins as the other sub-screens (app picker, feeds, setup).
+    // Same top bar and side margins as the other sub-screens (app picker, feeds, setup).
+    val gutter = pageGutter()
     Column(Modifier.fillMaxSize()) {
         SubScreenTopBar("Import blocklists", onBack = onBack)
         Box(Modifier.fillMaxSize()) {
             LazyColumn(
                 Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 80.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
+                contentPadding = PaddingValues(start = gutter, end = gutter, bottom = 80.dp),
+                verticalArrangement = Arrangement.spacedBy(CardSpacing),
             ) {
-                item {
-                    Text(
+                item(key = "intro") {
+                    IntroText(
                         "Import hosts files or domain lists. Every domain in an enabled list — and its " +
                             "subdomains — is blocked while blocking is on.",
-                        style = MaterialTheme.typography.bodyMedium,
                     )
                 }
 
-                item {
+                item(key = "buttons") {
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Button(onClick = { pickFile.launch(arrayOf("text/*", "application/octet-stream")) }, enabled = !busy) {
-                            Icon(Icons.Filled.FileOpen, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Icon(Icons.Outlined.FileOpen, contentDescription = null, modifier = Modifier.size(18.dp))
                             Spacer(Modifier.width(8.dp))
                             Text("Import file")
                         }
                         OutlinedButton(onClick = { showUrlDialog = true }, enabled = !busy) {
-                            Icon(Icons.Filled.Link, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Icon(Icons.Outlined.Link, contentDescription = null, modifier = Modifier.size(18.dp))
                             Spacer(Modifier.width(8.dp))
                             Text("Add from URL")
                         }
                     }
                 }
 
-                progress?.let { p -> item { ProgressCard(p) } }
+                progress?.let { p -> item(key = "progress") { Box(Modifier.animateItem()) { ProgressCard(p) } } }
 
-                item {
-                    Text("Ready-made lists", style = MaterialTheme.typography.titleMedium)
-                    Text(
-                        "From github.com/StevenBlack/hosts. The add-ons work on top of Unified.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.outline,
-                    )
-                    Spacer(Modifier.size(4.dp))
-                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        HostsTemplates.ALL.forEach { t ->
-                            val added = sources.any { it.url == t.url }
-                            FilterChip(
-                                selected = added,
-                                onClick = { if (!added) vm.addTemplate(t) },
-                                enabled = added || !busy,
-                                label = { Text(t.name) },
-                                leadingIcon = {
-                                    Icon(if (added) Icons.Filled.Check else Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(18.dp))
-                                },
-                            )
+                item(key = "templates") {
+                    Column(Modifier.animateItem(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        SectionHeader("Ready-made lists")
+                        SupportingText("From github.com/StevenBlack/hosts. The add-ons work on top of Unified.")
+                        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            HostsTemplates.ALL.forEach { t ->
+                                val added = sources.any { it.url == t.url }
+                                FilterChip(
+                                    selected = added,
+                                    onClick = { if (!added) vm.addTemplate(t) },
+                                    enabled = added || !busy,
+                                    label = { Text(t.name) },
+                                    leadingIcon = {
+                                        Icon(if (added) Icons.Filled.Check else Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+                                    },
+                                )
+                            }
                         }
                     }
                 }
 
-                item {
+                item(key = "yours") {
                     val active = sources.filter { it.enabled }
-                    Text("Your lists", style = MaterialTheme.typography.titleMedium)
-                    Text(
-                        if (sources.isEmpty()) "No lists yet — import a file, add a link or tap a ready-made list."
-                        else "${active.size} of ${sources.size} enabled · ${formatCount(active.sumOf { it.domainCount })} domains",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.outline,
-                    )
+                    Column(Modifier.animateItem(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        SectionHeader("Your lists")
+                        SupportingText(
+                            if (sources.isEmpty()) "No lists yet — import a file, add a link or tap a ready-made list."
+                            else "${active.size} of ${sources.size} enabled · ${formatCount(active.sumOf { it.domainCount })} domains",
+                        )
+                    }
                 }
 
                 items(sources, key = { it.id }) { source ->
-                    SourceCard(
-                        source = source,
-                        busy = busy,
-                        onToggle = { vm.setEnabled(source, it) },
-                        onRefresh = { vm.refresh(source) },
-                        onDelete = { confirmDelete = source },
-                        onTime = { timing = source },
-                    )
+                    Box(Modifier.animateItem()) {
+                        SourceCard(
+                            source = source,
+                            busy = busy,
+                            onToggle = { vm.setEnabled(source, it) },
+                            onRefresh = { vm.refresh(source) },
+                            onDelete = { confirmDelete = source },
+                            onTime = { timing = source },
+                        )
+                    }
                 }
             }
 
@@ -215,7 +214,7 @@ fun HostsListsScreen(onBack: () -> Unit, vm: HostsViewModel = viewModel(), times
 private fun ProgressCard(p: ImportProgress) {
     Card(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp)) {
-            Text("Importing “${p.sourceName}”…", style = MaterialTheme.typography.titleSmall, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            Text("Importing “${p.sourceName}”…", style = MaterialTheme.typography.titleMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
             Spacer(Modifier.size(8.dp))
             if (p.totalBytes > 0) {
                 LinearProgressIndicator(
@@ -229,7 +228,7 @@ private fun ProgressCard(p: ImportProgress) {
             Text(
                 "${formatCount(p.domains)} domains · ${formatMegabytes(p.bytesRead)}",
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.outline,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
     }
@@ -252,7 +251,7 @@ private fun SourceCard(
                     Text(
                         "${formatCount(source.domainCount)} domains · ${if (source.url != null) "Link" else "File"}",
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.outline,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     SpanLabel(source.activeFrom, source.activeUntil)
                 }
@@ -270,19 +269,19 @@ private fun SourceCard(
                 Text(
                     "Updated ${formatDate(source.updatedAt)}",
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.outline,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.weight(1f),
                 )
                 IconButton(onClick = onTime) {
-                    Icon(Icons.Filled.Schedule, contentDescription = "Time limit for ${source.name}")
+                    Icon(Icons.Outlined.Schedule, contentDescription = "Time limit for ${source.name}")
                 }
                 if (source.url != null) {
                     IconButton(onClick = onRefresh, enabled = !busy) {
-                        Icon(Icons.Filled.Refresh, contentDescription = "Update ${source.name}")
+                        Icon(Icons.Outlined.Refresh, contentDescription = "Update ${source.name}")
                     }
                 }
                 IconButton(onClick = onDelete) {
-                    Icon(Icons.Filled.Delete, contentDescription = "Remove ${source.name}")
+                    Icon(Icons.Outlined.Delete, contentDescription = "Remove ${source.name}")
                 }
             }
         }

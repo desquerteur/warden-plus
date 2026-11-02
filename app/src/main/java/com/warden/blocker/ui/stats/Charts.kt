@@ -206,13 +206,15 @@ fun DonutChart(
     }
 }
 
-/** Thin horizontal share bar (0..1) used in the app list. */
+/** Thin horizontal share bar (0..1) used in the app list; grows in when it first shows. */
 @Composable
 fun ShareBar(fraction: Float, color: Color, modifier: Modifier = Modifier) {
     val track = MaterialTheme.colorScheme.surfaceVariant
+    val grow = remember { Animatable(0f) }
+    LaunchedEffect(Unit) { grow.animateTo(1f, tween(600)) }
     Canvas(modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp))) {
         drawRect(track)
-        val w = size.width * fraction.coerceIn(0f, 1f)
+        val w = size.width * fraction.coerceIn(0f, 1f) * grow.value
         if (w > 0f) drawRoundRect(color, size = Size(w.coerceAtLeast(size.height), size.height), cornerRadius = CornerRadius(size.height / 2))
     }
 }

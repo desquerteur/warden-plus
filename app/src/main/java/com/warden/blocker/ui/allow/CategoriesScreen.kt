@@ -1,6 +1,7 @@
 package com.warden.blocker.ui.allow
 
 import androidx.compose.foundation.clickable
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -36,7 +37,10 @@ import com.warden.blocker.allow.AppCategories
 import com.warden.blocker.allow.AppCategory
 import com.warden.blocker.allow.CategorizedApp
 import com.warden.blocker.ui.AppIcon
+import com.warden.blocker.ui.CardPadding
+import com.warden.blocker.ui.IntroText
 import com.warden.blocker.ui.SubScreenTopBar
+import com.warden.blocker.ui.pageGutter
 
 /**
  * Block whole categories (all games, all social apps …) as apps declare them, with a manual
@@ -55,18 +59,18 @@ fun CategoriesScreen(onBack: () -> Unit, vm: AllowViewModel = viewModel()) {
     val list = apps.orEmpty().filter { it.packageName !in alwaysAllowed }
     fun effective(app: CategorizedApp) = AppCategories.effective(app.packageName, app.detected, config.categoryOverrides)
 
+    val gutter = pageGutter()
     Column(Modifier.fillMaxSize()) {
         SubScreenTopBar("Block categories", onBack = onBack, showDone = true)
         LazyColumn(
             Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 20.dp),
+            contentPadding = PaddingValues(start = gutter, end = gutter, bottom = gutter),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             item {
-                Text(
+                IntroText(
                     "Block every app of a kind — also ones you install later. Apps say themselves what they are; " +
                         "if one is wrong, correct it below. Your own blocklist settings for an app (e.g. a pause) win.",
-                    style = MaterialTheme.typography.bodyMedium,
                 )
             }
             items(AppCategory.entries, key = { it.name }) { category ->
@@ -74,7 +78,7 @@ fun CategoriesScreen(onBack: () -> Unit, vm: AllowViewModel = viewModel()) {
                 val excluded = list.filter { it.detected == category && config.categoryOverrides[it.packageName] == AppCategories.NONE }
                 val open = category.name in expanded
                 Card(Modifier.fillMaxWidth()) {
-                    Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Column(Modifier.fillMaxWidth().padding(CardPadding), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Column(Modifier.weight(1f)) {
                                 Text("Block all ${category.label.lowercase()}", style = MaterialTheme.typography.titleMedium)
@@ -88,26 +92,29 @@ fun CategoriesScreen(onBack: () -> Unit, vm: AllowViewModel = viewModel()) {
                         TextButton(onClick = { expanded = if (open) expanded - category.name else expanded + category.name }) {
                             Text(if (open) "Hide apps" else "Show apps")
                         }
-                        if (open) {
-                            if (members.isEmpty()) Hint("None found.")
-                            members.forEach { app ->
-                                val byHand = config.categoryOverrides[app.packageName] == category.name
-                                CategoryAppRow(
-                                    app,
-                                    status = if (byHand) "Added by you" else "Detected",
-                                    action = if (byHand) "Remove" else "Not a ${category.singular}",
-                                    onAction = { vm.setOverride(app.packageName, if (byHand) null else AppCategories.NONE) },
-                                )
+                        // The apps fold open and closed.
+                        AnimatedVisibility(open) {
+                            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                if (members.isEmpty()) Hint("None found.")
+                                members.forEach { app ->
+                                    val byHand = config.categoryOverrides[app.packageName] == category.name
+                                    CategoryAppRow(
+                                        app,
+                                        status = if (byHand) "Added by you" else "Detected",
+                                        action = if (byHand) "Remove" else "Not a ${category.singular}",
+                                        onAction = { vm.setOverride(app.packageName, if (byHand) null else AppCategories.NONE) },
+                                    )
+                                }
+                                excluded.forEach { app ->
+                                    CategoryAppRow(
+                                        app,
+                                        status = "You said: not a ${category.singular}",
+                                        action = "Count again",
+                                        onAction = { vm.setOverride(app.packageName, null) },
+                                    )
+                                }
+                                TextButton(onClick = { addingTo = category.name }) { Text("Not detected? Add an app") }
                             }
-                            excluded.forEach { app ->
-                                CategoryAppRow(
-                                    app,
-                                    status = "You said: not a ${category.singular}",
-                                    action = "Count again",
-                                    onAction = { vm.setOverride(app.packageName, null) },
-                                )
-                            }
-                            TextButton(onClick = { addingTo = category.name }) { Text("Not detected? Add an app") }
                         }
                     }
                 }

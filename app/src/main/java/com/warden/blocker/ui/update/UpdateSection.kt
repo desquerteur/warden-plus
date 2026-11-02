@@ -8,6 +8,10 @@ import android.net.Uri
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.tween
+import com.warden.blocker.ui.CardPadding
+import com.warden.blocker.ui.Motion
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -78,11 +82,13 @@ fun UpdateSection(modifier: Modifier = Modifier, vm: UpdateViewModel = viewModel
     }
 
     Card(modifier.fillMaxWidth()) {
-        Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        // Grows and shrinks smoothly when parts appear (switched on, update found, …).
+        Column(Modifier.fillMaxWidth().animateContentSize(tween(Motion.MEDIUM)).padding(CardPadding), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text("Updates", style = MaterialTheme.typography.titleMedium)
             Text(
                 "Installed version: ${BuildConfig.VERSION_NAME}" + if (BuildConfig.DEBUG) " (debug build)" else "",
                 style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             if (BuildConfig.DEBUG) {
                 Text(
@@ -166,7 +172,7 @@ fun UpdateSection(modifier: Modifier = Modifier, vm: UpdateViewModel = viewModel
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f).padding(end = 8.dp)) {
                     Text("Check automatically", style = MaterialTheme.typography.bodyLarge)
-                    Text("Once a day. You get a notification when a new version is out.", style = MaterialTheme.typography.bodySmall)
+                    Text("Once a day. You get a notification when a new version is out.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 Switch(checked = autoCheck, onCheckedChange = vm::setAutoCheck)
             }
@@ -218,7 +224,7 @@ private fun NotificationPermissionHint() {
     }
     val launcher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted = it }
     if (!granted) {
-        Text("Notifications are off, so you won't be told about new versions.", style = MaterialTheme.typography.bodySmall)
+        Text("Notifications are off, so you won't be told about new versions.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         TextButton(onClick = { launcher.launch(Manifest.permission.POST_NOTIFICATIONS) }) { Text("Allow notifications") }
     }
 }

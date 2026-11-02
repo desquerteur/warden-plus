@@ -1,5 +1,6 @@
 package com.warden.blocker.ui
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -72,22 +73,23 @@ fun ItemEditorSheet(item: BlockedItem, onSave: (BlockedItem) -> Unit, onDismiss:
                     FilterChip(selected = mode == InterceptMode.BLOCK, onClick = { mode = InterceptMode.BLOCK }, label = { Text("Hard block") })
                 }
 
-                if (mode == InterceptMode.PAUSE && item.type == BlockType.APP) {
-                    Stepper("Breathe for (seconds)", pauseSeconds, step = 5, min = 0, max = 120) { pauseSeconds = it }
-                    OutlinedTextField(
-                        value = prompt, onValueChange = { prompt = it },
-                        label = { Text("Pause prompt (optional)") },
-                        placeholder = { Text("Why are you opening this?") },
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                    Stepper("Opens per day (0 = unlimited)", openLimit, step = 1, min = 0, max = 30) { openLimit = it }
-                    Stepper("Daily time limit, min (0 = off)", timeLimit, step = 5, min = 0, max = 240) { timeLimit = it }
-                    Stepper("Cooldown between opens, min", cooldown, step = 5, min = 0, max = 240) { cooldown = it }
-                } else if (mode == InterceptMode.PAUSE) {
-                    Text(
-                        "Mindful pause applies to apps. Websites are hard-blocked at the network layer.",
-                        style = MaterialTheme.typography.bodyMedium,
-                    )
+                // The pause options fold open when "Mindful pause" is picked.
+                AnimatedVisibility(mode == InterceptMode.PAUSE && item.type == BlockType.APP) {
+                    Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                        Stepper("Breathe for (seconds)", pauseSeconds, step = 5, min = 0, max = 120) { pauseSeconds = it }
+                        OutlinedTextField(
+                            value = prompt, onValueChange = { prompt = it },
+                            label = { Text("Pause prompt (optional)") },
+                            placeholder = { Text("Why are you opening this?") },
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        Stepper("Opens per day (0 = unlimited)", openLimit, step = 1, min = 0, max = 30) { openLimit = it }
+                        Stepper("Daily time limit, min (0 = off)", timeLimit, step = 5, min = 0, max = 240) { timeLimit = it }
+                        Stepper("Cooldown between opens, min", cooldown, step = 5, min = 0, max = 240) { cooldown = it }
+                    }
+                }
+                AnimatedVisibility(mode == InterceptMode.PAUSE && item.type != BlockType.APP) {
+                    SupportingText("Mindful pause applies to apps. Websites are hard-blocked at the network layer.")
                 }
 
                 SpanSection(activeFrom, activeUntil) { f, u -> activeFrom = f; activeUntil = u }

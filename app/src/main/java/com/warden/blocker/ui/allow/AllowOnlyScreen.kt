@@ -1,7 +1,9 @@
 package com.warden.blocker.ui.allow
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -16,7 +18,8 @@ import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.Language
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -47,7 +50,11 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.warden.blocker.allow.AllowScope
 import com.warden.blocker.allow.ListMode
 import com.warden.blocker.allow.SystemDomains
+import com.warden.blocker.ui.CardSpacing
+import com.warden.blocker.ui.IntroText
+import com.warden.blocker.ui.SectionCard
 import com.warden.blocker.ui.SubScreenTopBar
+import com.warden.blocker.ui.pageGutter
 
 /**
  * "Block everything except …": the mode for apps and websites, when it applies, the allowed
@@ -77,18 +84,18 @@ fun AllowOnlyScreen(onBack: () -> Unit, vm: AllowViewModel = viewModel()) {
         }
     }
 
+    val gutter = pageGutter()
     Column(Modifier.fillMaxSize()) {
         SubScreenTopBar("Allow only", onBack = onBack, showDone = true)
         LazyColumn(
             Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 20.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            contentPadding = PaddingValues(start = gutter, end = gutter, bottom = gutter),
+            verticalArrangement = Arrangement.spacedBy(CardSpacing),
         ) {
             item {
-                Text(
+                IntroText(
                     "Block everything except what you choose. Phone, emergency calls, Settings, your home screen, " +
                         "the keyboard, the clock and Warden+ always stay open.",
-                    style = MaterialTheme.typography.bodyMedium,
                 )
             }
 
@@ -117,7 +124,7 @@ fun AllowOnlyScreen(onBack: () -> Unit, vm: AllowViewModel = viewModel()) {
                         allowOnlyText = "Block every website except the allowed ones",
                         onSelect = vm::setWebMode,
                     )
-                    if (config.webMode == ListMode.ALLOW_ONLY) {
+                    AnimatedVisibility(config.webMode == ListMode.ALLOW_ONLY) {
                         Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)) {
                             Text(
                                 "Everything online that isn't allowed here is blocked — in the browser and in apps. " +
@@ -150,10 +157,11 @@ fun AllowOnlyScreen(onBack: () -> Unit, vm: AllowViewModel = viewModel()) {
             }
 
             items(config.allowedDomains.sorted(), key = { "domain:$it" }) { domain ->
-                Card(Modifier.fillMaxWidth()) {
+                Card(Modifier.fillMaxWidth().animateItem()) {
                     Row(Modifier.fillMaxWidth().padding(start = 16.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Text("🌐  $domain", style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
-                        IconButton(onClick = { vm.removeDomain(domain) }) { Icon(Icons.Filled.Delete, contentDescription = "Remove $domain") }
+                        Icon(Icons.Outlined.Language, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                        Text(domain, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f).padding(start = 12.dp))
+                        IconButton(onClick = { vm.removeDomain(domain) }) { Icon(Icons.Outlined.Delete, contentDescription = "Remove $domain", tint = MaterialTheme.colorScheme.onSurfaceVariant) }
                     }
                 }
             }
@@ -164,8 +172,8 @@ fun AllowOnlyScreen(onBack: () -> Unit, vm: AllowViewModel = viewModel()) {
                     TextButton(onClick = { showSystem = !showSystem }) {
                         Text(if (showSystem) "Hide the list" else "Show the list (${SystemDomains.ALL.size})")
                     }
-                    if (showSystem) {
-                        Text(SystemDomains.ALL.joinToString("\n"), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline)
+                    AnimatedVisibility(showSystem) {
+                        Text(SystemDomains.ALL.joinToString("\n"), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
             }
@@ -203,18 +211,13 @@ private fun ModeChoice(selected: ListMode, blockListText: String, allowOnlyText:
 }
 
 @Composable
-internal fun Section(title: String, content: @Composable () -> Unit) {
-    Card(Modifier.fillMaxWidth()) {
-        Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-            content()
-        }
-    }
+internal fun Section(title: String, content: @Composable ColumnScope.() -> Unit) {
+    SectionCard(title, content = content)
 }
 
 @Composable
 internal fun Hint(text: String) {
-    Text(text, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline)
+    Text(text, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
 }
 
 @Composable

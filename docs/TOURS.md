@@ -45,6 +45,8 @@ uninstall protection, Settings guard, Maximum protection), then strict focus and
 - Mini settings screens are drawn, never screenshots.
 - With system animations off (`ANIMATOR_DURATION_SCALE` = 0) everything jumps; the mini
   screens become numbered sentences.
+- Screens fade / slide when they change (docs/STYLE.md). The spotlight keeps following its
+  target while it moves in, so a restyled card must keep its `tourTarget` id.
 
 ## Behaviour
 

@@ -1,8 +1,7 @@
 package com.warden.blocker.ui.tour
 
-import android.content.Context
-import android.provider.Settings
 import androidx.activity.compose.BackHandler
+import com.warden.blocker.ui.animationsEnabled
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -90,9 +89,6 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.math.roundToInt
 
-/** False when "Remove animations" / animator scale 0 is set: then the guide jumps instead of gliding. */
-fun animationsEnabled(context: Context): Boolean =
-    Settings.Global.getFloat(context.contentResolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f) > 0f
 
 /**
  * Hosts the guides on top of [content] (the whole app incl. the bottom bar). [currentRoute] is

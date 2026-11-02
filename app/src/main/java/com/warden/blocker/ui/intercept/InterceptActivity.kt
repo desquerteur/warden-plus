@@ -5,11 +5,18 @@ import android.os.Bundle
 import android.os.SystemClock
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -20,7 +27,10 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Shield
 import androidx.compose.material3.Button
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
@@ -34,10 +44,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.scale
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.lifecycleScope
 import com.warden.blocker.accessibility.ForegroundGate
@@ -46,6 +56,8 @@ import com.warden.blocker.block.LimitReason
 import com.warden.blocker.data.BlockType
 import com.warden.blocker.data.BlockedItem
 import com.warden.blocker.stats.StatsRecorder
+import com.warden.blocker.ui.LocalMotion
+import com.warden.blocker.ui.Motion
 import com.warden.blocker.ui.hideOverlayWindows
 import com.warden.blocker.ui.theme.WardenTheme
 import com.warden.blocker.usage.AppsHelper
@@ -76,25 +88,35 @@ class InterceptActivity : ComponentActivity() {
         setContent {
             WardenTheme {
                 var item by remember { mutableStateOf<BlockedItem?>(null) }
-                LaunchedEffect(itemId) { item = wardenContainer.repository.item(itemId) }
+                // Until the entry is read, show the calm background instead of a wrong screen
+                // for a moment; then the right one fades in.
+                var loaded by remember { mutableStateOf(false) }
+                LaunchedEffect(itemId) {
+                    item = wardenContainer.repository.item(itemId)
+                    loaded = true
+                }
 
                 Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-                    val current = item
-                    when {
-                        kind == KIND_FEATURE -> FeatureBlockScreen(featureLabel, ::goHome)
-                        // "Allow only" / blocked category: no blocklist entry behind it.
-                        AllowBlockNotice.isAllowBlock(itemId) -> CenteredMessage(
-                            title = AllowBlockNotice.title(itemId),
-                            body = AllowBlockNotice.body(itemId, allowBlockLabel),
-                            onHome = ::goHome,
-                        )
-                        kind == KIND_PAUSE && current != null -> PauseScreen(
-                            item = current,
-                            onContinue = { minutes -> grantAndEnter(current, minutes) },
-                            onCancel = ::goHome,
-                        )
-                        kind == KIND_LIMIT && current != null -> LimitScreen(current, reason, ::goHome)
-                        else -> HardBlockScreen(current, ::goHome)
+                    val needsItem = kind != KIND_FEATURE && !AllowBlockNotice.isAllowBlock(itemId)
+                    Crossfade(!needsItem || loaded, animationSpec = tween(Motion.MEDIUM), label = "intercept") { ready ->
+                        if (!ready) return@Crossfade
+                        val current = item
+                        when {
+                            kind == KIND_FEATURE -> FeatureBlockScreen(featureLabel, ::goHome)
+                            // "Allow only" / blocked category: no blocklist entry behind it.
+                            AllowBlockNotice.isAllowBlock(itemId) -> CenteredMessage(
+                                title = AllowBlockNotice.title(itemId),
+                                body = AllowBlockNotice.body(itemId, allowBlockLabel),
+                                onHome = ::goHome,
+                            )
+                            kind == KIND_PAUSE && current != null -> PauseScreen(
+                                item = current,
+                                onContinue = { minutes -> grantAndEnter(current, minutes) },
+                                onCancel = ::goHome,
+                            )
+                            kind == KIND_LIMIT && current != null -> LimitScreen(current, reason, ::goHome)
+                            else -> HardBlockScreen(current, ::goHome)
+                        }
                     }
                 }
             }
@@ -162,24 +184,13 @@ private fun PauseScreen(item: BlockedItem, onContinue: (Int) -> Unit, onCancel: 
     LaunchedEffect(Unit) {
         while (remaining > 0) { delay(1000); remaining-- }
     }
-    val breathing by rememberInfiniteTransition(label = "breath").animateFloat(
-        initialValue = 0.72f,
-        targetValue = 1.08f,
-        animationSpec = infiniteRepeatable(tween(4000), RepeatMode.Reverse),
-        label = "scale",
-    )
 
     Column(
         Modifier.fillMaxSize().padding(28.dp),
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Box(contentAlignment = Alignment.Center) {
-            Surface(
-                shape = CircleShape,
-                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.18f),
-                modifier = Modifier.size(220.dp).scale(breathing),
-            ) {}
+        BreathingCircle(220.dp, from = 0.72f, to = 1.08f) {
             Text(
                 if (remaining > 0) "Breathe\n${remaining}s" else "Ready?",
                 style = MaterialTheme.typography.headlineSmall,
@@ -194,23 +205,67 @@ private fun PauseScreen(item: BlockedItem, onContinue: (Int) -> Unit, onCancel: 
         )
         Spacer(Modifier.height(28.dp))
 
-        if (remaining > 0) {
-            Text(
-                "Take a moment. If you still want in, you can continue in a second.",
-                style = MaterialTheme.typography.bodyMedium,
-                textAlign = TextAlign.Center,
-            )
-        } else {
-            Text("Continue for…", style = MaterialTheme.typography.bodyMedium)
-            Spacer(Modifier.height(8.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                listOf(1, 5, 15).forEach { min ->
-                    OutlinedButton(onClick = { onContinue(min) }) { Text("$min min") }
+        // The choices fade in once the breath is over.
+        AnimatedContent(
+            remaining > 0,
+            transitionSpec = { fadeIn(tween(Motion.MEDIUM * 2)) togetherWith fadeOut(tween(Motion.SHORT)) },
+            label = "pauseChoices",
+        ) { waiting ->
+            if (waiting) {
+                Text(
+                    "Take a moment. If you still want in, you can continue in a second.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
+                )
+            } else {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text("Continue for…", style = MaterialTheme.typography.bodyMedium)
+                    Spacer(Modifier.height(8.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        listOf(1, 5, 15).forEach { min ->
+                            OutlinedButton(onClick = { onContinue(min) }) { Text("$min min") }
+                        }
+                    }
                 }
             }
         }
         Spacer(Modifier.height(20.dp))
         TextButton(onClick = onCancel) { Text("Not now — take me home") }
+    }
+}
+
+/**
+ * A soft circle in the theme colour that slowly grows and shrinks (one breath every 8 s) behind
+ * [content]. Still with "Remove animations". Only drawn while the screen is shown.
+ */
+@Composable
+private fun BreathingCircle(size: Dp, from: Float, to: Float, content: @Composable () -> Unit) {
+    val motion = LocalMotion.current
+    val breath = if (motion) {
+        rememberInfiniteTransition(label = "breath").animateFloat(
+            initialValue = from,
+            targetValue = to,
+            animationSpec = infiniteRepeatable(tween(4000, easing = FastOutSlowInEasing), RepeatMode.Reverse),
+            label = "scale",
+        )
+    } else {
+        null
+    }
+    val color = MaterialTheme.colorScheme.primary.copy(alpha = 0.18f)
+    Box(contentAlignment = Alignment.Center) {
+        // Read in the draw phase only: the breath doesn't recompose the screen.
+        Box(
+            Modifier
+                .size(size)
+                .graphicsLayer {
+                    val s = breath?.value ?: 1f
+                    scaleX = s
+                    scaleY = s
+                }
+                .background(color, CircleShape),
+        )
+        content()
     }
 }
 
@@ -242,11 +297,14 @@ private fun CenteredMessage(title: String, body: String, onHome: () -> Unit) {
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Text("🛡", style = MaterialTheme.typography.displayMedium, color = Color.Unspecified)
-        Spacer(Modifier.height(16.dp))
+        // Same calm breathing as the pause screen, smaller: a shield in a soft circle.
+        BreathingCircle(120.dp, from = 0.9f, to = 1.06f) {
+            Icon(Icons.Outlined.Shield, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(52.dp))
+        }
+        Spacer(Modifier.height(24.dp))
         Text(title, style = MaterialTheme.typography.headlineMedium, textAlign = TextAlign.Center, fontWeight = FontWeight.Bold)
         Spacer(Modifier.height(12.dp))
-        Text(body, style = MaterialTheme.typography.bodyLarge, textAlign = TextAlign.Center)
+        Text(body, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
         Spacer(Modifier.height(32.dp))
         Button(onClick = onHome) { Text("Back to home") }
     }

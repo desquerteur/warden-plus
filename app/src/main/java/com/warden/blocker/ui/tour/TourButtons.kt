@@ -52,7 +52,7 @@ fun RestartGuideCard(modifier: Modifier = Modifier) {
     Card(modifier.fillMaxWidth().tourTarget(TourIds.SETTINGS_GUIDES)) {
         Column(Modifier.fillMaxWidth().padding(16.dp)) {
             Text("Restart guide", style = MaterialTheme.typography.titleMedium)
-            Text("Forgot how it works? Shows the Getting started tour again.", style = MaterialTheme.typography.bodySmall)
+            Text("Forgot how it works? Shows the Getting started tour again.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Spacer(Modifier.height(8.dp))
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Button(onClick = { controller.start(Tours.GETTING_STARTED) }) { Text("Restart guide") }

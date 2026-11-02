@@ -1,6 +1,10 @@
 package com.warden.blocker.ui.guard
 
 import android.text.format.DateFormat
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.tween
+import com.warden.blocker.ui.CardPadding
+import com.warden.blocker.ui.Motion
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -57,7 +61,8 @@ fun SettingsGuardSection(modifier: Modifier = Modifier) {
     }
 
     Card(modifier.fillMaxWidth()) {
-        Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        // Grows and shrinks smoothly when parts appear (switched on, update found, …).
+        Column(Modifier.fillMaxWidth().animateContentSize(tween(Motion.MEDIUM)).padding(CardPadding), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
                     Text("Settings guard", style = MaterialTheme.typography.titleMedium)
@@ -68,6 +73,7 @@ fun SettingsGuardSection(modifier: Modifier = Modifier) {
                             "Off — get a hint when a system page that could switch Warden+ off is opened."
                         },
                         style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
                 Switch(checked = enabled, onCheckedChange = { on ->
@@ -88,7 +94,7 @@ fun SettingsGuardSection(modifier: Modifier = Modifier) {
                     })
                     Text("Also Date & time", style = MaterialTheme.typography.bodyMedium)
                 }
-                Text("Hints shown: $warned", style = MaterialTheme.typography.bodySmall)
+                Text("Hints shown: $warned", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             Text(
                 "Clock changed by hand: $clockChanges" + (lastClock?.let { c ->
@@ -96,6 +102,7 @@ fun SettingsGuardSection(modifier: Modifier = Modifier) {
                         "${DateFormat.getDateFormat(context).format(Date(c.at))})"
                 } ?: ""),
                 style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
     }

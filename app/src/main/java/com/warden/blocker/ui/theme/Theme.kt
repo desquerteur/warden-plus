@@ -10,8 +10,12 @@ import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import com.warden.blocker.ui.LocalMotion
+import com.warden.blocker.ui.animationsEnabled
 
 private val Indigo = Color(0xFF4F5BD5)
 private val IndigoDark = Color(0xFF3A44A8)
@@ -39,5 +43,9 @@ fun WardenTheme(
         darkTheme -> DarkColors
         else -> LightColors
     }
-    MaterialTheme(colorScheme = colors, typography = WardenTypography, content = content)
+    // Read once per screen: "Remove animations" in Android settings turns all motion off.
+    val motion = remember { animationsEnabled(context) }
+    MaterialTheme(colorScheme = colors, typography = WardenTypography) {
+        CompositionLocalProvider(LocalMotion provides motion, content = content)
+    }
 }

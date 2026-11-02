@@ -2,6 +2,10 @@ package com.warden.blocker.ui.owner
 
 import android.content.Context
 import android.text.format.DateFormat
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.tween
+import com.warden.blocker.ui.CardPadding
+import com.warden.blocker.ui.Motion
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -55,7 +59,8 @@ fun MaxProtectionSection(modifier: Modifier = Modifier, vm: OwnerViewModel = vie
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { vm.refresh() }
 
     Card(modifier.fillMaxWidth()) {
-        Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        // Grows and shrinks smoothly when parts appear (switched on, update found, …).
+        Column(Modifier.fillMaxWidth().animateContentSize(tween(Motion.MEDIUM)).padding(CardPadding), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text("Maximum protection (device owner)", style = MaterialTheme.typography.titleMedium)
             if (!isOwner) {
                 Text(
@@ -64,6 +69,7 @@ fun MaxProtectionSection(modifier: Modifier = Modifier, vm: OwnerViewModel = vie
                         "the filter can't be disconnected, the clock can't be changed. For the setup all accounts " +
                         "(Google, Samsung) have to be signed out for a moment. There's always a way back.",
                     style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 SelectionContainer {
                     Text(
@@ -115,7 +121,7 @@ fun OwnerLockedExit(modifier: Modifier = Modifier, vm: OwnerViewModel = viewMode
     if (!isOwner && message == null) return
     Column(modifier.fillMaxWidth().padding(top = 24.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         if (isOwner) EmergencyExitBlock(vm, pinBypassed = true)
-        message?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
+        message?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
     }
 }
 
@@ -124,7 +130,7 @@ private fun PolicyRow(policy: OwnerPolicy, checked: Boolean, onChange: (Boolean)
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         Column(Modifier.weight(1f).padding(end = 8.dp)) {
             Text(policy.title, style = MaterialTheme.typography.bodyLarge)
-            Text(policy.explanation, style = MaterialTheme.typography.bodySmall)
+            Text(policy.explanation, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         Switch(checked = checked, onCheckedChange = onChange)
     }
@@ -151,6 +157,7 @@ private fun EmergencyExitBlock(vm: OwnerViewModel, pinBypassed: Boolean) {
                         "asks for a wait, it's 24 hours at most."
                 },
                 style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             OutlinedButton(onClick = { confirm = true }, modifier = Modifier.fillMaxWidth()) {
                 Text("Remove device owner")
@@ -161,11 +168,12 @@ private fun EmergencyExitBlock(vm: OwnerViewModel, pinBypassed: Boolean) {
                 "Removal requested. Possible from ${formatDateTime(context, status.readyAt)} " +
                     "(in ${formatWait(status.readyAt - now)}).",
                 style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             OutlinedButton(onClick = vm::cancelExit, modifier = Modifier.fillMaxWidth()) { Text("Cancel request") }
         }
         ExitStatus.Ready -> {
-            Text("The wait is over. Device owner can be removed now.", style = MaterialTheme.typography.bodySmall)
+            Text("The wait is over. Device owner can be removed now.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Button(onClick = vm::removeNow, modifier = Modifier.fillMaxWidth()) { Text("Remove device owner now") }
             TextButton(onClick = vm::cancelExit) { Text("Keep device owner") }
         }

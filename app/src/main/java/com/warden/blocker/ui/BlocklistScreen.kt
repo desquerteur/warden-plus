@@ -1,6 +1,9 @@
 package com.warden.blocker.ui
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -9,7 +12,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
@@ -18,14 +20,17 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.outlined.Apps
+import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.FileDownload
+import androidx.compose.material.icons.outlined.Language
+import androidx.compose.material.icons.outlined.Slideshow
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -39,7 +44,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -47,8 +51,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.warden.blocker.data.BlockType
 import com.warden.blocker.data.BlockedItem
 import com.warden.blocker.data.InterceptMode
-import com.warden.blocker.ui.allow.AllowEntryButtons
-import com.warden.blocker.ui.hosts.HostsListsEntryButton
+import com.warden.blocker.ui.allow.AllowEntryRows
 import com.warden.blocker.ui.times.SpanLabel
 import com.warden.blocker.ui.tour.TourIds
 import com.warden.blocker.ui.tour.tourTarget
@@ -103,16 +106,16 @@ fun BlocklistScreen(
 
     // Header and entries scroll together, so on short screens (fold cover display, open
     // keyboard) the list isn't squeezed into the little space left under the buttons.
+    val gutter = pageGutter()
     LazyColumn(
         Modifier.fillMaxSize(),
         state = listState,
-        contentPadding = PaddingValues(20.dp),
+        contentPadding = PaddingValues(gutter),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         item(key = "header") {
-            Column {
-                Text("Blocklist", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
-                Spacer(Modifier.height(12.dp))
+            Column(verticalArrangement = Arrangement.spacedBy(CardSpacing)) {
+                PageTitle("Blocklist")
                 Row(Modifier.tourTarget(TourIds.BLOCKLIST_ADD_SITE), verticalAlignment = Alignment.CenterVertically) {
                     OutlinedTextField(
                         value = input,
@@ -130,38 +133,58 @@ fun BlocklistScreen(
                     )
                     Button(onClick = { submit() }, modifier = Modifier.padding(start = 8.dp)) { Text("Add") }
                 }
-                Spacer(Modifier.height(10.dp))
-                OutlinedButton(onClick = onOpenAppPicker, modifier = Modifier.fillMaxWidth().tourTarget(TourIds.BLOCKLIST_ADD_APPS)) { Text("+ Add apps to block") }
-                Spacer(Modifier.height(8.dp))
-                OutlinedButton(onClick = onOpenFeatures, modifier = Modifier.fillMaxWidth().tourTarget(TourIds.BLOCKLIST_FEEDS)) { Text("Block in-app feeds (Reels, Shorts…)") }
-                Spacer(Modifier.height(8.dp))
-                HostsListsEntryButton(onClick = onOpenHostsLists, modifier = Modifier.fillMaxWidth().tourTarget(TourIds.BLOCKLIST_HOSTS))
-                Spacer(Modifier.height(8.dp))
-                Box(Modifier.tourTarget(TourIds.BLOCKLIST_ALLOW)) { AllowEntryButtons(onOpenAllowOnly, onOpenCategories) }
-                Spacer(Modifier.height(8.dp))
+                // Everything else that blocks: one quiet card of entries instead of a wall of buttons.
+                ActionGroup {
+                    ActionRow(
+                        Icons.Outlined.Apps, "Add apps to block", "Fully, or with a pause before they open",
+                        onOpenAppPicker, Modifier.tourTarget(TourIds.BLOCKLIST_ADD_APPS),
+                    )
+                    ActionRow(
+                        Icons.Outlined.Slideshow, "Block in-app feeds", "Reels, Shorts, For You …",
+                        onOpenFeatures, Modifier.tourTarget(TourIds.BLOCKLIST_FEEDS), divider = true,
+                    )
+                    ActionRow(
+                        Icons.Outlined.FileDownload, "Import blocklists", "Hosts files — thousands of sites at once",
+                        onOpenHostsLists, Modifier.tourTarget(TourIds.BLOCKLIST_HOSTS), divider = true,
+                    )
+                    Column(Modifier.tourTarget(TourIds.BLOCKLIST_ALLOW)) { AllowEntryRows(onOpenAllowOnly, onOpenCategories) }
+                }
                 if (items.isEmpty()) {
-                    Text("Nothing blocked yet — add a website above or tap “Add apps”.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.outline)
+                    EmptyState("Nothing blocked yet — add a website above or tap “Add apps”.")
+                } else {
+                    SectionHeader("Blocked · ${items.size}")
                 }
             }
         }
         items(items, key = { it.id }) { item ->
-            val colors = if (item.id == highlighted) {
-                CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
-            } else CardDefaults.cardColors()
-            Card(Modifier.fillMaxWidth().clickable { editing = item }, colors = colors) {
-                Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+            // The entry just added glows briefly in the theme colour, then fades back.
+            val container by animateColorAsState(
+                if (item.id == highlighted) MaterialTheme.colorScheme.primaryContainer else CardDefaults.cardColors().containerColor,
+                tween(Motion.MEDIUM * 2),
+                label = "highlight",
+            )
+            Card(
+                Modifier.fillMaxWidth().animateItem().clickable { editing = item },
+                colors = CardDefaults.cardColors(containerColor = container),
+            ) {
+                Row(Modifier.fillMaxWidth().padding(start = CardPadding, end = 4.dp, top = 8.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                     if (item.type == BlockType.APP) {
-                        AppIcon(item.value, modifier = Modifier.size(36.dp).padding(end = 12.dp))
+                        AppIcon(item.value, modifier = Modifier.size(36.dp))
                     } else {
-                        Text("🌐", style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(end = 12.dp))
+                        Box(Modifier.size(36.dp), contentAlignment = Alignment.Center) {
+                            Icon(Icons.Outlined.Language, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                        }
                     }
+                    Spacer(Modifier.width(12.dp))
                     Column(Modifier.weight(1f)) {
                         Text(item.label, style = MaterialTheme.typography.titleMedium)
-                        Text(itemSummary(item), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline)
+                        SupportingText(itemSummary(item))
                         SpanLabel(item.activeFrom, item.activeUntil)
                     }
                     Switch(checked = item.enabled, onCheckedChange = { vm.toggleItem(item) })
-                    IconButton(onClick = { vm.removeItem(item) }) { Icon(Icons.Filled.Delete, contentDescription = "Remove") }
+                    IconButton(onClick = { vm.removeItem(item) }) {
+                        Icon(Icons.Outlined.Delete, contentDescription = "Remove", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
                 }
             }
         }

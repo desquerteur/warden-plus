@@ -3,6 +3,7 @@ package com.warden.blocker.ui
 import android.text.format.DateFormat
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -14,6 +15,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.verticalScroll
@@ -139,83 +141,80 @@ fun ProtectionScreen(vm: WardenViewModel, onBack: () -> Unit, onOpenSetup: () ->
         if (new.mode != ProtectionMode.OFF && !adminActive) showAdminExplain = true
     }
 
+    val gutter = pageGutter()
     Column(Modifier.fillMaxSize()) {
         SubScreenTopBar("Protection", onBack = onBack)
         Column(
-            Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(start = 20.dp, end = 20.dp, bottom = 20.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(start = gutter, end = gutter, bottom = gutter),
+            verticalArrangement = Arrangement.spacedBy(CardSpacing),
         ) {
-            Text(
-                "Makes it harder to weaken blocking on impulse. Adding or tightening always works right away.",
-                style = MaterialTheme.typography.bodyMedium,
-            )
+            IntroText("Makes it harder to weaken blocking on impulse. Adding or tightening always works right away.")
 
             SectionHeader("Block protection")
-            Text(
-                protectionSummary(protection, now, vm::whenText),
-                style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier.tourTarget(TourIds.PROTECTION_MODES),
-            )
-            if (focusStrict && focusEndsAt > now) {
+            SectionCard(null) {
                 Text(
-                    "A strict focus session locks all of this until ${vm.whenText(focusEndsAt)}.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.error,
+                    protectionSummary(protection, now, vm::whenText),
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.tourTarget(TourIds.PROTECTION_MODES),
                 )
-            }
+                if (focusStrict && focusEndsAt > now) {
+                    Text(
+                        "A strict focus session locks all of this until ${vm.whenText(focusEndsAt)}.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
 
-            ModeOption(
-                "Off", "Changes apply right away. With a PIN set, turning blocking off still asks for it.",
-                selected = mode == ProtectionMode.OFF,
-            ) { choose(ProtectionSettings(ProtectionMode.OFF, protection.delayMinutes, 0L)) }
-            ModeOption(
-                "PIN", "Every change that weakens blocking asks for your PIN." + if (hasPin) "" else " You'll set one now.",
-                selected = mode == ProtectionMode.PIN,
-            ) { choose(ProtectionSettings(ProtectionMode.PIN, protection.delayMinutes, 0L)) }
-            ModeOption(
-                "Delay", "Weakening waits a while and can be cancelled until then.",
-                selected = mode == ProtectionMode.DELAY || expanded == ProtectionMode.DELAY,
-            ) { expanded = ProtectionMode.DELAY }
-            if (mode == ProtectionMode.DELAY || expanded == ProtectionMode.DELAY) {
-                FlowRow(Modifier.padding(start = 48.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    DELAY_CHOICES.forEach { minutes ->
-                        FilterChip(
-                            selected = mode == ProtectionMode.DELAY && protection.delayMinutes == minutes,
-                            onClick = { choose(ProtectionSettings(ProtectionMode.DELAY, minutes, 0L)) },
-                            label = { Text(durationLeft(minutes * 60_000L) + if (minutes == 1) " (test)" else "") },
-                        )
+                ModeOption(
+                    "Off", "Changes apply right away. With a PIN set, turning blocking off still asks for it.",
+                    selected = mode == ProtectionMode.OFF,
+                ) { choose(ProtectionSettings(ProtectionMode.OFF, protection.delayMinutes, 0L)) }
+                ModeOption(
+                    "PIN", "Every change that weakens blocking asks for your PIN." + if (hasPin) "" else " You'll set one now.",
+                    selected = mode == ProtectionMode.PIN,
+                ) { choose(ProtectionSettings(ProtectionMode.PIN, protection.delayMinutes, 0L)) }
+                ModeOption(
+                    "Delay", "Weakening waits a while and can be cancelled until then.",
+                    selected = mode == ProtectionMode.DELAY || expanded == ProtectionMode.DELAY,
+                ) { expanded = ProtectionMode.DELAY }
+                // The choices fold open under their mode.
+                AnimatedVisibility(mode == ProtectionMode.DELAY || expanded == ProtectionMode.DELAY) {
+                    FlowRow(Modifier.padding(start = 36.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        DELAY_CHOICES.forEach { minutes ->
+                            FilterChip(
+                                selected = mode == ProtectionMode.DELAY && protection.delayMinutes == minutes,
+                                onClick = { choose(ProtectionSettings(ProtectionMode.DELAY, minutes, 0L)) },
+                                label = { Text(durationLeft(minutes * 60_000L) + if (minutes == 1) " (test)" else "") },
+                            )
+                        }
                     }
                 }
-            }
-            ModeOption(
-                "Locked until", "Nothing can be weakened until the time you pick (at most $MAX_LOCK_DAYS days ahead).",
-                selected = mode == ProtectionMode.LOCKED || expanded == ProtectionMode.LOCKED,
-            ) { expanded = ProtectionMode.LOCKED }
-            if (mode == ProtectionMode.LOCKED || expanded == ProtectionMode.LOCKED) {
-                FlowRow(Modifier.padding(start = 48.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    LOCK_CHOICES.forEach { hours ->
-                        FilterChip(
-                            selected = false,
-                            onClick = { choose(ProtectionSettings(ProtectionMode.LOCKED, protection.delayMinutes, now + hours * 3_600_000L)) },
-                            label = { Text(if (hours < 24) "$hours h" else "${hours / 24} day" + if (hours > 24) "s" else "") },
-                        )
+                ModeOption(
+                    "Locked until", "Nothing can be weakened until the time you pick (at most $MAX_LOCK_DAYS days ahead).",
+                    selected = mode == ProtectionMode.LOCKED || expanded == ProtectionMode.LOCKED,
+                ) { expanded = ProtectionMode.LOCKED }
+                AnimatedVisibility(mode == ProtectionMode.LOCKED || expanded == ProtectionMode.LOCKED) {
+                    FlowRow(Modifier.padding(start = 36.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        LOCK_CHOICES.forEach { hours ->
+                            FilterChip(
+                                selected = false,
+                                onClick = { choose(ProtectionSettings(ProtectionMode.LOCKED, protection.delayMinutes, now + hours * 3_600_000L)) },
+                                label = { Text(if (hours < 24) "$hours h" else "${hours / 24} day" + if (hours > 24) "s" else "") },
+                            )
+                        }
+                        FilterChip(selected = false, onClick = { pickDate = true }, label = { Text("Pick date & time…") })
                     }
-                    FilterChip(selected = false, onClick = { pickDate = true }, label = { Text("Pick date & time…") })
                 }
             }
 
             PendingChangesCard(vm)
 
             // PIN
-            Card(Modifier.fillMaxWidth().tourTarget(TourIds.SETTINGS_PIN)) {
-                Column(Modifier.fillMaxWidth().padding(16.dp)) {
-                    Text("PIN lock", style = MaterialTheme.typography.titleMedium)
-                    Text(if (hasPin) "A PIN is required to change settings or stop blocking." else "Protect settings and disabling with a 4-digit PIN.", style = MaterialTheme.typography.bodySmall)
-                    Spacer(Modifier.height(8.dp))
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Button(onClick = { showSetPin = true }) { Text(if (hasPin) "Change PIN" else "Set PIN") }
-                        if (hasPin) OutlinedButton(onClick = { showRemovePin = true }) { Text("Remove PIN") }
-                    }
+            SectionCard("PIN lock", Modifier.tourTarget(TourIds.SETTINGS_PIN)) {
+                SupportingText(if (hasPin) "A PIN is required to change settings or stop blocking." else "Protect settings and disabling with a 4-digit PIN.")
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Button(onClick = { showSetPin = true }) { Text(if (hasPin) "Change PIN" else "Set PIN") }
+                    if (hasPin) OutlinedButton(onClick = { showRemovePin = true }) { Text("Remove PIN") }
                 }
             }
 
@@ -286,15 +285,13 @@ fun ProtectionScreen(vm: WardenViewModel, onBack: () -> Unit, onOpenSetup: () ->
                 style = MaterialTheme.typography.bodyMedium,
                 fontWeight = if (offCount > 0) FontWeight.Bold else FontWeight.Normal,
             )
-            Text(
+            InfoNote(
                 "Honest limits: no app can fully stop this. Turning off accessibility or the VPN in Android " +
                     "settings stays possible, uninstall protection only adds a \"Deactivate & uninstall\" step, " +
                     "and some phones (e.g. Samsung's \"Active apps → Stop\") can still stop Warden+. After a stop, " +
                     "Android also switches app blocking (accessibility) off until you turn it on again. Warden+ " +
                     "notices, tells you, and counts it here and in Usage. Phone, Settings and your home screen " +
                     "are never blocked.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
     }
@@ -371,33 +368,37 @@ fun ProtectionScreen(vm: WardenViewModel, onBack: () -> Unit, onOpenSetup: () ->
 @Composable
 private fun ModeOption(title: String, text: String, selected: Boolean, onClick: () -> Unit) {
     Row(
-        Modifier.fillMaxWidth().selectable(selected = selected, role = Role.RadioButton, onClick = onClick),
+        Modifier.fillMaxWidth().selectable(selected = selected, role = Role.RadioButton, onClick = onClick).padding(vertical = 4.dp),
         verticalAlignment = Alignment.Top,
     ) {
-        RadioButton(selected = selected, onClick = null, modifier = Modifier.padding(top = 2.dp, end = 12.dp, start = 12.dp))
+        RadioButton(selected = selected, onClick = null, modifier = Modifier.padding(top = 2.dp, end = 12.dp))
         Column(Modifier.weight(1f)) {
             Text(title, style = MaterialTheme.typography.titleMedium)
-            Text(text, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            SupportingText(text)
         }
     }
 }
 
 /**
- * A checklist line: ✓/✗, what it is, and a button to the right Android setting. A missing
- * item gets its title in the theme's error colour. [action] null: nothing to do here (e.g.
- * managed by device-owner mode).
+ * A checklist line: a tick (drawn when it turns done) or a red mark, what it is, and a button
+ * to the right Android setting. A missing item gets its title in the theme's error colour.
+ * [action] null: nothing to do here (e.g. managed by device-owner mode).
  */
 @Composable
 private fun CheckRow(ok: Boolean, title: String, text: String, action: String?, onAction: () -> Unit = {}) {
     Card(Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text(
-                (if (ok) "✓ " else "✗ ") + title,
-                style = MaterialTheme.typography.titleMedium,
-                color = if (ok) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.error,
-            )
-            Text(text, style = MaterialTheme.typography.bodySmall)
-            if (action != null) OutlinedButton(onClick = onAction) { Text(action) }
+        Row(Modifier.fillMaxWidth().padding(CardPadding), verticalAlignment = Alignment.Top) {
+            StatusIcon(ok)
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(
+                    title,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = if (ok) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.error,
+                )
+                SupportingText(text)
+                if (action != null) OutlinedButton(onClick = onAction) { Text(action) }
+            }
         }
     }
 }

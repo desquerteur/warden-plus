@@ -9,6 +9,10 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.defaultMinSize
@@ -53,7 +57,11 @@ import com.warden.blocker.ui.AppPickerScreen
 import com.warden.blocker.ui.BlocklistScreen
 import com.warden.blocker.ui.FeaturesScreen
 import com.warden.blocker.ui.HomeScreen
+import com.warden.blocker.ui.LocalMotion
+import com.warden.blocker.ui.Motion
 import com.warden.blocker.ui.LocalTabReselected
+import com.warden.blocker.ui.navEnter
+import com.warden.blocker.ui.navExit
 import com.warden.blocker.ui.ProtectionScreen
 import com.warden.blocker.ui.VerifyPinDialog
 import com.warden.blocker.system.ProtectionWatch
@@ -337,9 +345,14 @@ private fun WardenScaffold(
         },
     ) {
     Scaffold(
-        bottomBar = bottomBar@{
-            // The setup wizard is full-page, with its own Back / Next at the bottom.
-            if (currentEntry?.destination?.route == "setup") return@bottomBar
+        bottomBar = {
+            // The setup wizard is full-page, with its own Back / Next at the bottom: the bar
+            // slides away for it and comes back after.
+            AnimatedVisibility(
+                visible = currentEntry?.destination?.route != "setup",
+                enter = expandVertically(tween(Motion.MEDIUM), expandFrom = Alignment.Top),
+                exit = shrinkVertically(tween(Motion.MEDIUM), shrinkTowards = Alignment.Top),
+            ) {
             CompactNavigationBar {
                 val dest = currentEntry?.destination
                 Tab.entries.forEach { tab ->
@@ -362,13 +375,25 @@ private fun WardenScaffold(
                     )
                 }
             }
+            }
         },
     ) { padding ->
         // Pops only while [route] is still on the stack, so a double tap on back/"Done"
         // can't also pop the screen underneath.
         fun leave(route: String) { navController.popBackStack(route, inclusive = true) }
 
-        NavHost(navController, startDestination = Tab.HOME.route, modifier = Modifier.padding(padding)) {
+        // Tabs fade into each other, sub-screens slide in and back out (none with "Remove animations").
+        val tabRoutes = remember { Tab.entries.map { it.route }.toSet() }
+        val motion = LocalMotion.current
+        NavHost(
+            navController,
+            startDestination = Tab.HOME.route,
+            modifier = Modifier.padding(padding),
+            enterTransition = { navEnter(tabRoutes, motion, popping = false) },
+            exitTransition = { navExit(tabRoutes, motion, popping = false) },
+            popEnterTransition = { navEnter(tabRoutes, motion, popping = true) },
+            popExitTransition = { navExit(tabRoutes, motion, popping = true) },
+        ) {
             composable(Tab.HOME.route) {
                 TabContent(Tab.HOME, reselected) {
                     HomeScreen(vm, onToggleBlocking, onStartFocus, onCancelFocus, onOpenSetup = { navController.navigate("setup") }, onRetryVpn = onRetryVpn)

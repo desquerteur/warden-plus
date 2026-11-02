@@ -8,7 +8,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material3.ElevatedCard
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.material3.Card
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -25,10 +27,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.warden.blocker.ui.CardPadding
+import com.warden.blocker.ui.Motion
+import com.warden.blocker.ui.SupportingText
 import com.warden.blocker.ui.WardenViewModel
 
 /**
@@ -51,17 +55,18 @@ fun SetupProgressCard(
     if (!WizardLogic.showHomeCard(sdk, done, skipped)) { orElse(); return }
     val open = WizardLogic.open(sdk, done, skipped)
     val (count, total) = WizardLogic.progress(sdk, done)
-    ElevatedCard(
+    val shown by animateFloatAsState(count / total.toFloat(), tween(Motion.MEDIUM * 2), label = "setupProgress")
+    Card(
         modifier.fillMaxWidth().clickable {
             wizard.resumeAt(open.first())
             onOpen()
         },
     ) {
-        Row(Modifier.fillMaxWidth().padding(start = 20.dp, top = 8.dp, bottom = 16.dp), verticalAlignment = Alignment.Top) {
+        Row(Modifier.fillMaxWidth().padding(start = CardPadding, top = 8.dp, bottom = 16.dp), verticalAlignment = Alignment.Top) {
             Column(Modifier.weight(1f).padding(top = 8.dp)) {
-                Text(WizardLogic.homeCardTitle(count, total), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                Text("Next: ${open.first().title}. Tap to go on.", style = MaterialTheme.typography.bodySmall)
-                LinearProgressIndicator(progress = { count / total.toFloat() }, modifier = Modifier.fillMaxWidth().padding(top = 10.dp))
+                Text(WizardLogic.homeCardTitle(count, total), style = MaterialTheme.typography.titleMedium)
+                SupportingText("Next: ${open.first().title}. Tap to go on.")
+                LinearProgressIndicator(progress = { shown }, modifier = Modifier.fillMaxWidth().padding(top = 10.dp))
             }
             // Hides the card: the open pages count as "later" (still in Settings › Setup wizard).
             IconButton(onClick = { wizard.skipAll(open) }) { Icon(Icons.Filled.Close, contentDescription = "Hide setup reminder") }

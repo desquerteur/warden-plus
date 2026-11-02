@@ -2,13 +2,26 @@ package com.warden.blocker.ui
 
 import android.os.Build
 import android.text.format.DateFormat
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.width
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Shield
+import androidx.compose.material.icons.outlined.LocalFireDepartment
+import androidx.compose.material3.Card
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -16,8 +29,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.ElevatedCard
+import androidx.compose.material.icons.outlined.Shield
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Switch
@@ -59,6 +71,7 @@ import com.warden.blocker.vpn.WardenVpnService
 import kotlinx.coroutines.delay
 import java.util.Calendar
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun HomeScreen(
     vm: WardenViewModel,
@@ -110,98 +123,105 @@ fun HomeScreen(
     val scroll = rememberScrollState()
     ScrollToTopOnReselect(scroll)
 
+    val gutter = pageGutter()
+
     Column(
-        Modifier.fillMaxSize().verticalScroll(scroll).padding(20.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
+        Modifier.fillMaxSize().verticalScroll(scroll).padding(gutter),
+        verticalArrangement = Arrangement.spacedBy(CardSpacing),
     ) {
-        Text(stringResource(R.string.app_name), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+        PageTitle(stringResource(R.string.app_name))
         // Both accessibility cards open the wizard right on "App blocking", not where it was left.
         val openWizardAt = rememberOpenWizardAt(onOpenSetup)
         if (needsSetup && AccessibilityAlert.shouldWarn(false, accessibilityUsed, enabled, items.any { it.type == BlockType.APP && it.enabled })) {
             // It worked before (or is clearly relied on) — typically Android switched it off after
             // Warden+ was updated from an APK file. Make that impossible to miss.
-            Box(Modifier.tourTarget(TourIds.HOME_SETUP)) {
             WarningCard(
-                title = "⚠ App blocking is off",
+                title = "App blocking is off",
                 text = "Warden+ has no accessibility access, so apps aren't blocked. Android switches it off " +
                     "after an update from an APK file and after \"Force stop\". Tap to turn it on.",
+                modifier = Modifier.tourTarget(TourIds.HOME_SETUP),
                 onClick = { openWizardAt(WizardStep.APP_BLOCKING) },
             )
-            }
         } else {
             // One setup card at a time: the wizard's progress, or else the plain "Finish setup".
             SetupProgressCard(vm, onOpen = onOpenSetup, modifier = Modifier.tourTarget(TourIds.HOME_SETUP)) {
                 if (needsSetup) {
-                    ElevatedCard(Modifier.fillMaxWidth().clickable { openWizardAt(WizardStep.APP_BLOCKING) }.tourTarget(TourIds.HOME_SETUP)) {
-                        Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                            Text("Finish setup", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                            Text("Grant accessibility so Warden+ can block apps and feeds. Tap to fix.", style = MaterialTheme.typography.bodySmall)
+                    Card(Modifier.fillMaxWidth().clickable { openWizardAt(WizardStep.APP_BLOCKING) }.tourTarget(TourIds.HOME_SETUP)) {
+                        Column(Modifier.padding(CardPadding), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Text("Finish setup", style = MaterialTheme.typography.titleMedium)
+                            SupportingText("Grant accessibility so Warden+ can block apps and feeds. Tap to fix.")
                             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                                Text(stringResource(R.string.accessibility_help_hint), style = MaterialTheme.typography.bodySmall)
+                                SupportingText(stringResource(R.string.accessibility_help_hint))
                             }
                         }
                     }
                 }
             }
         }
-        if (problem == FilterProblem.OTHER_VPN) {
-            // Android allows one VPN at a time; another app (Tailscale & co.) holds it, often as
-            // "Always-on VPN", which makes Android close our consent dialog without showing it.
+        // Android allows one VPN at a time; another app (Tailscale & co.) holds it, often as
+        // "Always-on VPN", which makes Android close our consent dialog without showing it.
+        AnimatedVisibility(problem == FilterProblem.OTHER_VPN) {
             WarningCard(
-                title = "⚠ Website blocking is off",
+                title = "Website blocking is off",
                 text = "Another VPN app (for example Tailscale) is on or set to \"Always-on VPN\". Android " +
                     "allows only one VPN at a time. Turn the other VPN off — and its \"Always-on VPN\" " +
                     "option — in VPN settings, then tap Try again." +
                     if (needsSetup) "" else " App blocking still works.",
             ) {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Button(onClick = { runCatching { context.startActivity(VpnController.settingsIntent()) } }) { Text("VPN settings") }
                     OutlinedButton(onClick = onRetryVpn) { Text("Try again") }
                 }
             }
-        } else if (problem == FilterProblem.DISCONNECTED) {
-            // Android took the tunnel away (VPN settings, or Always-on cleared when device owner was
-            // removed) and no other VPN is there: one tap brings it back (D6).
+        }
+        // Android took the tunnel away (VPN settings, or Always-on cleared when device owner was
+        // removed) and no other VPN is there: one tap brings it back (D6).
+        AnimatedVisibility(problem == FilterProblem.DISCONNECTED) {
             WarningCard(
-                title = "⚠ Website filter was disconnected",
+                title = "Website filter was disconnected",
                 text = "Android disconnected Warden+'s website filter. Tap Try again to turn it back on." +
                     if (needsSetup) "" else " App blocking still works.",
             ) {
                 OutlinedButton(onClick = onRetryVpn) { Text("Try again") }
             }
-        } else if (problem == FilterProblem.PAUSED) {
-            // Blocking is on but the filter isn't running (OS killed it). Never leave the user
-            // silently unprotected — surface it and offer a one-tap re-arm.
+        }
+        // Blocking is on but the filter isn't running (OS killed it). Never leave the user
+        // silently unprotected — surface it and offer a one-tap re-arm.
+        AnimatedVisibility(problem == FilterProblem.PAUSED) {
             WarningCard(
-                title = "⚠ Protection paused",
+                title = "Protection paused",
                 text = "Blocking is on but the filter isn't running — your phone may have stopped it. Tap to restart.",
                 onClick = onRetryVpn,
             )
         }
-        ElevatedCard(Modifier.fillMaxWidth().tourTarget(TourIds.HOME_MASTER)) {
-            Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                    Column(Modifier.weight(1f)) {
-                        BlockingHeadline(enabled, alwaysOn, focusEndsAt, schedules)
-                        Text(summary, style = MaterialTheme.typography.bodyMedium)
-                        if (protecting) {
-                            Text(
-                                protectionStatus(appsOn = !needsSetup, websitesOn = vpnRunning, otherVpn = otherVpn, disconnected = vpnRevoked),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = if (needsSetup || showPaused) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                    }
+        // The main switch: a shield that lights up (with a few soft pulses) while protecting.
+        Card(Modifier.fillMaxWidth().tourTarget(TourIds.HOME_MASTER)) {
+            Column(
+                Modifier.fillMaxWidth().animateContentSize(tween(Motion.MEDIUM)).padding(CardPadding),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    IconBadge(Icons.Filled.Shield, Icons.Outlined.Shield, active = protecting, pulse = true)
+                    Spacer(Modifier.weight(1f))
                     Switch(
                         checked = enabled,
                         // Off goes through Block protection: PIN, a wait, or "locked until …".
                         onCheckedChange = onToggleBlocking,
                     )
                 }
-                Text(
+                Spacer(Modifier.height(4.dp))
+                BlockingHeadline(enabled, alwaysOn, focusEndsAt, schedules)
+                Text(summary, style = MaterialTheme.typography.bodyMedium)
+                if (protecting) {
+                    SupportingText(
+                        protectionStatus(appsOn = !needsSetup, websitesOn = vpnRunning, otherVpn = otherVpn, disconnected = vpnRevoked),
+                        color = if (needsSetup || showPaused) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Spacer(Modifier.height(4.dp))
+                SupportingText(
                     "Turning this on starts a local, on-device VPN that filters DNS. Warden+ adds no " +
                         "servers of its own — allowed lookups go to your normal DNS resolver.",
-                    style = MaterialTheme.typography.bodySmall,
                 )
             }
         }
@@ -209,19 +229,20 @@ fun HomeScreen(
         Box(Modifier.tourTarget(TourIds.HOME_FOCUS)) { FocusCard(focusEndsAt = focusEndsAt, strict = focusStrict, onStart = onStartFocus, onCancel = onCancelFocus) }
         // "Block until …" — saved first, then the same VPN start (and consent) as a retry.
         Box(Modifier.tourTarget(TourIds.HOME_BLOCK_UNTIL)) { BlockUntilCard(focusEndsAt = focusEndsAt, focusStrict = focusStrict, onStarted = onRetryVpn) }
-        if (shownFocusStreak(streak, focusSessions) > 0) {
-            ElevatedCard(Modifier.fillMaxWidth()) {
-                Row(Modifier.fillMaxWidth().padding(20.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Text("🔥", style = MaterialTheme.typography.headlineMedium)
-                    Spacer(Modifier.height(0.dp))
-                    Column(Modifier.padding(start = 16.dp)) {
-                        Text("$streak-day focus streak", style = MaterialTheme.typography.titleLarge)
-                        Text("Keep Warden+ on each day to grow it.", style = MaterialTheme.typography.bodySmall)
+        AnimatedVisibility(shownFocusStreak(streak, focusSessions) > 0) {
+            Card(Modifier.fillMaxWidth()) {
+                Row(Modifier.fillMaxWidth().padding(CardPadding), verticalAlignment = Alignment.CenterVertically) {
+                    IconBadge(Icons.Outlined.LocalFireDepartment, Icons.Outlined.LocalFireDepartment, active = true)
+                    Spacer(Modifier.width(16.dp))
+                    Column {
+                        val shown = rememberCountUp(streak.toLong())
+                        Text("$shown-day focus streak", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                        SupportingText("Keep Warden+ on each day to grow it.")
                     }
                 }
             }
         }
-        Text("Add sites and apps in Blocklist, or set times in Schedules.", style = MaterialTheme.typography.bodyMedium)
+        InfoNote("Add sites and apps in Blocklist, or set times in Schedules.")
     }
 }
 
@@ -233,18 +254,15 @@ fun HomeScreen(
 internal fun PendingChangesCard(vm: WardenViewModel) {
     val pending by vm.pendingChanges.collectAsStateWithLifecycle()
     if (pending.isEmpty()) return
-    ElevatedCard(Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("Pending changes", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-            pending.sortedBy { it.dueAt }.forEach { p ->
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        "${p.change.describe()} at ${vm.whenText(p.dueAt)}",
-                        style = MaterialTheme.typography.bodyMedium,
-                        modifier = Modifier.weight(1f),
-                    )
-                    TextButton(onClick = { vm.cancelPending(p.id) }) { Text("Cancel") }
-                }
+    SectionCard("Pending changes") {
+        pending.sortedBy { it.dueAt }.forEach { p ->
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    "${p.change.describe()} at ${vm.whenText(p.dueAt)}",
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.weight(1f),
+                )
+                TextButton(onClick = { vm.cancelPending(p.id) }) { Text("Cancel") }
             }
         }
     }
@@ -253,6 +271,7 @@ internal fun PendingChangesCard(vm: WardenViewModel) {
 /**
  * "Blocking is ON/OFF", "Focus session – 23 min left" or "On – waiting for schedule (next: …)".
  * Ticks on its own so only this line recomposes while a countdown or a schedule is due.
+ * A new text fades in over the old one.
  */
 @Composable
 private fun BlockingHeadline(enabled: Boolean, alwaysOn: Boolean, focusEndsAt: Long, schedules: List<Schedule>) {
@@ -266,25 +285,11 @@ private fun BlockingHeadline(enabled: Boolean, alwaysOn: Boolean, focusEndsAt: L
         enabled, alwaysOn, focusEndsAt, schedules,
         Calendar.getInstance().apply { timeInMillis = now }, is24Hour,
     )
-    Text(text, style = MaterialTheme.typography.titleLarge)
-}
-
-/** Red card for something that leaves the user less protected than the switch suggests. */
-@Composable
-private fun WarningCard(
-    title: String,
-    text: String,
-    onClick: (() -> Unit)? = null,
-    actions: @Composable ColumnScope.() -> Unit = {},
-) {
-    ElevatedCard(
-        Modifier.fillMaxWidth().then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier),
-        colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
-    ) {
-        Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-            Text(text, style = MaterialTheme.typography.bodySmall)
-            actions()
-        }
+    AnimatedContent(
+        text,
+        transitionSpec = { fadeIn(tween(Motion.MEDIUM)) togetherWith fadeOut(tween(Motion.SHORT)) },
+        label = "headline",
+    ) { shown ->
+        Text(shown, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
     }
 }

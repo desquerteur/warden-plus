@@ -69,6 +69,10 @@ import com.warden.blocker.stats.StatsPeriod
 import com.warden.blocker.stats.TimeRange
 import com.warden.blocker.stats.UsageEventsSource
 import com.warden.blocker.ui.AppIcon
+import com.warden.blocker.ui.EmptyState
+import com.warden.blocker.ui.InfoNote
+import com.warden.blocker.ui.SectionCard
+import com.warden.blocker.ui.rememberCountUp
 import com.warden.blocker.ui.ScrollToTopOnReselect
 import com.warden.blocker.ui.tour.TourIds
 import com.warden.blocker.ui.tour.tourTarget
@@ -171,7 +175,9 @@ private fun Tiles(state: StatsUiState) {
     val screen = TileModel(
         icon = Icons.Outlined.Schedule,
         label = "Screen time",
-        value = usage?.let { formatDuration(it.totalMillis) } ?: dash,
+        value = dash,
+        count = usage?.totalMillis,
+        format = ::formatDuration,
         detail = when {
             noPermission -> "Needs usage access"
             usage == null -> ""
@@ -185,7 +191,8 @@ private fun Tiles(state: StatsUiState) {
         TileModel(
             icon = Icons.Outlined.LockOpen,
             label = "Unlocks",
-            value = usage?.unlocks?.toString() ?: dash,
+            value = dash,
+            count = usage?.unlocks?.toLong(),
             detail = when {
                 noPermission -> "Needs usage access"
                 usage == null -> ""
@@ -198,7 +205,8 @@ private fun Tiles(state: StatsUiState) {
         TileModel(
             icon = Icons.Outlined.TouchApp,
             label = "App opens",
-            value = usage?.opens?.toString() ?: dash,
+            value = dash,
+            count = usage?.opens?.toLong(),
             detail = if (noPermission) "Needs usage access" else "",
             tone = Tone.Neutral,
         )
@@ -207,7 +215,8 @@ private fun Tiles(state: StatsUiState) {
     val blocksTile = TileModel(
         icon = Icons.Outlined.Block,
         label = "Blocks",
-        value = b?.current?.total?.toString() ?: "…",
+        value = "…",
+        count = b?.current?.total?.toLong(),
         detail = b?.let { "${it.current.apps} apps · ${it.current.domains} sites" } ?: "",
         tone = Tone.Neutral,
     )
@@ -240,7 +249,16 @@ private fun Tiles(state: StatsUiState) {
     }
 }
 
-private data class TileModel(val icon: ImageVector, val label: String, val value: String, val detail: String, val tone: Tone)
+/** [count] set: the number counts up to it (formatted by [format]); else [value] is shown ("…", "—"). */
+private data class TileModel(
+    val icon: ImageVector,
+    val label: String,
+    val value: String,
+    val detail: String,
+    val tone: Tone,
+    val count: Long? = null,
+    val format: (Long) -> String = { it.toString() },
+)
 
 @Composable
 private fun StatTile(t: TileModel, modifier: Modifier = Modifier) {
@@ -257,7 +275,8 @@ private fun StatTile(t: TileModel, modifier: Modifier = Modifier) {
                 )
             }
             Spacer(Modifier.height(6.dp))
-            Text(t.value, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, maxLines = 1)
+            val shown = t.count?.let { t.format(rememberCountUp(it)) } ?: t.value
+            Text(shown, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, maxLines = 1)
             if (t.detail.isNotEmpty()) {
                 Text(
                     t.detail,
@@ -286,7 +305,7 @@ private fun UsageSections(state: StatsUiState) {
         UsageState.NoPermission -> PermissionCard()
         is UsageState.Ready -> {
             if (u.data.partialHistory) {
-                Note("Android only keeps about 10 days of detailed history, so older days are empty.")
+                InfoNote("Android only keeps about 10 days of detailed history, so older days are empty.")
             }
             ScreenTimeCard(state.period, u.data)
             if (u.data.slices.isNotEmpty()) TopAppsCard(u.data)
@@ -302,7 +321,7 @@ private fun ScreenTimeCard(period: StatsPeriod, data: UsageData) {
     val futureFrom = buckets.indexOfFirst { it.start > data.now }.let { if (it < 0) buckets.size else it }
     val title = if (period == StatsPeriod.TODAY) "Screen time per hour" else "Screen time per day"
     SectionCard(title) {
-        if (data.totalMillis == 0L) EmptyText("No screen time recorded in this period yet.")
+        if (data.totalMillis == 0L) EmptyState("No screen time recorded in this period yet.")
         else ScreenTimeChart(period, data, buckets, futureFrom, selected, zone, title) { selected = it }
     }
 }
@@ -414,7 +433,7 @@ private fun LazyListScope.appList(state: StatsUiState, expanded: String?, onTogg
         )
     }
     if (data.apps.isEmpty()) {
-        item(key = "apps-empty") { EmptyText("No apps used in this period.") }
+        item(key = "apps-empty") { EmptyState("No apps used in this period.") }
         return
     }
     val slicePkgs = data.slices.mapNotNull { it.packageName }
@@ -427,6 +446,7 @@ private fun LazyListScope.appList(state: StatsUiState, expanded: String?, onTogg
             blocks = state.blocks?.current?.perApp?.get(app.packageName) ?: 0,
             expanded = expanded == app.packageName,
             onClick = { onToggle(app.packageName) },
+            modifier = Modifier.animateItem(),
         )
     }
 }
@@ -440,12 +460,13 @@ private fun AppRowItem(
     blocks: Int,
     expanded: Boolean,
     onClick: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val palette = seriesColors()
     val barColor = if (colorIndex >= 0) palette[colorIndex % palette.size] else MaterialTheme.colorScheme.outline
     val zone = remember { ZoneId.systemDefault() }
     Card(
-        Modifier.fillMaxWidth().clickable(
+        modifier.fillMaxWidth().clickable(
             onClickLabel = if (expanded) "Hide history" else "Show history",
             role = Role.Button,
             onClick = onClick,
@@ -523,61 +544,18 @@ private fun AppRowItem(
 // --- Building blocks ---
 
 @Composable
-private fun SectionCard(title: String, content: @Composable () -> Unit) {
-    Card(
-        Modifier.fillMaxWidth(),
-    ) {
-        Column(Modifier.padding(16.dp)) {
-            Text(
-                title, style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier.semantics { heading() },
-            )
-            Spacer(Modifier.height(4.dp))
-            content()
-        }
-    }
-}
-
-@Composable
 private fun PermissionCard() {
     val context = LocalContext.current
-    Card(
-        Modifier.fillMaxWidth(),
-    ) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("See where your time goes", style = MaterialTheme.typography.titleMedium)
-            Text(
-                "Warden+ needs \"Usage access\" to show screen time, unlocks and your top apps. " +
-                    "Everything stays on this phone.",
-                style = MaterialTheme.typography.bodyMedium,
-            )
-            Button(onClick = {
-                runCatching { context.startActivity(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS)) }
-            }) { Text("Grant usage access") }
-        }
+    SectionCard("See where your time goes") {
+        Text(
+            "Warden+ needs \"Usage access\" to show screen time, unlocks and your top apps. " +
+                "Everything stays on this phone.",
+            style = MaterialTheme.typography.bodyMedium,
+        )
+        Button(onClick = {
+            runCatching { context.startActivity(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS)) }
+        }) { Text("Grant usage access") }
     }
-}
-
-@Composable
-private fun Note(text: String) {
-    Row(
-        Modifier.fillMaxWidth().padding(horizontal = 4.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Icon(Icons.Outlined.Info, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(16.dp))
-        Spacer(Modifier.width(8.dp))
-        Text(text, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-    }
-}
-
-@Composable
-private fun EmptyText(text: String) {
-    Text(
-        text,
-        style = MaterialTheme.typography.bodyMedium,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.padding(vertical = 12.dp),
-    )
 }
 
 @Composable

@@ -8,6 +8,19 @@ import android.provider.Settings
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -23,8 +36,6 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.RadioButtonUnchecked
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -58,14 +69,18 @@ import com.warden.blocker.system.AdminManager
 import com.warden.blocker.system.Hardening
 import com.warden.blocker.owner.DeviceOwnerManager
 import com.warden.blocker.ui.protectionSummary
+import com.warden.blocker.ui.AnimatedCheck
+import com.warden.blocker.ui.LocalMotion
+import com.warden.blocker.ui.Motion
 import com.warden.blocker.ui.SubScreenTopBar
+import com.warden.blocker.ui.pageGutter
 import com.warden.blocker.ui.WardenViewModel
 import com.warden.blocker.ui.hosts.HostsViewModel
 import com.warden.blocker.ui.tour.LocalTourController
 import com.warden.blocker.ui.tour.SettingsGuide
 import com.warden.blocker.ui.tour.SettingsPathAnimation
 import com.warden.blocker.ui.tour.Tours
-import com.warden.blocker.ui.tour.animationsEnabled
+import com.warden.blocker.ui.animationsEnabled
 import com.warden.blocker.ui.tour.openSettingsGuide
 import com.warden.blocker.vpn.VpnController
 import kotlinx.coroutines.delay
@@ -112,48 +127,68 @@ fun SetupWizardScreen(
 
     BackHandler { if (WizardLogic.back(step, sdk) != null) wizard.back(step) else leave() }
 
+    val gutter = pageGutter()
     Column(Modifier.fillMaxSize()) {
         SubScreenTopBar("Setup", onBack = ::leave)
         WizardLogic.position(step, sdk)?.let { (i, n) ->
-            Column(Modifier.padding(horizontal = 20.dp)) {
+            val shown by animateFloatAsState(i / n.toFloat(), tween(Motion.MEDIUM * 2), label = "wizardProgress")
+            Column(Modifier.padding(horizontal = gutter)) {
                 Text("Step $i of $n", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
-                LinearProgressIndicator(progress = { i / n.toFloat() }, modifier = Modifier.fillMaxWidth().padding(top = 6.dp))
+                LinearProgressIndicator(progress = { shown }, modifier = Modifier.fillMaxWidth().padding(top = 6.dp))
             }
         }
-        Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
-            Column(
-                Modifier.widthIn(max = 600.dp).fillMaxWidth().verticalScroll(rememberScrollState()).padding(20.dp),
-                verticalArrangement = Arrangement.spacedBy(14.dp),
-            ) {
-                when (step) {
-                    WizardStep.WELCOME -> WelcomePage()
-                    WizardStep.NOTIFICATIONS -> NotificationsPage(doneNow)
-                    WizardStep.APP_BLOCKING -> AppBlockingPage(doneNow)
-                    WizardStep.WEBSITE_BLOCKING -> WebsiteBlockingPage(doneNow)
-                    WizardStep.USAGE -> UsagePage(doneNow)
-                    WizardStep.BATTERY -> BatteryPage(doneNow)
-                    WizardStep.PROTECTION -> ProtectionPage(vm, doneNow, onChosen = wizard::chooseProtection, onOpenProtection)
-                    WizardStep.FIRST_BLOCKS -> FirstBlocksPage(vm, onOpenAppPicker)
-                    WizardStep.DONE -> DonePage(
-                        vm, sdk, done, state.skipped,
-                        onOpen = wizard::goTo,
-                        onEnableBlocking = onEnableBlocking,
-                        onTour = {
-                            wizard.finish()
-                            onClose()
-                            tours?.start(Tours.GETTING_STARTED)
-                        },
-                        onFinish = {
-                            wizard.finish()
-                            tours?.markSkippedIfNew(Tours.GETTING_STARTED)
-                            onClose()
-                        },
-                    )
+        // Pages slide like a book: Next from the end, Back from the start.
+        val motion = LocalMotion.current
+        AnimatedContent(
+            step,
+            modifier = Modifier.weight(1f).fillMaxWidth(),
+            transitionSpec = {
+                if (!motion) {
+                    EnterTransition.None togetherWith ExitTransition.None
+                } else {
+                    val forward = targetState.ordinal > initialState.ordinal
+                    (slideInHorizontally(tween(Motion.MEDIUM)) { if (forward) it / 4 else -it / 4 } + fadeIn(tween(Motion.MEDIUM))) togetherWith
+                        (slideOutHorizontally(tween(Motion.MEDIUM)) { if (forward) -it / 4 else it / 4 } + fadeOut(tween(Motion.SHORT)))
+                }
+            },
+            label = "wizardPage",
+        ) { page ->
+            val pageDone = page in done
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
+                Column(
+                    Modifier.widthIn(max = 600.dp).fillMaxWidth().verticalScroll(rememberScrollState()).padding(gutter),
+                    verticalArrangement = Arrangement.spacedBy(14.dp),
+                ) {
+                    when (page) {
+                        WizardStep.WELCOME -> WelcomePage()
+                        WizardStep.NOTIFICATIONS -> NotificationsPage(pageDone)
+                        WizardStep.APP_BLOCKING -> AppBlockingPage(pageDone)
+                        WizardStep.WEBSITE_BLOCKING -> WebsiteBlockingPage(pageDone)
+                        WizardStep.USAGE -> UsagePage(pageDone)
+                        WizardStep.BATTERY -> BatteryPage(pageDone)
+                        WizardStep.PROTECTION -> ProtectionPage(vm, pageDone, onChosen = wizard::chooseProtection, onOpenProtection)
+                        WizardStep.FIRST_BLOCKS -> FirstBlocksPage(vm, onOpenAppPicker)
+                        WizardStep.DONE -> DonePage(
+                            vm, sdk, done, state.skipped,
+                            onOpen = wizard::goTo,
+                            onEnableBlocking = onEnableBlocking,
+                            onTour = {
+                                wizard.finish()
+                                onClose()
+                                tours?.start(Tours.GETTING_STARTED)
+                            },
+                            onFinish = {
+                                wizard.finish()
+                                tours?.markSkippedIfNew(Tours.GETTING_STARTED)
+                                onClose()
+                            },
+                        )
+                    }
                 }
             }
         }
         if (step != WizardStep.DONE) {
-            HorizontalDivider()
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
             Row(
                 Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
@@ -182,13 +217,23 @@ private fun PageTitle(title: String, text: String) {
     Text(text, style = MaterialTheme.typography.bodyLarge)
 }
 
-/** Green tick once Android reports the page as done. */
+/**
+ * Tick once Android reports the page as done. Coming back from Android's settings with it
+ * switched on, the tick is drawn (then the wizard moves on); on a page that was already done it
+ * just shows.
+ */
 @Composable
 private fun DoneBadge(done: Boolean, text: String = "Done — on to the next step") {
-    if (!done) return
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Icon(Icons.Filled.CheckCircle, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-        Text(text, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(start = 8.dp))
+    val doneOnEnter = remember { done }
+    AnimatedVisibility(
+        done,
+        enter = fadeIn(tween(Motion.MEDIUM)) + expandVertically(tween(Motion.MEDIUM)),
+        exit = fadeOut(tween(Motion.SHORT)) + shrinkVertically(tween(Motion.SHORT)),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            AnimatedCheck(true, size = 28.dp, animateIn = !doneOnEnter)
+            Text(text, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(start = 8.dp))
+        }
     }
 }
 
@@ -464,17 +509,14 @@ private fun ColumnScope.DonePage(
     Card(Modifier.fillMaxWidth()) {
         Column {
             WizardLogic.tasks(sdk).forEachIndexed { i, step ->
-                if (i > 0) HorizontalDivider()
+                if (i > 0) HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                 val isDone = step in done
                 Row(
                     Modifier.fillMaxWidth().clickable { onOpen(step) }.padding(horizontal = 16.dp, vertical = 12.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Icon(
-                        if (isDone) Icons.Filled.CheckCircle else Icons.Filled.RadioButtonUnchecked,
-                        contentDescription = null,
-                        tint = if (isDone) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
-                    )
+                    // The ticks are drawn one after another when the summary opens.
+                    AnimatedCheck(isDone, animateIn = true, delayMillis = 120 + i * 90)
                     Text(step.title, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f).padding(start = 12.dp))
                     Text(
                         when {

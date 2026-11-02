@@ -34,7 +34,10 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.warden.blocker.allow.AlwaysAllowed
 import com.warden.blocker.allow.CategorizedApp
 import com.warden.blocker.ui.AppIcon
+import com.warden.blocker.ui.IntroText
+import com.warden.blocker.ui.SectionHeader
 import com.warden.blocker.ui.SubScreenTopBar
+import com.warden.blocker.ui.pageGutter
 
 /** Tick the apps that stay open in "Allow only". Saved on every tap. */
 @Composable
@@ -45,6 +48,7 @@ fun AllowedAppsScreen(vm: AllowViewModel, onBack: () -> Unit) {
     var query by rememberSaveable { mutableStateOf("") }
     LaunchedEffect(Unit) { vm.refreshApps() }
 
+    val gutter = pageGutter()
     Column(Modifier.fillMaxSize()) {
         SubScreenTopBar("Allowed apps", onBack = onBack, showDone = true)
         val list = apps
@@ -61,12 +65,12 @@ fun AllowedAppsScreen(vm: AllowViewModel, onBack: () -> Unit) {
 
         LazyColumn(
             Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 20.dp),
+            contentPadding = PaddingValues(start = gutter, end = gutter, bottom = gutter),
             verticalArrangement = Arrangement.spacedBy(2.dp),
         ) {
             item {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("Ticked apps open normally in “Allow only”. Everything else is blocked.", style = MaterialTheme.typography.bodyMedium)
+                    IntroText("Ticked apps open normally in “Allow only”. Everything else is blocked.")
                     OutlinedTextField(
                         value = query, onValueChange = { query = it },
                         label = { Text("Search apps") }, singleLine = true,
@@ -95,7 +99,7 @@ fun AllowedAppsScreen(vm: AllowViewModel, onBack: () -> Unit) {
 
 @Composable
 private fun Heading(text: String) {
-    Text(text, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 12.dp, bottom = 4.dp))
+    SectionHeader(text, Modifier.padding(bottom = 4.dp))
 }
 
 /** [onToggle] null: always allowed, shown with a lock and not changeable. */

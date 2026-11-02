@@ -12,10 +12,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -28,6 +25,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.warden.blocker.data.BlockType
@@ -50,8 +49,9 @@ fun AppPickerScreen(vm: WardenViewModel, onBack: () -> Unit) {
 
     Column(Modifier.fillMaxSize()) {
         SubScreenTopBar("Add apps", onBack = onBack, showDone = true)
-        Column(Modifier.fillMaxSize().padding(start = 20.dp, end = 20.dp, bottom = 20.dp)) {
-            Text("Tap an app to block it. New apps start in mindful-pause mode — tune it in Blocklist.", style = MaterialTheme.typography.bodyMedium)
+        val gutter = pageGutter()
+        Column(Modifier.fillMaxSize().padding(start = gutter, end = gutter, bottom = gutter)) {
+            IntroText("Tap an app to block it. New apps start in mindful-pause mode — tune it in Blocklist.")
             Spacer(Modifier.height(12.dp))
             OutlinedTextField(
                 value = query, onValueChange = { query = it },
@@ -79,9 +79,13 @@ fun AppPickerScreen(vm: WardenViewModel, onBack: () -> Unit) {
                             AppIcon(app.packageName, modifier = Modifier.size(40.dp).padding(end = 12.dp))
                             Column(Modifier.weight(1f)) {
                                 Text(app.label, style = MaterialTheme.typography.bodyLarge)
-                                Text(app.packageName, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline)
+                                SupportingText(app.packageName, maxLines = 1)
                             }
-                            if (added) Icon(Icons.Filled.CheckCircle, contentDescription = "Added", tint = MaterialTheme.colorScheme.primary)
+                            if (added) {
+                                // Drawn when tapped; already blocked apps just show it.
+                                val addedOnEnter = remember { added }
+                                AnimatedCheck(true, Modifier.semantics { contentDescription = "Added" }, animateIn = !addedOnEnter)
+                            }
                         }
                     }
                 }

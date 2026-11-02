@@ -30,6 +30,26 @@ class WizardControllerTest {
         (found ?: throw AssertionError("Timed out; last value: $last")).single()
     }
 
+    @Test fun appBlockingCardOpensRightOnAppBlocking() {
+        // W3: the wizard was left on "First blocks" (or finished); Home's "App blocking is off"
+        // card resumes it on "App blocking", and opening the wizard keeps that page.
+        val store = newStore()
+        val home = WizardController(store, scope, sdk)
+        home.finish()
+        await(store.state) { it.status == WizardStatus.FINISHED }
+        home.resumeAt(WizardStep.APP_BLOCKING)
+        await(store.state) { it.step == WizardStep.APP_BLOCKING }
+        val wizard = WizardController(store, scope, sdk)
+        wizard.opened()
+        val s = await(store.state) { it.status == WizardStatus.IN_PROGRESS }
+        assertEquals(WizardStep.APP_BLOCKING, WizardLogic.currentStep(s, sdk))
+    }
+
+    @Test fun homeCardSaysHowManyAreDone() {
+        // S1: not "Setup 6/7" next to the wizard's "Step 5 of 7".
+        assertEquals("Setup: 6 of 7 done – continue", WizardLogic.homeCardTitle(6, 7))
+    }
+
     @Test fun movesAreSavedInOrder() {
         val store = newStore()
         val c = WizardController(store, scope, sdk)

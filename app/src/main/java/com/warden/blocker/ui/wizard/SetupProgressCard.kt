@@ -17,6 +17,8 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -30,7 +32,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.warden.blocker.ui.WardenViewModel
 
 /**
- * "Setup 5/7 – continue" on Home while a setup page is neither done nor put off; otherwise
+ * "Setup: 5 of 7 done – continue" on Home while a setup page is neither done nor put off; otherwise
  * [orElse] (Home's plain "Finish setup" card), so the two never show together.
  */
 @Composable
@@ -57,7 +59,7 @@ fun SetupProgressCard(
     ) {
         Row(Modifier.fillMaxWidth().padding(start = 20.dp, top = 8.dp, bottom = 16.dp), verticalAlignment = Alignment.Top) {
             Column(Modifier.weight(1f).padding(top = 8.dp)) {
-                Text("Setup $count/$total – continue", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                Text(WizardLogic.homeCardTitle(count, total), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                 Text("Next: ${open.first().title}. Tap to go on.", style = MaterialTheme.typography.bodySmall)
                 LinearProgressIndicator(progress = { count / total.toFloat() }, modifier = Modifier.fillMaxWidth().padding(top = 10.dp))
             }
@@ -82,4 +84,15 @@ fun AutoOpenSetupWizard(wizardVm: WizardViewModel = viewModel(), open: suspend (
         handled = true
         if (WizardLogic.shouldAutoOpen(status, WizardChecks.freshInstall(context))) open()
     }
+}
+
+/**
+ * Opens the setup wizard right at a page — e.g. Home's "App blocking is off" goes straight to
+ * "App blocking", not wherever the wizard was left (W3).
+ */
+@Composable
+fun rememberOpenWizardAt(onOpenSetup: () -> Unit, wizardVm: WizardViewModel = viewModel()): (WizardStep) -> Unit {
+    val controller = wizardVm.controller
+    val open by rememberUpdatedState(onOpenSetup)
+    return remember(controller) { { step -> controller.resumeAt(step); open() } }
 }

@@ -85,6 +85,12 @@ object WizardLogic {
         return tasks.count { it in done } to tasks.size
     }
 
+    /**
+     * Home card title: how many are done, not "6/7" — the wizard itself numbers its pages
+     * ("Step 5 of 7"), and the two read alike although they mean different things (S1).
+     */
+    fun homeCardTitle(done: Int, total: Int): String = "Setup: $done of $total done – continue"
+
     /** The page on screen (a saved page that doesn't exist on this Android version falls back to Welcome). */
     fun currentStep(state: WizardState, sdk: Int): WizardStep =
         state.step.takeIf { it in steps(sdk) } ?: WizardStep.WELCOME

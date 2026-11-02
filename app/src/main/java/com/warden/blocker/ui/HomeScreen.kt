@@ -51,6 +51,8 @@ import com.warden.blocker.ui.times.BlockUntilCard
 import com.warden.blocker.ui.tour.TourIds
 import com.warden.blocker.ui.tour.tourTarget
 import com.warden.blocker.ui.wizard.SetupProgressCard
+import com.warden.blocker.ui.wizard.WizardStep
+import com.warden.blocker.ui.wizard.rememberOpenWizardAt
 import com.warden.blocker.util.PermissionsHelper
 import com.warden.blocker.vpn.VpnController
 import com.warden.blocker.vpn.WardenVpnService
@@ -110,6 +112,8 @@ fun HomeScreen(
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         Text(stringResource(R.string.app_name), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+        // Both accessibility cards open the wizard right on "App blocking", not where it was left.
+        val openWizardAt = rememberOpenWizardAt(onOpenSetup)
         if (needsSetup && AccessibilityAlert.shouldWarn(false, accessibilityUsed, enabled, items.any { it.type == BlockType.APP && it.enabled })) {
             // It worked before (or is clearly relied on) — typically Android switched it off after
             // Warden+ was updated from an APK file. Make that impossible to miss.
@@ -118,14 +122,14 @@ fun HomeScreen(
                 title = "⚠ App blocking is off",
                 text = "Warden+ has no accessibility access, so apps aren't blocked. Android switches it off " +
                     "after an update from an APK file and after \"Force stop\". Tap to turn it on.",
-                onClick = onOpenSetup,
+                onClick = { openWizardAt(WizardStep.APP_BLOCKING) },
             )
             }
         } else {
             // One setup card at a time: the wizard's progress, or else the plain "Finish setup".
             SetupProgressCard(vm, onOpen = onOpenSetup, modifier = Modifier.tourTarget(TourIds.HOME_SETUP)) {
                 if (needsSetup) {
-                    ElevatedCard(Modifier.fillMaxWidth().clickable { onOpenSetup() }.tourTarget(TourIds.HOME_SETUP)) {
+                    ElevatedCard(Modifier.fillMaxWidth().clickable { openWizardAt(WizardStep.APP_BLOCKING) }.tourTarget(TourIds.HOME_SETUP)) {
                         Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                             Text("Finish setup", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                             Text("Grant accessibility so Warden+ can block apps and feeds. Tap to fix.", style = MaterialTheme.typography.bodySmall)

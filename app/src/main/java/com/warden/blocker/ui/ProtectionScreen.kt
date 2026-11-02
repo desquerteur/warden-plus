@@ -58,6 +58,8 @@ import com.warden.blocker.ui.owner.MaxProtectionSection
 import com.warden.blocker.ui.times.PickDateDialog
 import com.warden.blocker.ui.times.PickTimeDialog
 import com.warden.blocker.ui.tour.TourIds
+import com.warden.blocker.ui.wizard.WizardStep
+import com.warden.blocker.ui.wizard.rememberOpenWizardAt
 import com.warden.blocker.ui.tour.tourTarget
 import com.warden.blocker.system.Hardening
 import com.warden.blocker.util.PermissionsHelper
@@ -115,6 +117,7 @@ fun ProtectionScreen(vm: WardenViewModel, onBack: () -> Unit, onOpenSetup: () ->
     // As device owner ("Maximum protection" below) uninstalling, Force stop and the always-on VPN
     // are handled there; the device-admin switch here would do nothing.
     val isOwner = remember(resumes) { DeviceOwnerManager.isDeviceOwner(context) }
+    val openWizardAt = rememberOpenWizardAt(onOpenSetup)
     val ownerPolicies by OwnerPrefs.get(context).policies.collectAsStateWithLifecycle()
 
     // Delay / Locked show their choices first; the mode switches once one is picked.
@@ -270,7 +273,7 @@ fun ProtectionScreen(vm: WardenViewModel, onBack: () -> Unit, onOpenSetup: () ->
                 title = "Accessibility (app blocking)",
                 text = "Needed to block apps. Warden+ warns you if it is switched off.",
                 action = "Open setup",
-                onAction = onOpenSetup,
+                onAction = { openWizardAt(WizardStep.APP_BLOCKING) },
             )
 
             SettingsGuardSection(Modifier.tourTarget(TourIds.SETTINGS_GUARD_SYSTEM))

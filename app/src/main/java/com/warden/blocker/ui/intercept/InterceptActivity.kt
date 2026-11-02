@@ -39,12 +39,14 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.lifecycleScope
+import com.warden.blocker.allow.AllowBlockNotice
 import com.warden.blocker.block.LimitReason
 import com.warden.blocker.data.BlockType
 import com.warden.blocker.data.BlockedItem
 import com.warden.blocker.stats.StatsRecorder
 import com.warden.blocker.ui.hideOverlayWindows
 import com.warden.blocker.ui.theme.WardenTheme
+import com.warden.blocker.usage.AppsHelper
 import com.warden.blocker.wardenContainer
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -65,6 +67,7 @@ class InterceptActivity : ComponentActivity() {
         val itemId = intent.getLongExtra(EXTRA_ITEM_ID, -1L)
         val reason = intent.getStringExtra(EXTRA_REASON)?.let { runCatching { LimitReason.valueOf(it) }.getOrNull() }
         val featureLabel = intent.getStringExtra(EXTRA_FEATURE_LABEL)
+        val allowBlockLabel = AllowBlockNotice.packageName?.let { AppsHelper.labelFor(this, it) }
         // Count each interception once — not again when the Fold unfolds or the screen rotates.
         if (savedInstanceState == null) recordIntercept(kind, itemId, featureLabel)
 
@@ -77,6 +80,12 @@ class InterceptActivity : ComponentActivity() {
                     val current = item
                     when {
                         kind == KIND_FEATURE -> FeatureBlockScreen(featureLabel, ::goHome)
+                        // "Allow only" / blocked category: no blocklist entry behind it.
+                        AllowBlockNotice.isAllowBlock(itemId) -> CenteredMessage(
+                            title = AllowBlockNotice.title(itemId),
+                            body = AllowBlockNotice.body(itemId, allowBlockLabel),
+                            onHome = ::goHome,
+                        )
                         kind == KIND_PAUSE && current != null -> PauseScreen(
                             item = current,
                             onContinue = { minutes -> grantAndEnter(current, minutes) },
@@ -95,6 +104,8 @@ class InterceptActivity : ComponentActivity() {
         lifecycleScope.launch {
             val key = if (kind == KIND_FEATURE) {
                 "feature:${featureLabel ?: "feed"}"
+            } else if (AllowBlockNotice.isAllowBlock(itemId)) {
+                AllowBlockNotice.packageName
             } else {
                 wardenContainer.repository.item(itemId)?.takeIf { it.type == BlockType.APP }?.value
             }

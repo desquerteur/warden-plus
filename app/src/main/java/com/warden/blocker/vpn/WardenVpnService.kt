@@ -134,6 +134,7 @@ class WardenVpnService : VpnService() {
         val inputs = listOf<Flow<Any?>>(
             c.repository.items, c.repository.schedules, c.hostsLists.activeKey,
             c.settings.blockDoh, c.settings.masterEnabled, c.settings.alwaysOn, c.settings.focusEndsAt,
+            c.allowStore.config,
         ).map { it.distinctUntilChanged() } // settings flows re-emit on every unrelated pref write
         combine(inputs) { }
             .drop(1) // the initial values are covered by the refresh before the packet loop
@@ -149,7 +150,9 @@ class WardenVpnService : VpnService() {
             val focusEndsAt = runCatching { c.settings.focusEndsAt.first() }.getOrDefault(0L)
             delay(BlockStateClock.delayUntilNextCheck(System.currentTimeMillis(), focusEndsAt))
             val active = runCatching { c.blockEngine.isBlockingActiveNow() }.getOrNull() ?: continue
-            if (BlockStateClock.needsRebuild(builtForActive, active)) refreshBlocklist()
+            // Website "Allow only" limited to schedules/focus can start or end while blocking stays on.
+            val allowOnlyFlipped = active && runCatching { c.allowGate.webModeStale() }.getOrDefault(false)
+            if (BlockStateClock.needsRebuild(builtForActive, active) || allowOnlyFlipped) refreshBlocklist()
         }
     }
 

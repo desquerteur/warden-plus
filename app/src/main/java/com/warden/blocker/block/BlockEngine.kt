@@ -16,6 +16,8 @@ class BlockEngine(
     private val settings: SettingsStore,
     /** Domains from enabled imported hosts lists (see HostsListRepository), null if none. */
     private val listDomains: suspend () -> DomainHashSet? = { null },
+    /** Website "Allow only" filter while it's in force (see AllowGate), else null. */
+    private val allowOnlyWeb: suspend () -> DomainMatcher? = { null },
 ) {
     /**
      * True when blocking is enforced right now. A focus session forces it on for its
@@ -39,6 +41,7 @@ class BlockEngine(
      */
     suspend fun blocklist(active: Boolean? = null): DomainMatcher {
         if (!(active ?: isBlockingActiveNow())) return DomainMatcher.EMPTY
+        allowOnlyWeb()?.let { return it }
         return DomainMatcher(manualAndDohDomains(), listDomains())
     }
 

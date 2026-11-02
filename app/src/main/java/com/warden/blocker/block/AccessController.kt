@@ -29,10 +29,14 @@ class AccessController(
     private val repo: BlockRepository,
     private val engine: BlockEngine,
     private val usageMinutesToday: suspend (String) -> Long,
+    /** "Allow only" / blocked categories (see AllowGate): a decision, or null for the blocklist rules. */
+    private val allowGate: suspend (String, BlockedItem?) -> AccessDecision? = { _, _ -> null },
 ) {
     suspend fun decideForPackage(packageName: String): AccessDecision {
         if (!engine.isBlockingActiveNow()) return AccessDecision.Allow
-        val item = repo.appItem(packageName) ?: return AccessDecision.Allow
+        val found = repo.appItem(packageName)
+        allowGate(packageName, found)?.let { return it }
+        val item = found ?: return AccessDecision.Allow
 
         val now = System.currentTimeMillis()
         // Fetch only what each check needs (usage stats especially aren't free).

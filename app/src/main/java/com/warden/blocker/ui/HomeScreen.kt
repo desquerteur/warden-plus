@@ -6,6 +6,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
@@ -47,6 +48,9 @@ import com.warden.blocker.data.Schedule
 import com.warden.blocker.system.AccessibilityAlert
 import com.warden.blocker.ui.stats.shownFocusStreak
 import com.warden.blocker.ui.times.BlockUntilCard
+import com.warden.blocker.ui.tour.TourIds
+import com.warden.blocker.ui.tour.tourTarget
+import com.warden.blocker.ui.wizard.SetupProgressCard
 import com.warden.blocker.util.PermissionsHelper
 import com.warden.blocker.vpn.VpnController
 import com.warden.blocker.vpn.WardenVpnService
@@ -109,14 +113,16 @@ fun HomeScreen(
         if (needsSetup && AccessibilityAlert.shouldWarn(false, accessibilityUsed, enabled, items.any { it.type == BlockType.APP && it.enabled })) {
             // It worked before (or is clearly relied on) — typically Android switched it off after
             // Warden+ was updated from an APK file. Make that impossible to miss.
+            Box(Modifier.tourTarget(TourIds.HOME_SETUP)) {
             WarningCard(
                 title = "⚠ App blocking is off",
                 text = "Warden+ has no accessibility access, so apps aren't blocked. Android switches it off " +
                     "after an update from an APK file and after \"Force stop\". Tap to turn it on.",
                 onClick = onOpenSetup,
             )
+            }
         } else if (needsSetup) {
-            ElevatedCard(Modifier.fillMaxWidth().clickable { onOpenSetup() }) {
+            ElevatedCard(Modifier.fillMaxWidth().clickable { onOpenSetup() }.tourTarget(TourIds.HOME_SETUP)) {
                 Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text("Finish setup", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                     Text("Grant accessibility so Warden+ can block apps and feeds. Tap to fix.", style = MaterialTheme.typography.bodySmall)
@@ -126,6 +132,7 @@ fun HomeScreen(
                 }
             }
         }
+        SetupProgressCard(vm, onOpen = onOpenSetup)
         if (protecting && showPaused && otherVpn) {
             // Android allows one VPN at a time; another app (Tailscale & co.) holds it, often as
             // "Always-on VPN", which makes Android close our consent dialog without showing it.
@@ -150,7 +157,7 @@ fun HomeScreen(
                 onClick = onRetryVpn,
             )
         }
-        ElevatedCard(Modifier.fillMaxWidth()) {
+        ElevatedCard(Modifier.fillMaxWidth().tourTarget(TourIds.HOME_MASTER)) {
             Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
@@ -178,9 +185,9 @@ fun HomeScreen(
             }
         }
         PendingChangesCard(vm)
-        FocusCard(focusEndsAt = focusEndsAt, strict = focusStrict, onStart = onStartFocus, onCancel = onCancelFocus)
+        Box(Modifier.tourTarget(TourIds.HOME_FOCUS)) { FocusCard(focusEndsAt = focusEndsAt, strict = focusStrict, onStart = onStartFocus, onCancel = onCancelFocus) }
         // "Block until …" — saved first, then the same VPN start (and consent) as a retry.
-        BlockUntilCard(focusEndsAt = focusEndsAt, focusStrict = focusStrict, onStarted = onRetryVpn)
+        Box(Modifier.tourTarget(TourIds.HOME_BLOCK_UNTIL)) { BlockUntilCard(focusEndsAt = focusEndsAt, focusStrict = focusStrict, onStarted = onRetryVpn) }
         if (shownFocusStreak(streak, focusSessions) > 0) {
             ElevatedCard(Modifier.fillMaxWidth()) {
                 Row(Modifier.fillMaxWidth().padding(20.dp), verticalAlignment = Alignment.CenterVertically) {

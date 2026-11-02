@@ -3,7 +3,6 @@ package com.warden.blocker
 import android.app.Activity
 import android.content.Context
 import android.content.Intent
-import android.os.Build
 import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
@@ -62,13 +61,17 @@ import com.warden.blocker.vpn.WardenVpnService
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.warden.blocker.ui.SchedulesScreen
 import com.warden.blocker.ui.SettingsScreen
-import com.warden.blocker.ui.SetupScreen
 import com.warden.blocker.ui.WardenViewModel
 import com.warden.blocker.ui.allow.AllowOnlyScreen
 import com.warden.blocker.ui.allow.CategoriesScreen
 import com.warden.blocker.ui.hosts.HostsListsScreen
 import com.warden.blocker.ui.stats.StatsDashboard
 import com.warden.blocker.ui.theme.WardenTheme
+import com.warden.blocker.ui.tour.TourHost
+import com.warden.blocker.ui.tour.TourPath
+import com.warden.blocker.ui.tour.tourTarget
+import com.warden.blocker.ui.wizard.AutoOpenSetupWizard
+import com.warden.blocker.ui.wizard.SetupWizardScreen
 import com.warden.blocker.vpn.VpnController
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -97,9 +100,7 @@ class MainActivity : ComponentActivity() {
             WardenTheme {
                 val vm: WardenViewModel = viewModel()
 
-                val notifPermLauncher = rememberLauncherForActivityResult(
-                    ActivityResultContracts.RequestPermission(),
-                ) { /* result ignored; the app still works without it */ }
+                // Notifications are asked for in the setup wizard (and its Home card), not at once.
                 LaunchedEffect(Unit) {
                     vm.onAppOpened()
                     // After "Force stop" or a battery saver killed it: bring the filter back on its
@@ -111,12 +112,6 @@ class MainActivity : ComponentActivity() {
                         runCatching { VpnController.start(this@MainActivity) }
                     }
                     runCatching { ProtectionWatch.checkAccessibility(this@MainActivity) }
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
-                        checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) !=
-                        android.content.pm.PackageManager.PERMISSION_GRANTED
-                    ) {
-                        notifPermLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
-                    }
                 }
 
                 fun runAfterConsent(action: AfterConsent) {
@@ -310,30 +305,48 @@ private fun WardenScaffold(
             onDismiss = { vm.cancelPinRequest() },
         )
     }
+    // First start after installing: straight into the setup wizard.
+    AutoOpenSetupWizard {
+        navController.currentBackStackEntryFlow.first()
+        if (navController.currentDestination?.route != "setup") navController.navigate("setup")
+    }
+    fun openTab(route: String) {
+        val dest = navController.currentDestination
+        // Tapping the tab that is already open scrolls it back to the top.
+        if (dest?.route == route) {
+            reselected.tryEmit(route)
+            return
+        }
+        // Leave a sub-screen (app picker, feeds, hosts lists, setup) first. Otherwise it is
+        // saved into the tab's state and restored, so tapping "Blocklist" from
+        // the app picker would land right back in the app picker.
+        if (dest != null && Tab.entries.none { it.route == dest.route }) navController.popBackStack()
+        navController.navigate(route) {
+            popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+            launchSingleTop = true
+            restoreState = true
+        }
+    }
+    val currentEntry by navController.currentBackStackEntryAsState()
+    // The guides drive the app like a user: tabs like a tab tap, sub-screens like their button.
+    TourHost(
+        currentRoute = currentEntry?.destination?.route,
+        navigate = { route ->
+            if (Tab.entries.any { it.route == route }) openTab(route)
+            else if (navController.currentDestination?.route != route) navController.navigate(route)
+        },
+    ) {
     Scaffold(
-        bottomBar = {
+        bottomBar = bottomBar@{
+            // The setup wizard is full-page, with its own Back / Next at the bottom.
+            if (currentEntry?.destination?.route == "setup") return@bottomBar
             CompactNavigationBar {
-                val current by navController.currentBackStackEntryAsState()
-                val dest = current?.destination
+                val dest = currentEntry?.destination
                 Tab.entries.forEach { tab ->
                     NavigationBarItem(
+                        modifier = Modifier.tourTarget(TourPath.tabTarget(tab.route)),
                         selected = dest?.hierarchy?.any { it.route == tab.route } == true,
-                        onClick = {
-                            // Tapping the tab that is already open scrolls it back to the top.
-                            if (dest?.route == tab.route) {
-                                reselected.tryEmit(tab.route)
-                                return@NavigationBarItem
-                            }
-                            // Leave a sub-screen (app picker, feeds, hosts lists, setup) first. Otherwise it is
-                            // saved into the tab's state and restored, so tapping "Blocklist" from
-                            // the app picker would land right back in the app picker.
-                            if (dest != null && Tab.entries.none { it.route == dest.route }) navController.popBackStack()
-                            navController.navigate(tab.route) {
-                                popUpTo(navController.graph.findStartDestination().id) { saveState = true }
-                                launchSingleTop = true
-                                restoreState = true
-                            }
-                        },
+                        onClick = { openTab(tab.route) },
                         icon = { Icon(tab.icon, contentDescription = tab.label) },
                         // One line, never wrapped ("Schedules" broke onto two lines at 344dp);
                         // ellipsis is only a fallback for very large font scales.
@@ -361,9 +374,20 @@ private fun WardenScaffold(
                     HomeScreen(vm, onToggleBlocking, onStartFocus, onCancelFocus, onOpenSetup = { navController.navigate("setup") }, onRetryVpn = onRetryVpn)
                 }
             }
-            composable("setup") { SetupScreen(onBack = { leave("setup") }) }
+            composable("setup") {
+                SetupWizardScreen(
+                    vm,
+                    onClose = { leave("setup") },
+                    onOpenAppPicker = { navController.navigate("apppicker") },
+                    onEnableBlocking = { onToggleBlocking(true) },
+                    onOpenProtection = { navController.navigate("protection") },
+                )
+            }
             composable("protection") {
-                ProtectionScreen(vm, onBack = { leave("protection") }, onOpenSetup = { navController.navigate("setup") })
+                // From the wizard (setup → protection) "Open setup" goes back to it instead of stacking a second one.
+                ProtectionScreen(vm, onBack = { leave("protection") }, onOpenSetup = {
+                    if (!navController.popBackStack("setup", inclusive = false)) navController.navigate("setup")
+                })
             }
             composable(Tab.BLOCKLIST.route) {
                 TabContent(Tab.BLOCKLIST, reselected) {
@@ -394,5 +418,6 @@ private fun WardenScaffold(
                 }
             }
         }
+    }
     }
 }

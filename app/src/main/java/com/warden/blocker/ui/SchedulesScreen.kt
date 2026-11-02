@@ -38,6 +38,8 @@ import com.warden.blocker.data.Schedule
 import com.warden.blocker.ui.times.OnceBlockDialog
 import com.warden.blocker.ui.times.scheduleLine
 import java.time.ZoneId
+import com.warden.blocker.ui.tour.TourIds
+import com.warden.blocker.ui.tour.tourTarget
 
 @Composable
 fun SchedulesScreen(vm: WardenViewModel) {
@@ -56,7 +58,7 @@ fun SchedulesScreen(vm: WardenViewModel) {
         Spacer(Modifier.height(8.dp))
         Text("With 'always-on' off, the blocklist is only enforced during these windows.", style = MaterialTheme.typography.bodyMedium)
         Spacer(Modifier.height(12.dp))
-        OutlinedButton(onClick = { creating = true }, modifier = Modifier.fillMaxWidth()) { Text("+ New schedule") }
+        OutlinedButton(onClick = { creating = true }, modifier = Modifier.fillMaxWidth().tourTarget(TourIds.SCHEDULES_NEW)) { Text("+ New schedule") }
         Spacer(Modifier.height(8.dp))
         OutlinedButton(onClick = { creatingOnce = true }, modifier = Modifier.fillMaxWidth()) { Text("+ One-time block (date & time)") }
         Spacer(Modifier.height(16.dp))

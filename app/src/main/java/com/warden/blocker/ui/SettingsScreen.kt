@@ -36,6 +36,9 @@ import com.warden.blocker.block.ProtectionMode
 import com.warden.blocker.ui.guard.SettingsGuardSection
 import com.warden.blocker.ui.owner.MaxProtectionSection
 import com.warden.blocker.ui.owner.OwnerLockedExit
+import com.warden.blocker.ui.tour.RestartGuidesButton
+import com.warden.blocker.ui.tour.TourIds
+import com.warden.blocker.ui.tour.tourTarget
 import com.warden.blocker.ui.update.UpdateSection
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -76,7 +79,7 @@ fun SettingsScreen(vm: WardenViewModel, onOpenSetup: () -> Unit, onOpenProtectio
         Text("Settings", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
 
         // Blocking mode: always-on vs schedule-driven
-        Card(Modifier.fillMaxWidth()) {
+        Card(Modifier.fillMaxWidth().tourTarget(TourIds.SETTINGS_ALWAYS_ON)) {
             Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
                     Text("Always on", style = MaterialTheme.typography.titleMedium)
@@ -90,7 +93,7 @@ fun SettingsScreen(vm: WardenViewModel, onOpenSetup: () -> Unit, onOpenProtectio
         }
 
         // Block protection (replaces "Strict mode"): how hard it is to weaken blocking.
-        Card(Modifier.fillMaxWidth().clickable(onClick = onOpenProtection)) {
+        Card(Modifier.fillMaxWidth().clickable(onClick = onOpenProtection).tourTarget(TourIds.SETTINGS_BLOCK_PROTECTION)) {
             Column(Modifier.fillMaxWidth().padding(16.dp)) {
                 Text("Block protection", style = MaterialTheme.typography.titleMedium)
                 Text(
@@ -133,7 +136,7 @@ fun SettingsScreen(vm: WardenViewModel, onOpenSetup: () -> Unit, onOpenProtectio
         }
 
         // PIN
-        Card(Modifier.fillMaxWidth()) {
+        Card(Modifier.fillMaxWidth().tourTarget(TourIds.SETTINGS_PIN)) {
             Column(Modifier.fillMaxWidth().padding(16.dp)) {
                 Text("PIN lock", style = MaterialTheme.typography.titleMedium)
                 Text(if (hasPin) "A PIN is required to change settings or stop blocking." else "Protect settings and disabling with a 4-digit PIN.", style = MaterialTheme.typography.bodySmall)
@@ -145,16 +148,17 @@ fun SettingsScreen(vm: WardenViewModel, onOpenSetup: () -> Unit, onOpenProtectio
             }
         }
 
-        SettingsGuardSection()
+        SettingsGuardSection(Modifier.tourTarget(TourIds.SETTINGS_GUARD_SYSTEM))
 
-        MaxProtectionSection()
+        MaxProtectionSection(Modifier.tourTarget(TourIds.SETTINGS_DEVICE_OWNER))
 
-        UpdateSection()
+        UpdateSection(Modifier.tourTarget(TourIds.SETTINGS_UPDATES))
 
         HorizontalDivider()
-        OutlinedButton(onClick = onOpenSetup, modifier = Modifier.fillMaxWidth()) {
-            Text("Setup & permissions")
+        OutlinedButton(onClick = onOpenSetup, modifier = Modifier.fillMaxWidth().tourTarget(TourIds.SETTINGS_SETUP)) {
+            Text("Setup wizard")
         }
+        RestartGuidesButton()
     }
 
     if (showSetPin) {

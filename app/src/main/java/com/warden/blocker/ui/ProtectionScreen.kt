@@ -4,6 +4,7 @@ import android.text.format.DateFormat
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -57,6 +58,8 @@ import com.warden.blocker.system.AdminManager
 import com.warden.blocker.owner.DeviceOwnerManager
 import com.warden.blocker.owner.OwnerPolicy
 import com.warden.blocker.owner.OwnerPrefs
+import com.warden.blocker.ui.tour.TourIds
+import com.warden.blocker.ui.tour.tourTarget
 import com.warden.blocker.system.Hardening
 import com.warden.blocker.util.PermissionsHelper
 import com.warden.blocker.vpn.VpnController
@@ -150,6 +153,7 @@ fun ProtectionScreen(vm: WardenViewModel, onBack: () -> Unit, onOpenSetup: () ->
                 protectionSummary(protection, now, vm::whenText),
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
+                modifier = Modifier.tourTarget(TourIds.PROTECTION_MODES),
             )
             if (focusStrict && focusEndsAt > now) {
                 Text(
@@ -201,22 +205,29 @@ fun ProtectionScreen(vm: WardenViewModel, onBack: () -> Unit, onOpenSetup: () ->
 
             PendingChangesCard(vm)
 
-            Text("Keep Warden+ from being switched off", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-            if (isOwner) {
-                CheckRow(
-                    ok = true,
-                    title = "Uninstall protection",
-                    text = "Warden+ is device owner: it can't be uninstalled and \"Force stop\" is greyed out. " +
-                        "Managed under Settings → Maximum protection (with its emergency exit).",
-                    action = null,
-                )
-            } else {
-                CheckRow(
-                    ok = adminActive,
-                    title = "Uninstall protection",
-                    text = "Android won't uninstall Warden+, and \"Force stop\" in App info is greyed out.",
-                    action = if (adminActive) "Turn off" else "Turn on",
-                ) { if (adminActive) vm.disableUninstallProtection() else showAdminExplain = true }
+            Text(
+                "Keep Warden+ from being switched off",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.tourTarget(TourIds.SETTINGS_PROTECTION_CHECKLIST),
+            )
+            Box(Modifier.tourTarget(TourIds.SETTINGS_UNINSTALL)) {
+                if (isOwner) {
+                    CheckRow(
+                        ok = true,
+                        title = "Uninstall protection",
+                        text = "Warden+ is device owner: it can't be uninstalled and \"Force stop\" is greyed out. " +
+                            "Managed under Settings → Maximum protection (with its emergency exit).",
+                        action = null,
+                    )
+                } else {
+                    CheckRow(
+                        ok = adminActive,
+                        title = "Uninstall protection",
+                        text = "Android won't uninstall Warden+, and \"Force stop\" in App info is greyed out.",
+                        action = if (adminActive) "Turn off" else "Turn on",
+                    ) { if (adminActive) vm.disableUninstallProtection() else showAdminExplain = true }
+                }
             }
             CheckRow(
                 ok = batteryOk,

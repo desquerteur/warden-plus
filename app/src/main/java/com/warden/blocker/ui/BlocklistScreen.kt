@@ -2,6 +2,7 @@ package com.warden.blocker.ui
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -49,6 +50,8 @@ import com.warden.blocker.data.InterceptMode
 import com.warden.blocker.ui.allow.AllowEntryButtons
 import com.warden.blocker.ui.hosts.HostsListsEntryButton
 import com.warden.blocker.ui.times.SpanLabel
+import com.warden.blocker.ui.tour.TourIds
+import com.warden.blocker.ui.tour.tourTarget
 import kotlinx.coroutines.delay
 
 @Composable
@@ -110,7 +113,7 @@ fun BlocklistScreen(
             Column {
                 Text("Blocklist", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
                 Spacer(Modifier.height(12.dp))
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                Row(Modifier.tourTarget(TourIds.BLOCKLIST_ADD_SITE), verticalAlignment = Alignment.CenterVertically) {
                     OutlinedTextField(
                         value = input,
                         onValueChange = { input = it; inputInvalid = false },
@@ -128,13 +131,13 @@ fun BlocklistScreen(
                     Button(onClick = { submit() }, modifier = Modifier.padding(start = 8.dp)) { Text("Add") }
                 }
                 Spacer(Modifier.height(10.dp))
-                OutlinedButton(onClick = onOpenAppPicker, modifier = Modifier.fillMaxWidth()) { Text("+ Add apps to block") }
+                OutlinedButton(onClick = onOpenAppPicker, modifier = Modifier.fillMaxWidth().tourTarget(TourIds.BLOCKLIST_ADD_APPS)) { Text("+ Add apps to block") }
                 Spacer(Modifier.height(8.dp))
-                OutlinedButton(onClick = onOpenFeatures, modifier = Modifier.fillMaxWidth()) { Text("Block in-app feeds (Reels, Shorts…)") }
+                OutlinedButton(onClick = onOpenFeatures, modifier = Modifier.fillMaxWidth().tourTarget(TourIds.BLOCKLIST_FEEDS)) { Text("Block in-app feeds (Reels, Shorts…)") }
                 Spacer(Modifier.height(8.dp))
-                HostsListsEntryButton(onClick = onOpenHostsLists)
+                HostsListsEntryButton(onClick = onOpenHostsLists, modifier = Modifier.fillMaxWidth().tourTarget(TourIds.BLOCKLIST_HOSTS))
                 Spacer(Modifier.height(8.dp))
-                AllowEntryButtons(onOpenAllowOnly, onOpenCategories)
+                Box(Modifier.tourTarget(TourIds.BLOCKLIST_ALLOW)) { AllowEntryButtons(onOpenAllowOnly, onOpenCategories) }
                 Spacer(Modifier.height(8.dp))
                 if (items.isEmpty()) {
                     Text("Nothing blocked yet — add a website above or tap “Add apps”.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.outline)

@@ -40,7 +40,11 @@ class ImportException(message: String) : IOException(message)
  * import runs at a time. The VPN asks [activeDomainSet] for a compact set of all domains
  * from enabled lists and reloads whenever [activeKey] changes.
  */
-class HostsListRepository(private val context: Context) {
+class HostsListRepository(
+    private val context: Context,
+    /** Opens a list download (stream + length or -1); replaceable in tests. */
+    private val openUrl: (String) -> Pair<InputStream, Long> = { openHttps(it) },
+) {
 
     private val dir: File by lazy { File(context.filesDir, "hostlists").apply { mkdirs() } }
     private val metaFile: File get() = File(dir, "sources.json")
@@ -108,8 +112,11 @@ class HostsListRepository(private val context: Context) {
         ensureLoaded()
         _sources.value.firstOrNull { it.url == url }?.let { return refresh(it.id) }
         return runImport {
+            // A double tap queues a second import behind the lock; by now the first may have
+            // added this URL, so check again instead of creating the same list twice.
+            _sources.value.firstOrNull { it.url == url }?.let { return@runImport it }
             val source = HostsSource(id = newId(), name = name ?: defaultName(url), url = url)
-            val result = ingest(source) { openHttps(url) }
+            val result = ingest(source) { openUrl(url) }
             updateMeta { it + result }
             result
         }
@@ -121,7 +128,7 @@ class HostsListRepository(private val context: Context) {
         val source = _sources.value.firstOrNull { it.id == id }
             ?: return Result.failure(ImportException("This list no longer exists."))
         val url = source.url ?: return Result.failure(ImportException("Files from the phone can't be refreshed — import the file again."))
-        val result = runImport { ingest(source) { openHttps(url) } }
+        val result = runImport { ingest(source) { openUrl(url) } }
         updateMeta { list ->
             list.map { s ->
                 if (s.id != id) s
@@ -238,23 +245,6 @@ class HostsListRepository(private val context: Context) {
             }
         }
 
-    private fun openHttps(url: String): Pair<InputStream, Long> {
-        val conn = URL(url).openConnection() as? HttpsURLConnection
-            ?: throw ImportException("Only https:// links are supported.")
-        conn.connectTimeout = 15_000
-        conn.readTimeout = 30_000
-        conn.instanceFollowRedirects = true // never downgrades https → http
-        conn.setRequestProperty("User-Agent", "Warden")
-        val code = conn.responseCode
-        if (code !in 200..299) {
-            conn.disconnect()
-            throw ImportException("The server answered with error $code.")
-        }
-        val length = conn.contentLengthLong
-        if (length > MAX_BYTES) { conn.disconnect(); throw ImportException(TOO_LARGE) }
-        return conn.inputStream to length
-    }
-
     private suspend fun updateMeta(change: (List<HostsSource>) -> List<HostsSource>) {
         ensureLoaded()
         val updated = metaLock.withLock {
@@ -334,6 +324,23 @@ class HostsListRepository(private val context: Context) {
         private const val TOO_LARGE = "The list is larger than 30 MB."
 
         private fun newId() = UUID.randomUUID().toString()
+
+        private fun openHttps(url: String): Pair<InputStream, Long> {
+            val conn = URL(url).openConnection() as? HttpsURLConnection
+                ?: throw ImportException("Only https:// links are supported.")
+            conn.connectTimeout = 15_000
+            conn.readTimeout = 30_000
+            conn.instanceFollowRedirects = true // never downgrades https → http
+            conn.setRequestProperty("User-Agent", "Warden")
+            val code = conn.responseCode
+            if (code !in 200..299) {
+                conn.disconnect()
+                throw ImportException("The server answered with error $code.")
+            }
+            val length = conn.contentLengthLong
+            if (length > MAX_BYTES) { conn.disconnect(); throw ImportException(TOO_LARGE) }
+            return conn.inputStream to length
+        }
 
         /** Accepts `example.com/list.txt` or `https://…`; rejects anything that isn't https. */
         fun normalizeUrl(input: String): String? {

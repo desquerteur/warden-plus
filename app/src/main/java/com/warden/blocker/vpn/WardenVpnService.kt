@@ -301,7 +301,8 @@ class WardenVpnService : VpnService() {
     /** Another VPN app took over (Android allows only one): Home explains it instead of the
      *  generic "paused" notice. */
     override fun onRevoke() {
-        VpnController.reportRefused()
+        // Taken away, not refused: Home only blames another VPN if one is really there (D6).
+        VpnController.reportRevoked()
         CoroutineScope(Dispatchers.IO).launch { runCatching { ProtectionWatch.onVpnRevoked(applicationContext) } }
         super.onRevoke()
     }

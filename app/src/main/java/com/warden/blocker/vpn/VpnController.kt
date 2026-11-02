@@ -23,8 +23,18 @@ object VpnController {
      */
     val refused: StateFlow<Boolean> = _refused.asStateFlow()
 
+    private val _revoked = MutableStateFlow(false)
+
+    /**
+     * True after Android took the tunnel away (onRevoke): disconnected in VPN settings, another
+     * VPN took over, or "Always-on" was cleared when device owner was removed. Not by itself a
+     * sign of another VPN — Home checks for one ([otherVpnActive]) before saying so (D6).
+     */
+    val revoked: StateFlow<Boolean> = _revoked.asStateFlow()
+
     fun reportRefused() { _refused.value = true }
-    fun clearRefused() { _refused.value = false }
+    fun reportRevoked() { _revoked.value = true }
+    fun clearRefused() { _refused.value = false; _revoked.value = false }
 
     /**
      * Returns an intent to show the system VPN-consent dialog, or null if already granted.
@@ -45,9 +55,19 @@ object VpnController {
         context.startService(intent)
     }
 
-    /** Whether another app's VPN currently carries this app's traffic (ours never does: it
-     *  excludes Warden itself). */
-    fun otherVpnActive(context: Context): Boolean = runCatching {
+    /**
+     * Whether another app's VPN is in the way: it carries this app's traffic now (ours never
+     * does: it excludes Warden itself), or another app is set as Android's "Always-on VPN".
+     */
+    fun otherVpnActive(context: Context): Boolean = otherVpnCarriesTraffic(context) || otherAlwaysOnVpn(context)
+
+    /** Android's always-on VPN app, if it's another app (null when unknown or none). */
+    private fun otherAlwaysOnVpn(context: Context): Boolean = runCatching {
+        val pkg = Settings.Secure.getString(context.contentResolver, "always_on_vpn_app")
+        !pkg.isNullOrBlank() && pkg != context.packageName
+    }.getOrDefault(false)
+
+    private fun otherVpnCarriesTraffic(context: Context): Boolean = runCatching {
         val cm = context.getSystemService(ConnectivityManager::class.java) ?: return false
         cm.getNetworkCapabilities(cm.activeNetwork ?: return false)
             ?.hasTransport(NetworkCapabilities.TRANSPORT_VPN) == true

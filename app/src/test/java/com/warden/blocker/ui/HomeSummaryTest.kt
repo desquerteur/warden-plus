@@ -44,4 +44,19 @@ class HomeSummaryTest {
 
     @Test fun statusBothOff() =
         assertEquals("Apps: off · Websites: off", protectionStatus(appsOn = false, websitesOn = false, otherVpn = false))
+
+    @Test fun disconnectedIsNotBlamedOnAnotherVpn() {
+        // D6: removing device owner (or "Disconnect" in VPN settings) takes our tunnel away; no other VPN.
+        assertEquals(FilterProblem.DISCONNECTED, filterProblem(protecting = true, running = false, refused = false, revoked = true, otherVpnActive = false))
+        assertEquals("Apps: on · Websites: off (disconnected)", protectionStatus(appsOn = true, websitesOn = false, otherVpn = false, disconnected = true))
+    }
+
+    @Test fun anotherVpnIsNamedOnlyWhenItIsThere() {
+        assertEquals(FilterProblem.OTHER_VPN, filterProblem(protecting = true, running = false, refused = false, revoked = true, otherVpnActive = true))
+        // Our consent dialog closed at once: what Android does when another app holds Always-on VPN.
+        assertEquals(FilterProblem.OTHER_VPN, filterProblem(protecting = true, running = false, refused = true, revoked = false, otherVpnActive = false))
+        assertEquals(FilterProblem.PAUSED, filterProblem(protecting = true, running = false, refused = false, revoked = false, otherVpnActive = false))
+        assertEquals(FilterProblem.NONE, filterProblem(protecting = true, running = true, refused = true, revoked = true, otherVpnActive = true))
+        assertEquals(FilterProblem.NONE, filterProblem(protecting = false, running = false, refused = false, revoked = true, otherVpnActive = false))
+    }
 }

@@ -78,7 +78,6 @@ fun HomeScreen(
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
     val needsSetup = remember(resumes) { !PermissionsHelper.essentialsGranted(context) }
-    val otherVpnActive = remember(resumes) { VpnController.otherVpnActive(context) }
     val vpnRefused by VpnController.refused.collectAsStateWithLifecycle()
     val accessibilityUsed by vm.accessibilityUsed.collectAsStateWithLifecycle()
     val enabled by vm.masterEnabled.collectAsStateWithLifecycle()
@@ -103,7 +102,11 @@ fun HomeScreen(
         // Give a just-started tunnel a moment, so switching on doesn't flash the warning.
         if (protecting && !vpnRunning) { delay(1500); showPaused = true }
     }
+    val vpnRevoked by VpnController.revoked.collectAsStateWithLifecycle()
+    // Re-checked when the tunnel comes or goes, not only on resume.
+    val otherVpnActive = remember(resumes, vpnRunning, vpnRevoked) { VpnController.otherVpnActive(context) }
     val otherVpn = vpnRefused || otherVpnActive
+    val problem = if (showPaused) filterProblem(protecting, vpnRunning, vpnRefused, vpnRevoked, otherVpnActive) else FilterProblem.NONE
     val scroll = rememberScrollState()
     ScrollToTopOnReselect(scroll)
 
@@ -141,7 +144,7 @@ fun HomeScreen(
                 }
             }
         }
-        if (protecting && showPaused && otherVpn) {
+        if (problem == FilterProblem.OTHER_VPN) {
             // Android allows one VPN at a time; another app (Tailscale & co.) holds it, often as
             // "Always-on VPN", which makes Android close our consent dialog without showing it.
             WarningCard(
@@ -156,7 +159,17 @@ fun HomeScreen(
                     OutlinedButton(onClick = onRetryVpn) { Text("Try again") }
                 }
             }
-        } else if (protecting && showPaused) {
+        } else if (problem == FilterProblem.DISCONNECTED) {
+            // Android took the tunnel away (VPN settings, or Always-on cleared when device owner was
+            // removed) and no other VPN is there: one tap brings it back (D6).
+            WarningCard(
+                title = "⚠ Website filter was disconnected",
+                text = "Android disconnected Warden+'s website filter. Tap Try again to turn it back on." +
+                    if (needsSetup) "" else " App blocking still works.",
+            ) {
+                OutlinedButton(onClick = onRetryVpn) { Text("Try again") }
+            }
+        } else if (problem == FilterProblem.PAUSED) {
             // Blocking is on but the filter isn't running (OS killed it). Never leave the user
             // silently unprotected — surface it and offer a one-tap re-arm.
             WarningCard(
@@ -173,7 +186,7 @@ fun HomeScreen(
                         Text(summary, style = MaterialTheme.typography.bodyMedium)
                         if (protecting) {
                             Text(
-                                protectionStatus(appsOn = !needsSetup, websitesOn = vpnRunning, otherVpn = otherVpn),
+                                protectionStatus(appsOn = !needsSetup, websitesOn = vpnRunning, otherVpn = otherVpn, disconnected = vpnRevoked),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = if (needsSetup || showPaused) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
                             )

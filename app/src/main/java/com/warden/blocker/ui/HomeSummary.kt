@@ -73,13 +73,29 @@ internal fun clockTime(minuteOfDay: Int, is24Hour: Boolean): String {
  * accessibility service, websites need Warden's VPN. E.g. "Apps: on · Websites: off (another
  * VPN is active)" when Tailscale & co. hold the only VPN slot.
  */
-internal fun protectionStatus(appsOn: Boolean, websitesOn: Boolean, otherVpn: Boolean): String {
+internal fun protectionStatus(appsOn: Boolean, websitesOn: Boolean, otherVpn: Boolean, disconnected: Boolean = false): String {
     val websites = when {
         websitesOn -> "on"
         otherVpn -> "off (another VPN is active)"
+        disconnected -> "off (disconnected)"
         else -> "off"
     }
     return "Apps: ${if (appsOn) "on" else "off"} · Websites: $websites"
+}
+
+/** Why website blocking is off while it should be on — decides Home's warning card. */
+internal enum class FilterProblem { NONE, OTHER_VPN, DISCONNECTED, PAUSED }
+
+/**
+ * [refused]: Android turned down our VPN (consent dialog closed at once, tunnel refused) — with
+ * another app on "Always-on VPN" that's what happens. [revoked]: the running tunnel was taken
+ * away, which alone doesn't mean another VPN (removing device owner does it too, D6).
+ */
+internal fun filterProblem(protecting: Boolean, running: Boolean, refused: Boolean, revoked: Boolean, otherVpnActive: Boolean): FilterProblem = when {
+    !protecting || running -> FilterProblem.NONE
+    otherVpnActive || refused -> FilterProblem.OTHER_VPN
+    revoked -> FilterProblem.DISCONNECTED
+    else -> FilterProblem.PAUSED
 }
 
 internal fun protectedSummary(activeItems: Int, hostsLists: List<HostsSource>): String {

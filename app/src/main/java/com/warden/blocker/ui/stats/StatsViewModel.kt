@@ -11,6 +11,7 @@ import com.warden.blocker.stats.UsageAggregator
 import com.warden.blocker.stats.UsageEventsSource
 import com.warden.blocker.usage.AppsHelper
 import com.warden.blocker.usage.UsageStatsHelper
+import com.warden.blocker.ui.offCountSince
 import com.warden.blocker.wardenContainer
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -70,9 +71,11 @@ data class StatsUiState(
     val streak: Int = 0,
     val longestStreak: Int = 0,
     val focusSessions: Int = 0,
+    /** Times protection was found switched off from outside in the last 7 days (see ProtectionWatch). */
+    val protectionOffThisWeek: Int = 0,
 )
 
-private data class FocusStats(val streak: Int, val longest: Int, val sessions: Int)
+private data class FocusStats(val streak: Int, val longest: Int, val sessions: Int, val offThisWeek: Int)
 
 /** Loads the stats dashboard off the main thread; keeps the last result per period while refreshing. */
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -99,11 +102,13 @@ class StatsViewModel(app: Application) : AndroidViewModel(app) {
     }.flowOn(Dispatchers.Default)
 
     private val focus = app.wardenContainer.settings.let { s ->
-        combine(s.currentStreak, s.longestStreak, s.focusSessionsDone, ::FocusStats)
+        combine(s.currentStreak, s.longestStreak, s.focusSessionsDone, s.protectionOffEvents) { streak, longest, sessions, off ->
+            FocusStats(streak, longest, sessions, offCountSince(off, System.currentTimeMillis()))
+        }
     }
 
     val state: StateFlow<StatsUiState> = combine(period, usage, blocks, focus) { p, u, b, f ->
-        StatsUiState(p, u, b, shownFocusStreak(f.streak, f.sessions), shownFocusStreak(f.longest, f.sessions), f.sessions)
+        StatsUiState(p, u, b, shownFocusStreak(f.streak, f.sessions), shownFocusStreak(f.longest, f.sessions), f.sessions, f.offThisWeek)
     }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), StatsUiState())
 

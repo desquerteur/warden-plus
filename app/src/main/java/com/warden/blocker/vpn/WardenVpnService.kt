@@ -5,6 +5,7 @@ import android.app.PendingIntent
 import android.content.Intent
 import android.net.ConnectivityManager
 import android.net.VpnService
+import android.os.Build
 import android.os.ParcelFileDescriptor
 import android.util.Log
 import androidx.core.app.NotificationCompat
@@ -14,6 +15,7 @@ import com.warden.blocker.WardenApp
 import com.warden.blocker.block.BlockStateClock
 import com.warden.blocker.hosts.DomainMatcher
 import com.warden.blocker.stats.StatsRecorder
+import com.warden.blocker.system.ProtectionWatch
 import com.warden.blocker.wardenContainer
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -70,7 +72,7 @@ class WardenVpnService : VpnService() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
-            ACTION_STOP -> { stopTunnel(); stopSelf(); return START_NOT_STICKY }
+            ACTION_STOP -> { ProtectionWatch.markCleanStop(this); stopTunnel(); stopSelf(); return START_NOT_STICKY }
             else -> startTunnel()
         }
         return START_STICKY
@@ -104,6 +106,9 @@ class WardenVpnService : VpnService() {
 
         VpnController.clearRefused()
         _running.value = true
+        _alwaysOn.value = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) isAlwaysOn else null
+        // Reports a gap since the last heartbeat (force-stopped, put to sleep) and starts beating.
+        scope.launch { runCatching { ProtectionWatch.check(this@WardenVpnService, running = true) } }
         loopJob = scope.launch {
             refreshBlocklist()
             runPacketLoop(tunnel!!)
@@ -150,6 +155,9 @@ class WardenVpnService : VpnService() {
             delay(BlockStateClock.delayUntilNextCheck(System.currentTimeMillis(), focusEndsAt))
             val active = runCatching { c.blockEngine.isBlockingActiveNow() }.getOrNull() ?: continue
             if (BlockStateClock.needsRebuild(builtForActive, active)) refreshBlocklist()
+            ProtectionWatch.beat(this@WardenVpnService)
+            runCatching { ProtectionWatch.checkAccessibility(this@WardenVpnService) }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) _alwaysOn.value = isAlwaysOn
         }
     }
 
@@ -288,6 +296,7 @@ class WardenVpnService : VpnService() {
      *  generic "paused" notice. */
     override fun onRevoke() {
         VpnController.reportRefused()
+        CoroutineScope(Dispatchers.IO).launch { runCatching { ProtectionWatch.onVpnRevoked(applicationContext) } }
         super.onRevoke()
     }
 
@@ -306,6 +315,12 @@ class WardenVpnService : VpnService() {
          *  so users are never *silently* unblocked when the OS kills the service. */
         val runningState: StateFlow<Boolean> = _running.asStateFlow()
         val running: Boolean get() = _running.value
+
+        private val _alwaysOn = MutableStateFlow<Boolean?>(null)
+
+        /** Whether Android keeps Warden+ as "Always-on VPN" (restarts it after it was stopped);
+         *  null until the filter has run once (or before Android 10, which can't tell). */
+        val alwaysOnState: StateFlow<Boolean?> = _alwaysOn.asStateFlow()
 
         private const val TAG = "WardenVpn"
         const val ACTION_START = "com.warden.blocker.VPN_START"

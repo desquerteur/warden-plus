@@ -24,7 +24,8 @@ object AccessibilityAlert {
     fun shouldWarn(accessibilityOn: Boolean, usedBefore: Boolean, blockingOn: Boolean, hasBlockedApps: Boolean): Boolean =
         !accessibilityOn && (usedBefore || blockingOn || hasBlockedApps)
 
-    fun notifyTurnedOff(context: Context) {
+    fun notifyTurnedOff(context: Context, afterUpdate: Boolean = true) {
+        val why = if (afterUpdate) "Android switched it off after the update" else "It was switched off in Android settings"
         val pi = PendingIntent.getActivity(
             context, NOTIF_ID, MainActivity.requestIntent(context, openSetup = true),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
@@ -32,10 +33,10 @@ object AccessibilityAlert {
         val notification = NotificationCompat.Builder(context, WardenApp.ALERTS_CHANNEL_ID)
             .setSmallIcon(android.R.drawable.stat_sys_warning)
             .setContentTitle("App blocking was turned off")
-            .setContentText("Android switched it off after the update. Tap to turn it back on.")
+            .setContentText("$why. Tap to turn it back on.")
             .setStyle(
                 NotificationCompat.BigTextStyle().bigText(
-                    "Android switched off Warden+'s accessibility access after the update, so apps " +
+                    "Warden+'s accessibility access is off (${why.replaceFirstChar { it.lowercase() }}), so apps " +
                         "aren't blocked right now. Tap to turn it back on.",
                 ),
             )

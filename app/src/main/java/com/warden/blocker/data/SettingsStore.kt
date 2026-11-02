@@ -8,6 +8,10 @@ import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import com.warden.blocker.block.DEFAULT_DELAY_MINUTES
+import com.warden.blocker.block.PendingChange
+import com.warden.blocker.block.ProtectionMode
+import com.warden.blocker.block.ProtectionSettings
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
@@ -38,7 +42,56 @@ class SettingsStore(private val context: Context) {
         val PIN_FAILS = intPreferencesKey("pin_fails")
         val PIN_LOCK_UNTIL = longPreferencesKey("pin_lock_until")
         val ACCESSIBILITY_USED = booleanPreferencesKey("accessibility_used")
+        val PROTECTION_MODE = stringPreferencesKey("protection_mode")
+        val PROTECTION_DELAY = intPreferencesKey("protection_delay_minutes")
+        val PROTECTION_LOCKED_UNTIL = longPreferencesKey("protection_locked_until")
+        val PENDING_CHANGES = stringPreferencesKey("pending_changes")
+        val PROTECTION_OFF_EVENTS = stringSetPreferencesKey("protection_off_events")
     }
+
+    /**
+     * Block protection (see BlockProtection). Before 0.2.4 there was only "Strict mode", which
+     * worked only together with a PIN: such users start out in PIN mode, nothing is lost.
+     */
+    val protection: Flow<ProtectionSettings> = context.dataStore.data.map { p ->
+        val mode = p[Keys.PROTECTION_MODE]?.let { runCatching { ProtectionMode.valueOf(it) }.getOrNull() }
+            ?: if (p[Keys.STRICT_MODE] == true && p[Keys.PIN_HASH] != null) ProtectionMode.PIN else ProtectionMode.OFF
+        ProtectionSettings(mode, p[Keys.PROTECTION_DELAY] ?: DEFAULT_DELAY_MINUTES, p[Keys.PROTECTION_LOCKED_UNTIL] ?: 0L)
+    }
+
+    suspend fun setProtection(value: ProtectionSettings) =
+        context.dataStore.edit {
+            it[Keys.PROTECTION_MODE] = value.mode.name
+            it[Keys.PROTECTION_DELAY] = value.delayMinutes
+            it[Keys.PROTECTION_LOCKED_UNTIL] = value.lockedUntil
+            it.remove(Keys.STRICT_MODE) // replaced by the mode above
+        }.let { }
+
+    /** Weakenings waiting in "Delay" mode, oldest first. */
+    val pendingChanges: Flow<List<PendingChange>> =
+        context.dataStore.data.map { PendingChange.decode(it[Keys.PENDING_CHANGES]) }
+
+    /** Atomically rewrites the pending list; returns the new one. */
+    suspend fun updatePendingChanges(transform: (List<PendingChange>) -> List<PendingChange>): List<PendingChange> {
+        var result = emptyList<PendingChange>()
+        context.dataStore.edit {
+            result = transform(PendingChange.decode(it[Keys.PENDING_CHANGES]))
+            if (result.isEmpty()) it.remove(Keys.PENDING_CHANGES) else it[Keys.PENDING_CHANGES] = PendingChange.encode(result)
+        }
+        return result
+    }
+
+    /** When protection was found switched off from outside (epoch millis, last ~5 weeks). */
+    val protectionOffEvents: Flow<List<Long>> = context.dataStore.data.map { p ->
+        p[Keys.PROTECTION_OFF_EVENTS].orEmpty().mapNotNull { it.toLongOrNull() }.sorted()
+    }
+
+    suspend fun recordProtectionOff(at: Long) =
+        context.dataStore.edit { p ->
+            val keep = at - 35L * 24 * 60 * 60_000L
+            p[Keys.PROTECTION_OFF_EVENTS] = (p[Keys.PROTECTION_OFF_EVENTS].orEmpty()
+                .filter { (it.toLongOrNull() ?: 0L) >= keep } + at.toString()).toSet()
+        }.let { }
 
     /** Whether Warden's accessibility service has ever been connected — so its later absence
      *  (Android turns it off when the app is updated from an APK file) can be flagged. */
@@ -49,7 +102,6 @@ class SettingsStore(private val context: Context) {
 
     val masterEnabled: Flow<Boolean> = context.dataStore.data.map { it[Keys.MASTER_ENABLED] ?: false }
     val alwaysOn: Flow<Boolean> = context.dataStore.data.map { it[Keys.ALWAYS_ON] ?: true }
-    val strictMode: Flow<Boolean> = context.dataStore.data.map { it[Keys.STRICT_MODE] ?: false }
     val blockDoh: Flow<Boolean> = context.dataStore.data.map { it[Keys.BLOCK_DOH] ?: false }
     val blockNotifications: Flow<Boolean> = context.dataStore.data.map { it[Keys.BLOCK_NOTIFICATIONS] ?: false }
 
@@ -107,9 +159,6 @@ class SettingsStore(private val context: Context) {
 
     suspend fun setAlwaysOn(value: Boolean) =
         context.dataStore.edit { it[Keys.ALWAYS_ON] = value }.let { }
-
-    suspend fun setStrictMode(value: Boolean) =
-        context.dataStore.edit { it[Keys.STRICT_MODE] = value }.let { }
 
     suspend fun setPin(hash: String, salt: String) =
         context.dataStore.edit {

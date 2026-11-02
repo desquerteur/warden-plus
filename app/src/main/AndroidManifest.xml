@@ -16,6 +16,8 @@
     <!-- Anti-tapjacking on the block and PIN screens: hide other apps' overlays (Android 12+).
          Without it Window.setHideOverlayWindows throws and those screens crashed. -->
     <uses-permission android:name="android.permission.HIDE_OVERLAY_WINDOWS" />
+    <!-- Block protection: ask Android (with the user's OK) not to put Warden+ to sleep. -->
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
 
     <!-- Least privilege: see only launchable apps (for the picker) and the launcher (to keep
          it un-blockable) instead of requesting QUERY_ALL_PACKAGES. -->

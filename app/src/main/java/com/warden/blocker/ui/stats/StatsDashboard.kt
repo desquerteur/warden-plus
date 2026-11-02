@@ -228,6 +228,14 @@ private fun Tiles(state: StatsUiState) {
             StatTile(blocksTile, Modifier.weight(1f))
             StatTile(streakTile, Modifier.weight(1f))
         }
+        if (state.protectionOffThisWeek > 0) {
+            // Force-stopped, put to sleep, VPN or accessibility switched off from outside.
+            Text(
+                "Protection was turned off ${state.protectionOffThisWeek}× this week",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.error,
+            )
+        }
     }
 }
 

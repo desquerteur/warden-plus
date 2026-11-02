@@ -7,7 +7,8 @@ import android.service.quicksettings.Tile
 import android.service.quicksettings.TileService
 import com.warden.blocker.MainActivity
 import com.warden.blocker.R
-import com.warden.blocker.block.Loosening
+import com.warden.blocker.block.ProtectedChange
+import com.warden.blocker.block.Verdict
 import com.warden.blocker.vpn.VpnController
 import com.warden.blocker.wardenContainer
 import kotlinx.coroutines.CoroutineScope
@@ -22,8 +23,8 @@ import kotlinx.coroutines.launch
  *
  * - Turning ON needs the VPN to be consented. If it isn't yet, we send the user into the
  *   app to grant it once; afterwards the tile toggles directly.
- * - Turning OFF while a PIN is set is routed through the app so the PIN gate still applies —
- *   the tile can't be used to bypass strict mode.
+ * - Turning OFF goes through Block protection like the switch on Home; when it needs the PIN,
+ *   the app opens with the PIN dialog, so the tile is no way around it.
  */
 class WardenTileService : TileService() {
 
@@ -54,15 +55,10 @@ class WardenTileService : TileService() {
         applicationContext.wardenContainer.settings.setMasterEnabled(true)
     }
 
+    /** Same gate as the switch on Home: off now, after a wait, locked (with a message) — or the PIN. */
     private suspend fun turnOff() {
-        // A strict focus session or strict mode: the tile stays on and says why.
-        if (applicationContext.wardenContainer.strictGuard.refuse(Loosening.TURN_OFF_BLOCKING)) return
-        if (applicationContext.wardenContainer.settings.hasPin.first()) {
-            openApp() // let the in-app PIN gate handle disabling
-            return
-        }
-        VpnController.stop(this)
-        applicationContext.wardenContainer.settings.setMasterEnabled(false)
+        val verdict = applicationContext.wardenContainer.protection.request(ProtectedChange.TurnOffBlocking)
+        if (verdict == Verdict.NeedsPin) openApp() // the app shows the PIN dialog for this request
     }
 
     private fun openApp(enableBlocking: Boolean = false) {

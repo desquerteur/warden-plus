@@ -4,7 +4,8 @@ import android.app.Application
 import android.net.Uri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.warden.blocker.block.Loosening
+import com.warden.blocker.block.ProtectedChange
+import com.warden.blocker.block.Verdict
 import com.warden.blocker.hosts.HostsSource
 import com.warden.blocker.hosts.HostsTemplate
 import com.warden.blocker.hosts.ImportProgress
@@ -17,7 +18,7 @@ import kotlinx.coroutines.launch
 /** Drives [HostsListsScreen]; all heavy work happens in HostsListRepository on IO. */
 class HostsViewModel(app: Application) : AndroidViewModel(app) {
     private val repo = app.wardenContainer.hostsLists
-    private val guard = app.wardenContainer.strictGuard
+    private val guard = app.wardenContainer.protection
 
     val sources: StateFlow<List<HostsSource>> = repo.sources
     val progress: StateFlow<ImportProgress?> = repo.progress
@@ -38,25 +39,19 @@ class HostsViewModel(app: Application) : AndroidViewModel(app) {
 
     fun refresh(source: HostsSource) = launchImport { repo.refresh(source.id) }
 
+    /** Switching a list off goes through Block protection (PIN, a wait or a lock). */
     fun setEnabled(source: HostsSource, enabled: Boolean) = viewModelScope.launch {
-        if (!enabled && refused(Loosening.DISABLE_HOSTS_LIST)) return@launch
-        repo.setEnabled(source.id, enabled)
+        if (enabled) repo.setEnabled(source.id, true)
+        else guard.request(ProtectedChange.DisableHostsList(source.id, source.name))
     }
 
     fun delete(source: HostsSource) = viewModelScope.launch {
-        if (refused(Loosening.REMOVE_HOSTS_LIST)) return@launch
-        repo.delete(source.id)
-        _message.value = "Removed “${source.name}”"
+        if (guard.request(ProtectedChange.RemoveHostsList(source.id, source.name)) == Verdict.Allow) {
+            _message.value = "Removed “${source.name}”"
+        }
     }
 
     fun messageShown() { _message.value = null }
-
-    /** A strict focus session keeps every list on; the snackbar says until when. */
-    private suspend fun refused(change: Loosening): Boolean {
-        val reason = guard.reason(change) ?: return false
-        _message.value = guard.message(reason)
-        return true
-    }
 
     /** Runs on the repository's app-wide scope, so leaving the screen doesn't cancel a download. */
     private fun launchImport(block: suspend () -> Result<HostsSource>) = repo.scope.launch {

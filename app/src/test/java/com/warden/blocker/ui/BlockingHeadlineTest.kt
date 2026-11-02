@@ -1,5 +1,7 @@
 package com.warden.blocker.ui
 
+import com.warden.blocker.block.ProtectionMode
+import com.warden.blocker.block.ProtectionSettings
 import com.warden.blocker.block.ScheduleEvaluator
 import com.warden.blocker.data.Schedule
 import com.warden.blocker.ui.stats.shownFocusStreak
@@ -100,5 +102,33 @@ class BlockingHeadlineTest {
     @Test fun focusStreakNeedsASession() {
         assertEquals(0, shownFocusStreak(days = 1, sessionsDone = 0))
         assertEquals(3, shownFocusStreak(days = 3, sessionsDone = 1))
+    }
+
+    @Test fun whenLabels() {
+        val now = monday(12)
+        assertEquals("15:40", whenLabel(monday(15, 40), now, true))
+        assertEquals("Fri 18:00", whenLabel(monday(18).apply { add(Calendar.DAY_OF_YEAR, 4) }, now, true))
+    }
+
+    @Test fun protectionSummaries() {
+        val now = monday(12).timeInMillis
+        val at = { _: Long -> "Fri 18:00" }
+        assertEquals("Off – changes apply right away.", protectionSummary(ProtectionSettings(), now, at))
+        assertEquals(
+            "Delay – weakening waits 15 min (you can cancel).",
+            protectionSummary(ProtectionSettings(ProtectionMode.DELAY, 15), now, at),
+        )
+        assertEquals(
+            "Locked until Fri 18:00 – nothing can be weakened.",
+            protectionSummary(ProtectionSettings(ProtectionMode.LOCKED, 60, now + 1), now, at),
+        )
+        // A lock that ran out reads as off.
+        assertEquals("Off – changes apply right away.", protectionSummary(ProtectionSettings(ProtectionMode.LOCKED, 60, now), now, at))
+    }
+
+    @Test fun switchOffsThisWeek() {
+        val now = monday(12).timeInMillis
+        val day = 24 * 60 * 60_000L
+        assertEquals(2, offCountSince(listOf(now - 8 * day, now - 6 * day, now - 1000), now))
     }
 }

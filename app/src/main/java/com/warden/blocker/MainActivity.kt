@@ -55,6 +55,11 @@ import com.warden.blocker.ui.BlocklistScreen
 import com.warden.blocker.ui.FeaturesScreen
 import com.warden.blocker.ui.HomeScreen
 import com.warden.blocker.ui.LocalTabReselected
+import com.warden.blocker.ui.ProtectionScreen
+import com.warden.blocker.ui.VerifyPinDialog
+import com.warden.blocker.system.ProtectionWatch
+import com.warden.blocker.vpn.WardenVpnService
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.warden.blocker.ui.SchedulesScreen
 import com.warden.blocker.ui.SettingsScreen
 import com.warden.blocker.ui.SetupScreen
@@ -95,6 +100,15 @@ class MainActivity : ComponentActivity() {
                 ) { /* result ignored; the app still works without it */ }
                 LaunchedEffect(Unit) {
                     vm.onAppOpened()
+                    // After "Force stop" or a battery saver killed it: bring the filter back on its
+                    // own (it then reports the gap), instead of waiting for "Tap to restart".
+                    val c = wardenContainer
+                    if (!WardenVpnService.running && VpnController.consentIntent(this@MainActivity) == null &&
+                        c.blockEngine.isBlockingActiveNow()
+                    ) {
+                        runCatching { VpnController.start(this@MainActivity) }
+                    }
+                    runCatching { ProtectionWatch.checkAccessibility(this@MainActivity) }
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
                         checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) !=
                         android.content.pm.PackageManager.PERMISSION_GRANTED
@@ -144,7 +158,7 @@ class MainActivity : ComponentActivity() {
 
                 fun toggleBlocking(enabled: Boolean) {
                     if (enabled) withVpn(AfterConsent.ENABLE_BLOCKING)
-                    else { VpnController.stop(this@MainActivity); vm.setMasterEnabled(false) }
+                    else vm.turnOffBlocking() // Block protection may ask for the PIN, wait, or refuse
                 }
 
                 fun startFocus(minutes: Int, strict: Boolean) {
@@ -163,10 +177,8 @@ class MainActivity : ComponentActivity() {
                 // Retry from Home: same consent flow; with the main switch off only the focus session needs it.
                 fun retryVpn() = withVpn(if (vm.masterEnabled.value) AfterConsent.ENABLE_BLOCKING else AfterConsent.START_FOCUS)
 
-                fun cancelFocus() {
-                    vm.cancelFocus()
-                    if (!vm.masterEnabled.value) VpnController.stop(this@MainActivity)
-                }
+                // Stops the VPN too when nothing else needs it (see ProtectionGuard.apply).
+                fun cancelFocus() { vm.cancelFocus() }
 
                 WardenScaffold(
                     vm, ::toggleBlocking, ::startFocus, ::cancelFocus, ::retryVpn,
@@ -286,6 +298,16 @@ private fun WardenScaffold(
             if (navController.currentDestination?.route != "setup") navController.navigate("setup")
         }
     }
+    // Block protection in PIN mode: any screen's weakening lands here and waits for the PIN.
+    val pinRequest by vm.pinRequest.collectAsStateWithLifecycle()
+    pinRequest?.let { change ->
+        VerifyPinDialog(
+            title = "Enter PIN: ${change.describe().replaceFirstChar { it.lowercase() }}",
+            verify = vm::verifyPin,
+            onSuccess = { vm.confirmPinRequest() },
+            onDismiss = { vm.cancelPinRequest() },
+        )
+    }
     Scaffold(
         bottomBar = {
             CompactNavigationBar {
@@ -338,6 +360,9 @@ private fun WardenScaffold(
                 }
             }
             composable("setup") { SetupScreen(onBack = { leave("setup") }) }
+            composable("protection") {
+                ProtectionScreen(vm, onBack = { leave("protection") }, onOpenSetup = { navController.navigate("setup") })
+            }
             composable(Tab.BLOCKLIST.route) {
                 TabContent(Tab.BLOCKLIST, reselected) {
                     BlocklistScreen(
@@ -354,7 +379,13 @@ private fun WardenScaffold(
             composable(Tab.SCHEDULES.route) { TabContent(Tab.SCHEDULES, reselected) { SchedulesScreen(vm) } }
             composable(Tab.STATS.route) { TabContent(Tab.STATS, reselected) { StatsDashboard() } }
             composable(Tab.SETTINGS.route) {
-                TabContent(Tab.SETTINGS, reselected) { SettingsScreen(vm, onOpenSetup = { navController.navigate("setup") }) }
+                TabContent(Tab.SETTINGS, reselected) {
+                    SettingsScreen(
+                        vm,
+                        onOpenSetup = { navController.navigate("setup") },
+                        onOpenProtection = { navController.navigate("protection") },
+                    )
+                }
             }
         }
     }

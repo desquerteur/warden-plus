@@ -177,6 +177,8 @@ object UpdateInstaller {
                 val flags = PendingIntent.FLAG_UPDATE_CURRENT or
                     (if (Build.VERSION.SDK_INT >= 31) PendingIntent.FLAG_MUTABLE else 0)
                 val pending = PendingIntent.getBroadcast(context, sessionId, intent, flags)
+                // The update restarts Warden+; that pause is not "protection was switched off".
+                com.warden.blocker.system.ProtectionWatch.markCleanStop(context)
                 session.commit(pending.intentSender)
             }
         } catch (e: Exception) {

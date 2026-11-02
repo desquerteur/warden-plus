@@ -46,6 +46,10 @@ internal fun dayAndTime(at: Calendar, now: Calendar, is24Hour: Boolean): String 
     return "$day ${clockTime(at.get(Calendar.HOUR_OF_DAY) * 60 + at.get(Calendar.MINUTE), is24Hour)}"
 }
 
+/** "15:40" when [at] is today, otherwise "Fri 18:00" — for "… at 15:40" and "locked until Fri 18:00". */
+internal fun whenLabel(at: Calendar, now: Calendar, is24Hour: Boolean): String =
+    dayAndTime(at, now, is24Hour).removePrefix("today ")
+
 /** Minutes since midnight as "17:00" or "5:00 PM", following the phone's 12/24-hour setting. */
 internal fun clockTime(minuteOfDay: Int, is24Hour: Boolean): String {
     val h = minuteOfDay / 60

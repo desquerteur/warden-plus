@@ -311,7 +311,9 @@ private fun WardenScaffold(
         },
     ) {
     Scaffold(
-        bottomBar = {
+        bottomBar = bottomBar@{
+            // The setup wizard is full-page, with its own Back / Next at the bottom.
+            if (currentEntry?.destination?.route == "setup") return@bottomBar
             CompactNavigationBar {
                 val dest = currentEntry?.destination
                 Tab.entries.forEach { tab ->

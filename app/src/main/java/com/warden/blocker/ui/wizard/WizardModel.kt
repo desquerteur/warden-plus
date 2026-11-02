@@ -90,11 +90,11 @@ object WizardLogic {
         state.step.takeIf { it in steps(sdk) } ?: WizardStep.WELCOME
 
     /**
-     * Opens by itself only after a fresh install (also again if it was closed half-way by
-     * killing the app). People updating from an older version just get the Home card.
+     * Opens by itself once, on the first start after a fresh install. After that (also when
+     * it was interrupted) and for people updating from an older version, the Home card reminds.
      */
     fun shouldAutoOpen(status: WizardStatus, freshInstall: Boolean): Boolean =
-        freshInstall && (status == WizardStatus.NEW || status == WizardStatus.IN_PROGRESS)
+        freshInstall && status == WizardStatus.NEW
 
     /**
      * "Setup 5/7 – continue" on Home while a task is open. Not while app blocking is missing:

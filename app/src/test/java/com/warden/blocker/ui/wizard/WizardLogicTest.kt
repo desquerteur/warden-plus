@@ -65,7 +65,7 @@ class WizardLogicTest {
 
     @Test fun opensByItselfOnlyAfterAFreshInstall() {
         assertTrue(WizardLogic.shouldAutoOpen(WizardStatus.NEW, freshInstall = true))
-        assertTrue("killed half-way: opens again", WizardLogic.shouldAutoOpen(WizardStatus.IN_PROGRESS, freshInstall = true))
+        assertFalse("interrupted: the Home card reminds instead", WizardLogic.shouldAutoOpen(WizardStatus.IN_PROGRESS, freshInstall = true))
         assertFalse("update of an older version", WizardLogic.shouldAutoOpen(WizardStatus.NEW, freshInstall = false))
         assertFalse(WizardLogic.shouldAutoOpen(WizardStatus.DISMISSED, freshInstall = true))
         assertFalse(WizardLogic.shouldAutoOpen(WizardStatus.FINISHED, freshInstall = true))

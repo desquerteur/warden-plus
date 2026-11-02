@@ -11,7 +11,7 @@ of its own.
 | `TourHost.kt` | Overlay over the whole app: spotlight, finger animation, guide card, auto-start, page tips |
 | `SettingsGuides.kt` / `SettingsPathAnimation.kt` | Drawn mini settings screens for steps outside the app |
 | `TourController.kt` / `TourStore.kt` | Running tour and saved state (own DataStore file `warden_tours`) |
-| `TourButtons.kt` | "Show me how" (Setup) and "Restart guides" (Settings) |
+| `TourButtons.kt` | "Restart guides" (Settings) |
 
 ## Add a step
 
@@ -49,9 +49,10 @@ away, its step disappears the same way.
 
 ## Behaviour
 
-- "Getting started" opens once on Home after the first start (continues if left half-way).
-- "Setup & permissions": "Show me how" on the Setup screen.
+- "Getting started" is offered at the end of the setup wizard (docs/SETUP_WIZARD.md); if the
+  app was closed half-way through it, it continues on the next start.
+- The Android-settings walk-throughs are also used by the setup wizard.
 - People who skipped "Getting started" get a small "Tips for this page?" chip on the first
   visit of Blocklist, Schedules, Usage and Settings.
-- Settings › "Restart guides" starts any guide again or resets all of them.
+- Settings › "Restart guides" starts a guide again or shows the page tips again.
 - System back = one step back (on the first step: close).

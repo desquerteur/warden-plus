@@ -42,7 +42,7 @@ fun SetupProgressCard(vm: WardenViewModel, onOpen: () -> Unit, wizardVm: WizardV
     val (count, total) = WizardLogic.progress(sdk, done)
     ElevatedCard(
         Modifier.fillMaxWidth().clickable {
-            wizard.goTo(open.first())
+            wizard.resumeAt(open.first())
             onOpen()
         },
     ) {

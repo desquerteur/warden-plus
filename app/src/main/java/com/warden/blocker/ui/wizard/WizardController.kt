@@ -29,6 +29,9 @@ class WizardController(private val store: WizardStore, scope: CoroutineScope, pr
 
     fun goTo(step: WizardStep) = update { it.copy(step = step) }
 
+    /** From the Home card: straight to [step], also in a wizard that was finished before. */
+    fun resumeAt(step: WizardStep) = update { it.copy(status = WizardStatus.IN_PROGRESS, step = step) }
+
     fun next(from: WizardStep) = goTo(WizardLogic.next(from, sdk))
 
     fun back(from: WizardStep) { WizardLogic.back(from, sdk)?.let(::goTo) }

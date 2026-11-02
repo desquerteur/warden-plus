@@ -60,6 +60,10 @@ class WizardControllerTest {
         second.goTo(WizardStep.USAGE) // tapped a line in the summary
         second.opened()
         assertEquals(WizardStep.DONE, await(store.state) { it.step == WizardStep.DONE }.step)
+        // Home card: straight to the open page, even in a finished wizard.
+        second.resumeAt(WizardStep.USAGE)
+        second.opened()
+        await(store.state) { it.step == WizardStep.USAGE && it.status == WizardStatus.IN_PROGRESS }
     }
 
     @Test fun dismissKeepsAFinishedWizardFinished() {

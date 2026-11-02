@@ -7,6 +7,7 @@ import com.warden.blocker.data.BlockType
 import com.warden.blocker.data.BlockedItem
 import com.warden.blocker.data.InterceptMode
 import com.warden.blocker.data.Schedule
+import com.warden.blocker.hosts.HostsSource
 import com.warden.blocker.security.PinHasher
 import com.warden.blocker.security.PinResult
 import com.warden.blocker.system.FocusEndWorker
@@ -24,6 +25,13 @@ class WardenViewModel(app: Application) : AndroidViewModel(app) {
         container.repository.items.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
     val schedules: StateFlow<List<Schedule>> =
         container.repository.schedules.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    /** Imported hosts lists, for the count on Home. */
+    val hostsLists: StateFlow<List<HostsSource>> = container.hostsLists.sources
+
+    init {
+        viewModelScope.launch { container.hostsLists.ensureLoaded() }
+    }
 
     val masterEnabled: StateFlow<Boolean> =
         container.settings.masterEnabled.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)

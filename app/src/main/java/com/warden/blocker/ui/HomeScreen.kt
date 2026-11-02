@@ -49,7 +49,8 @@ fun HomeScreen(
     val focusEndsAt by vm.focusEndsAt.collectAsStateWithLifecycle()
     val focusStrict by vm.focusStrict.collectAsStateWithLifecycle()
     val items by vm.items.collectAsStateWithLifecycle()
-    val activeCount = items.count { it.enabled }
+    val hostsLists by vm.hostsLists.collectAsStateWithLifecycle()
+    val summary = protectedSummary(items.count { it.enabled }, hostsLists)
     var showVerify by remember { mutableStateOf(false) }
     val scroll = rememberScrollState()
     ScrollToTopOnReselect(scroll)
@@ -87,7 +88,7 @@ fun HomeScreen(
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                     Column {
                         Text(if (enabled) "Blocking is ON" else "Blocking is OFF", style = MaterialTheme.typography.titleLarge)
-                        Text("$activeCount item(s) protected", style = MaterialTheme.typography.bodyMedium)
+                        Text(summary, style = MaterialTheme.typography.bodyMedium)
                     }
                     Switch(
                         checked = enabled,

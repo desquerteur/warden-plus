@@ -38,6 +38,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.warden.blocker.block.Loosening
 import com.warden.blocker.system.AdminManager
+import com.warden.blocker.ui.guard.SettingsGuardSection
 import com.warden.blocker.ui.update.UpdateSection
 import kotlinx.coroutines.launch
 
@@ -196,6 +197,8 @@ fun SettingsScreen(vm: WardenViewModel, onOpenSetup: () -> Unit) {
                 }
             }
         }
+
+        SettingsGuardSection()
 
         UpdateSection()
 

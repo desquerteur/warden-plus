@@ -9,6 +9,7 @@ import com.warden.blocker.block.LimitReason
 import com.warden.blocker.feature.AppFeature
 import com.warden.blocker.feature.FeatureCatalog
 import com.warden.blocker.feature.FeatureDetector
+import com.warden.blocker.guard.SettingsGuardHook
 import com.warden.blocker.system.AccessibilityAlert
 import com.warden.blocker.ui.intercept.InterceptActivity
 import com.warden.blocker.util.CriticalApps
@@ -37,6 +38,7 @@ import kotlinx.coroutines.withContext
 class AppBlockAccessibilityService : AccessibilityService() {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    private val settingsGuard by lazy { SettingsGuardHook(this) }
     // Only touched on the main thread (accessibility events and the grant timer).
     private var lastPackage: String? = null
     private var grantRecheck: Job? = null
@@ -55,11 +57,13 @@ class AppBlockAccessibilityService : AccessibilityService() {
         // Remembered so Home and the after-update check can say when Android switched us off.
         scope.launch { runCatching { wardenContainer.settings.markAccessibilityUsed() } }
         AccessibilityAlert.cancel(this)
+        settingsGuard.start()
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         val type = event?.eventType ?: return
         val pkg = event.packageName?.toString() ?: return
+        settingsGuard.onEvent(event) // Settings guard (warn only); before the app-block logic, which skips Settings
         if (pkg == packageName) {
             // Our own screen (e.g. the pause screen) is in front: the app behind it gets decided
             // again when it comes back — that's what starts the timer for a "Continue for 1 min".
@@ -158,6 +162,7 @@ class AppBlockAccessibilityService : AccessibilityService() {
     override fun onInterrupt() {}
 
     override fun onDestroy() {
+        settingsGuard.stop()
         scope.cancel()
         super.onDestroy()
     }

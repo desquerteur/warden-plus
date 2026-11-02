@@ -38,6 +38,8 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.warden.blocker.block.Loosening
 import com.warden.blocker.system.AdminManager
+import com.warden.blocker.ui.owner.MaxProtectionSection
+import com.warden.blocker.ui.owner.OwnerLockedExit
 import com.warden.blocker.ui.update.UpdateSection
 import kotlinx.coroutines.launch
 
@@ -71,6 +73,7 @@ fun SettingsScreen(vm: WardenViewModel, onOpenSetup: () -> Unit) {
             Text("Settings are locked", style = MaterialTheme.typography.titleLarge)
             Spacer(Modifier.height(12.dp))
             Button(onClick = { showUnlock = true }) { Text("Unlock with PIN") }
+            OwnerLockedExit()
         }
         if (showUnlock) {
             VerifyPinDialog("Enter PIN", vm::verifyPin, onSuccess = { unlocked = true; showUnlock = false }, onDismiss = { showUnlock = false })
@@ -196,6 +199,8 @@ fun SettingsScreen(vm: WardenViewModel, onOpenSetup: () -> Unit) {
                 }
             }
         }
+
+        MaxProtectionSection()
 
         UpdateSection()
 

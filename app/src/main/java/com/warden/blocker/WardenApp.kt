@@ -35,11 +35,14 @@ class WardenApp : Application() {
             getString(R.string.vpn_notification_channel),
             NotificationManager.IMPORTANCE_LOW,
         )
-        getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
+        // Important notices, e.g. Android switched app blocking off after an update.
+        val alerts = NotificationChannel(ALERTS_CHANNEL_ID, "Protection alerts", NotificationManager.IMPORTANCE_HIGH)
+        getSystemService(NotificationManager::class.java).createNotificationChannels(listOf(channel, alerts))
     }
 
     companion object {
         const val VPN_CHANNEL_ID = "warden_blocking"
+        const val ALERTS_CHANNEL_ID = "warden_alerts"
     }
 }
 

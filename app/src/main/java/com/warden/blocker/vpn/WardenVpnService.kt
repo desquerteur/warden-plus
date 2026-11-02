@@ -98,9 +98,11 @@ class WardenVpnService : VpnService() {
             .onFailure { Log.e(TAG, "VPN establish() failed", it) }
             .getOrNull() ?: run {
                 Log.e(TAG, "VPN establish() returned no tunnel (consent not granted?)")
+                VpnController.reportRefused()
                 stopSelf(); return
             }
 
+        VpnController.clearRefused()
         _running.value = true
         loopJob = scope.launch {
             refreshBlocklist()
@@ -280,6 +282,13 @@ class WardenVpnService : VpnService() {
             .setContentIntent(pi)
             .setOngoing(true)
             .build()
+    }
+
+    /** Another VPN app took over (Android allows only one): Home explains it instead of the
+     *  generic "paused" notice. */
+    override fun onRevoke() {
+        VpnController.reportRefused()
+        super.onRevoke()
     }
 
     override fun onDestroy() {

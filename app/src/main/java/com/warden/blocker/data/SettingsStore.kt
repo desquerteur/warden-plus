@@ -37,7 +37,15 @@ class SettingsStore(private val context: Context) {
         val FOCUS_SESSIONS_DONE = intPreferencesKey("focus_sessions_done")
         val PIN_FAILS = intPreferencesKey("pin_fails")
         val PIN_LOCK_UNTIL = longPreferencesKey("pin_lock_until")
+        val ACCESSIBILITY_USED = booleanPreferencesKey("accessibility_used")
     }
+
+    /** Whether Warden's accessibility service has ever been connected — so its later absence
+     *  (Android turns it off when the app is updated from an APK file) can be flagged. */
+    val accessibilityUsed: Flow<Boolean> = context.dataStore.data.map { it[Keys.ACCESSIBILITY_USED] ?: false }
+
+    suspend fun markAccessibilityUsed() =
+        context.dataStore.edit { it[Keys.ACCESSIBILITY_USED] = true }.let { }
 
     val masterEnabled: Flow<Boolean> = context.dataStore.data.map { it[Keys.MASTER_ENABLED] ?: false }
     val alwaysOn: Flow<Boolean> = context.dataStore.data.map { it[Keys.ALWAYS_ON] ?: true }

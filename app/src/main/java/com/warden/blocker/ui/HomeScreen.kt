@@ -6,20 +6,25 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Button
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -29,9 +34,15 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.warden.blocker.R
+import com.warden.blocker.data.BlockType
+import com.warden.blocker.system.AccessibilityAlert
 import com.warden.blocker.util.PermissionsHelper
+import com.warden.blocker.vpn.VpnController
 import com.warden.blocker.vpn.WardenVpnService
 import kotlinx.coroutines.delay
 
@@ -42,9 +53,21 @@ fun HomeScreen(
     onStartFocus: (Int, Boolean) -> Unit,
     onCancelFocus: () -> Unit,
     onOpenSetup: () -> Unit,
+    onRetryVpn: () -> Unit,
 ) {
     val context = LocalContext.current
-    val needsSetup = !PermissionsHelper.essentialsGranted(context)
+    // Re-check system state when coming back from Settings (accessibility, another VPN).
+    var resumes by remember { mutableIntStateOf(0) }
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event -> if (event == Lifecycle.Event.ON_RESUME) resumes++ }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+    val needsSetup = remember(resumes) { !PermissionsHelper.essentialsGranted(context) }
+    val otherVpnActive = remember(resumes) { VpnController.otherVpnActive(context) }
+    val vpnRefused by VpnController.refused.collectAsStateWithLifecycle()
+    val accessibilityUsed by vm.accessibilityUsed.collectAsStateWithLifecycle()
     val enabled by vm.masterEnabled.collectAsStateWithLifecycle()
     val hasPin by vm.hasPin.collectAsStateWithLifecycle()
     val streak by vm.currentStreak.collectAsStateWithLifecycle()
@@ -57,12 +80,16 @@ fun HomeScreen(
     // Observed, not read once: the card used to keep whatever the tunnel state was at the last
     // recomposition (e.g. "paused" right after switching on, before the VPN was up).
     val vpnRunning by WardenVpnService.runningState.collectAsStateWithLifecycle()
+    // A focus session forces blocking on even while the main switch is off.
+    val focusActive = focusEndsAt > System.currentTimeMillis()
+    val protecting = enabled || focusActive
     var showPaused by remember { mutableStateOf(false) }
-    LaunchedEffect(enabled, vpnRunning) {
+    LaunchedEffect(protecting, vpnRunning) {
         showPaused = false
         // Give a just-started tunnel a moment, so switching on doesn't flash the warning.
-        if (enabled && !vpnRunning) { delay(1500); showPaused = true }
+        if (protecting && !vpnRunning) { delay(1500); showPaused = true }
     }
+    val otherVpn = vpnRefused || otherVpnActive
     val scroll = rememberScrollState()
     ScrollToTopOnReselect(scroll)
 
@@ -71,7 +98,16 @@ fun HomeScreen(
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         Text(stringResource(R.string.app_name), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
-        if (needsSetup) {
+        if (needsSetup && AccessibilityAlert.shouldWarn(false, accessibilityUsed, enabled, items.any { it.type == BlockType.APP && it.enabled })) {
+            // It worked before (or is clearly relied on) — typically Android switched it off after
+            // Warden+ was updated from an APK file. Make that impossible to miss.
+            WarningCard(
+                title = "⚠ App blocking is off",
+                text = "Warden+ has no accessibility access, so apps aren't blocked. Android switches it " +
+                    "off after an update from an APK file. Tap to turn it on.",
+                onClick = onOpenSetup,
+            )
+        } else if (needsSetup) {
             ElevatedCard(Modifier.fillMaxWidth().clickable { onOpenSetup() }) {
                 Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text("Finish setup", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
@@ -81,25 +117,44 @@ fun HomeScreen(
                     }
                 }
             }
-        } else if (enabled && showPaused) {
-            // Blocking is on but the filter isn't running (OS killed it). Never leave the user
-            // silently unprotected — surface it and offer a one-tap re-arm.
-            ElevatedCard(
-                Modifier.fillMaxWidth().clickable { onToggleBlocking(true) },
-                colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
+        }
+        if (protecting && showPaused && otherVpn) {
+            // Android allows one VPN at a time; another app (Tailscale & co.) holds it, often as
+            // "Always-on VPN", which makes Android close our consent dialog without showing it.
+            WarningCard(
+                title = "⚠ Website blocking is off",
+                text = "Another VPN app (for example Tailscale) is on or set to \"Always-on VPN\". Android " +
+                    "allows only one VPN at a time. Turn the other VPN off — and its \"Always-on VPN\" " +
+                    "option — in VPN settings, then tap Try again." +
+                    if (needsSetup) "" else " App blocking still works.",
             ) {
-                Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text("⚠ Protection paused", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                    Text("Blocking is on but the filter isn't running — your phone may have stopped it. Tap to restart.", style = MaterialTheme.typography.bodySmall)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Button(onClick = { runCatching { context.startActivity(VpnController.settingsIntent()) } }) { Text("VPN settings") }
+                    OutlinedButton(onClick = onRetryVpn) { Text("Try again") }
                 }
             }
+        } else if (protecting && showPaused) {
+            // Blocking is on but the filter isn't running (OS killed it). Never leave the user
+            // silently unprotected — surface it and offer a one-tap re-arm.
+            WarningCard(
+                title = "⚠ Protection paused",
+                text = "Blocking is on but the filter isn't running — your phone may have stopped it. Tap to restart.",
+                onClick = onRetryVpn,
+            )
         }
         ElevatedCard(Modifier.fillMaxWidth()) {
             Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                    Column {
+                    Column(Modifier.weight(1f)) {
                         Text(if (enabled) "Blocking is ON" else "Blocking is OFF", style = MaterialTheme.typography.titleLarge)
                         Text(summary, style = MaterialTheme.typography.bodyMedium)
+                        if (protecting) {
+                            Text(
+                                protectionStatus(appsOn = !needsSetup, websitesOn = vpnRunning, otherVpn = otherVpn),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = if (needsSetup || showPaused) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
                     }
                     Switch(
                         checked = enabled,
@@ -139,5 +194,25 @@ fun HomeScreen(
             onSuccess = { showVerify = false; onToggleBlocking(false) },
             onDismiss = { showVerify = false },
         )
+    }
+}
+
+/** Red card for something that leaves the user less protected than the switch suggests. */
+@Composable
+private fun WarningCard(
+    title: String,
+    text: String,
+    onClick: (() -> Unit)? = null,
+    actions: @Composable ColumnScope.() -> Unit = {},
+) {
+    ElevatedCard(
+        Modifier.fillMaxWidth().then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier),
+        colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
+    ) {
+        Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            Text(text, style = MaterialTheme.typography.bodySmall)
+            actions()
+        }
     }
 }

@@ -63,14 +63,11 @@ class WardenTileService : TileService() {
     }
 
     private fun openApp(enableBlocking: Boolean = false) {
-        val intent = Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        if (enableBlocking) {
-            // CLEAR_TOP + SINGLE_TOP: an already open app gets the request via onNewIntent.
-            intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
-                .putExtra(MainActivity.EXTRA_ENABLE_BLOCKING, true)
-        }
+        val intent = if (enableBlocking) MainActivity.requestIntent(this, enableBlocking = true)
+        else Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-            // Own request code per variant: PendingIntents that differ only in extras are shared.
+            // Own request code per variant (PendingIntents that differ only in extras are shared);
+            // UPDATE_CURRENT carries this tap's request id.
             val pi = PendingIntent.getActivity(
                 this, if (enableBlocking) 1 else 0, intent,
                 PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,

@@ -38,6 +38,8 @@ class WardenViewModel(app: Application) : AndroidViewModel(app) {
 
     val masterEnabled: StateFlow<Boolean> =
         container.settings.masterEnabled.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+    val accessibilityUsed: StateFlow<Boolean> =
+        container.settings.accessibilityUsed.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
     val strictMode: StateFlow<Boolean> =
         container.settings.strictMode.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
     val alwaysOn: StateFlow<Boolean> =

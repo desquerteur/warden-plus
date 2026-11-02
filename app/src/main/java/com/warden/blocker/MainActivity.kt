@@ -1,6 +1,7 @@
 package com.warden.blocker
 
 import android.app.Activity
+import android.content.Context
 import android.content.Intent
 import android.os.Build
 import android.os.Bundle
@@ -65,17 +66,26 @@ import com.warden.blocker.vpn.VpnController
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 
 class MainActivity : ComponentActivity() {
 
-    /** Set when opened with [EXTRA_ENABLE_BLOCKING]; Compose turns blocking on and clears it. */
+    /** Set by a [requestIntent] asking to enable blocking; Compose does it and clears it. */
     private var enableRequested by mutableStateOf(false)
+
+    /** Set by a [requestIntent] asking for Setup; the scaffold navigates there and clears it. */
+    private var openSetupRequested by mutableStateOf(false)
+
+    /** Id of the last [requestIntent] acted on, saved so a recreation doesn't repeat it. */
+    private var handledRequest = 0L
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        // Only for a fresh start: after a recreation the request was already handled.
-        if (savedInstanceState == null) enableRequested = intent.getBooleanExtra(EXTRA_ENABLE_BLOCKING, false)
+        handledRequest = savedInstanceState?.getLong(STATE_HANDLED_REQUEST) ?: 0L
+        // Also when restored from saved state: after an update the old screen is restored but
+        // carries the new notification's intent.
+        handleRequest(intent)
         setContent {
             WardenTheme {
                 val vm: WardenViewModel = viewModel()
@@ -98,6 +108,16 @@ class MainActivity : ComponentActivity() {
                     if (action == AfterConsent.ENABLE_BLOCKING) vm.setMasterEnabled(true)
                 }
 
+                // Android refused the VPN — with another VPN app on "Always-on" (e.g. Tailscale)
+                // it closes the dialog at once, so nothing at all seemed to happen. Turn on what
+                // doesn't need the VPN (app blocking via accessibility) and let Home explain how
+                // to get website blocking back.
+                fun onVpnRefused(action: AfterConsent) {
+                    VpnController.reportRefused()
+                    if (action == AfterConsent.ENABLE_BLOCKING) vm.setMasterEnabled(true)
+                    showVpnRefused()
+                }
+
                 // What waits for the system VPN dialog. Saved (it used to be a lambda in plain
                 // `remember`), so it survives the activity being recreated while the dialog is
                 // open — folding/unfolding, rotating or a theme switch did that, and tapping
@@ -109,7 +129,7 @@ class MainActivity : ComponentActivity() {
                     val action = pendingAfterConsent
                     pendingAfterConsent = null
                     if (action == null) return@rememberLauncherForActivityResult
-                    if (result.resultCode == Activity.RESULT_OK) runAfterConsent(action) else showConsentMissing()
+                    if (result.resultCode == Activity.RESULT_OK) runAfterConsent(action) else onVpnRefused(action)
                 }
 
                 fun withVpn(action: AfterConsent) {
@@ -118,7 +138,7 @@ class MainActivity : ComponentActivity() {
                     pendingAfterConsent = action
                     runCatching { consentLauncher.launch(consent) }.onFailure {
                         pendingAfterConsent = null
-                        showConsentMissing()
+                        onVpnRefused(action)
                     }
                 }
 
@@ -140,27 +160,47 @@ class MainActivity : ComponentActivity() {
                     }
                 }
 
+                // Retry from Home: same consent flow; with the main switch off only the focus session needs it.
+                fun retryVpn() = withVpn(if (vm.masterEnabled.value) AfterConsent.ENABLE_BLOCKING else AfterConsent.START_FOCUS)
+
                 fun cancelFocus() {
                     vm.cancelFocus()
                     if (!vm.masterEnabled.value) VpnController.stop(this@MainActivity)
                 }
 
-                WardenScaffold(vm, ::toggleBlocking, ::startFocus, ::cancelFocus)
+                WardenScaffold(
+                    vm, ::toggleBlocking, ::startFocus, ::cancelFocus, ::retryVpn,
+                    openSetup = openSetupRequested,
+                    onSetupOpened = { openSetupRequested = false },
+                )
             }
         }
     }
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
-        if (intent.getBooleanExtra(EXTRA_ENABLE_BLOCKING, false)) enableRequested = true
+        handleRequest(intent)
     }
 
-    /** The VPN dialog was cancelled or couldn't be shown — say why blocking stayed off. */
-    private fun showConsentMissing() {
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        outState.putLong(STATE_HANDLED_REQUEST, handledRequest)
+    }
+
+    private fun handleRequest(intent: Intent?) {
+        val id = intent?.getLongExtra(EXTRA_REQUEST_ID, 0L) ?: 0L
+        if (id == 0L || id == handledRequest) return
+        handledRequest = id
+        if (intent?.getBooleanExtra(EXTRA_ENABLE_BLOCKING, false) == true) enableRequested = true
+        if (intent?.getBooleanExtra(EXTRA_OPEN_SETUP, false) == true) openSetupRequested = true
+    }
+
+    /** The VPN dialog was cancelled or couldn't be shown; Home has the details. */
+    private fun showVpnRefused() {
         // Short: Android cuts toasts off after two lines.
         Toast.makeText(
             this,
-            "Blocking stays off: no VPN permission. Is another VPN app set to Always-on?",
+            "Website blocking couldn't start (another VPN app?). Details on Home.",
             Toast.LENGTH_LONG,
         ).show()
     }
@@ -170,7 +210,23 @@ class MainActivity : ComponentActivity() {
 
     companion object {
         /** Intent extra: turn blocking on right away (asking for VPN consent if needed). */
-        const val EXTRA_ENABLE_BLOCKING = "com.warden.blocker.ENABLE_BLOCKING"
+        private const val EXTRA_ENABLE_BLOCKING = "com.warden.blocker.ENABLE_BLOCKING"
+
+        /** Intent extra: open the Setup screen (e.g. accessibility was switched off by an update). */
+        private const val EXTRA_OPEN_SETUP = "com.warden.blocker.OPEN_SETUP"
+        private const val EXTRA_REQUEST_ID = "com.warden.blocker.REQUEST_ID"
+        private const val STATE_HANDLED_REQUEST = "handled_request"
+
+        /**
+         * Opens Warden from outside (tile, notification) and asks it to turn blocking on and/or
+         * show Setup. An already open Warden gets it via onNewIntent; each request runs once.
+         */
+        fun requestIntent(context: Context, enableBlocking: Boolean = false, openSetup: Boolean = false): Intent =
+            Intent(context, MainActivity::class.java)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                .putExtra(EXTRA_ENABLE_BLOCKING, enableBlocking)
+                .putExtra(EXTRA_OPEN_SETUP, openSetup)
+                .putExtra(EXTRA_REQUEST_ID, System.currentTimeMillis())
     }
 }
 
@@ -217,9 +273,19 @@ private fun WardenScaffold(
     onToggleBlocking: (Boolean) -> Unit,
     onStartFocus: (Int, Boolean) -> Unit,
     onCancelFocus: () -> Unit,
+    onRetryVpn: () -> Unit,
+    openSetup: Boolean,
+    onSetupOpened: () -> Unit,
 ) {
     val navController = rememberNavController()
     val reselected = remember { MutableSharedFlow<String>(extraBufferCapacity = 1) }
+    LaunchedEffect(openSetup) {
+        if (openSetup) {
+            navController.currentBackStackEntryFlow.first() // wait until the NavHost has its graph
+            onSetupOpened()
+            if (navController.currentDestination?.route != "setup") navController.navigate("setup")
+        }
+    }
     Scaffold(
         bottomBar = {
             CompactNavigationBar {
@@ -268,7 +334,7 @@ private fun WardenScaffold(
         NavHost(navController, startDestination = Tab.HOME.route, modifier = Modifier.padding(padding)) {
             composable(Tab.HOME.route) {
                 TabContent(Tab.HOME, reselected) {
-                    HomeScreen(vm, onToggleBlocking, onStartFocus, onCancelFocus, onOpenSetup = { navController.navigate("setup") })
+                    HomeScreen(vm, onToggleBlocking, onStartFocus, onCancelFocus, onOpenSetup = { navController.navigate("setup") }, onRetryVpn = onRetryVpn)
                 }
             }
             composable("setup") { SetupScreen(onBack = { leave("setup") }) }

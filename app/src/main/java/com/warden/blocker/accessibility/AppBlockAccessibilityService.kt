@@ -9,6 +9,7 @@ import com.warden.blocker.block.LimitReason
 import com.warden.blocker.feature.AppFeature
 import com.warden.blocker.feature.FeatureCatalog
 import com.warden.blocker.feature.FeatureDetector
+import com.warden.blocker.system.AccessibilityAlert
 import com.warden.blocker.ui.intercept.InterceptActivity
 import com.warden.blocker.util.CriticalApps
 import com.warden.blocker.wardenContainer
@@ -43,6 +44,13 @@ class AppBlockAccessibilityService : AccessibilityService() {
     @Volatile private var cachedBlockingActive = false
     @Volatile private var cachedFeatureKeys: Set<String> = emptySet()
     @Volatile private var cacheStamp = 0L
+
+    override fun onServiceConnected() {
+        super.onServiceConnected()
+        // Remembered so Home and the after-update check can say when Android switched us off.
+        scope.launch { runCatching { wardenContainer.settings.markAccessibilityUsed() } }
+        AccessibilityAlert.cancel(this)
+    }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         val type = event?.eventType ?: return

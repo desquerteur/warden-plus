@@ -29,4 +29,19 @@ class HomeSummaryTest {
     @Test fun listsWithoutItems() {
         assertEquals("${n(77_758)} domains from lists", protectedSummary(0, listOf(list(77_758))))
     }
+
+    @Test fun statusEverythingOn() =
+        assertEquals("Apps: on · Websites: on", protectionStatus(appsOn = true, websitesOn = true, otherVpn = false))
+
+    @Test fun statusOtherVpnBlocksWebsitesOnly() =
+        assertEquals(
+            "Apps: on · Websites: off (another VPN is active)",
+            protectionStatus(appsOn = true, websitesOn = false, otherVpn = true),
+        )
+
+    @Test fun statusRunningTunnelWinsOverStaleOtherVpnFlag() =
+        assertEquals("Apps: off · Websites: on", protectionStatus(appsOn = false, websitesOn = true, otherVpn = true))
+
+    @Test fun statusBothOff() =
+        assertEquals("Apps: off · Websites: off", protectionStatus(appsOn = false, websitesOn = false, otherVpn = false))
 }

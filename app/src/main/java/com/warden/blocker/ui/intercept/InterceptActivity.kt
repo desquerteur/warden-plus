@@ -2,6 +2,7 @@ package com.warden.blocker.ui.intercept
 
 import android.content.Intent
 import android.os.Bundle
+import android.os.SystemClock
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.animation.core.RepeatMode
@@ -39,6 +40,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.lifecycleScope
+import com.warden.blocker.accessibility.ForegroundGate
 import com.warden.blocker.allow.AllowBlockNotice
 import com.warden.blocker.block.LimitReason
 import com.warden.blocker.data.BlockType
@@ -121,6 +123,8 @@ class InterceptActivity : ComponentActivity() {
     }
 
     private fun goHome() {
+        // Widgets of blocked apps live on the home screen; give it a moment before judging again.
+        ForegroundGate.shared.noteWentHome(SystemClock.uptimeMillis())
         startActivity(
             Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME)
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),

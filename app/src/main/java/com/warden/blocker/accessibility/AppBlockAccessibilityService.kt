@@ -1,15 +1,20 @@
 package com.warden.blocker.accessibility
 
 import android.accessibilityservice.AccessibilityService
+import android.content.ComponentName
 import android.content.Intent
+import android.os.Handler
+import android.os.Looper
 import android.os.SystemClock
 import android.view.accessibility.AccessibilityEvent
+import android.view.accessibility.AccessibilityWindowInfo
 import com.warden.blocker.block.AccessDecision
 import com.warden.blocker.block.LimitReason
 import com.warden.blocker.feature.AppFeature
 import com.warden.blocker.feature.FeatureCatalog
 import com.warden.blocker.feature.FeatureDetector
 import com.warden.blocker.system.AccessibilityAlert
+import com.warden.blocker.system.BlockLoopAlert
 import com.warden.blocker.ui.intercept.InterceptActivity
 import com.warden.blocker.util.CriticalApps
 import com.warden.blocker.wardenContainer
@@ -27,6 +32,9 @@ import kotlinx.coroutines.withContext
  * Watches the foreground app and asks [com.warden.blocker.block.AccessController] what to do,
  * launching [InterceptActivity] for a hard block, limit notice, or mindful pause.
  *
+ * Only an app the user really opened is blocked: [ForegroundGate] filters out widgets on the
+ * home screen, overlays, keyboards and the like, and keeps the block screen from looping.
+ *
  * It also performs *in-app feature* blocking: while a supported app is foreground, it scans
  * the visible node tree (throttled) for signals of a blocked feature — e.g. Instagram Reels
  * or YouTube Shorts — and intercepts when one is on screen.
@@ -37,12 +45,14 @@ import kotlinx.coroutines.withContext
 class AppBlockAccessibilityService : AccessibilityService() {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
-    // Only touched on the main thread (accessibility events and the grant timer).
-    private var lastPackage: String? = null
+    private val handler = Handler(Looper.getMainLooper())
+    private val gate = ForegroundGate.shared
+    private val activityCache = HashMap<String, Boolean>()
+    // Only touched on the main thread (accessibility events, rechecks and the grant timer).
     private var grantRecheck: Job? = null
 
     private var lastFeatureScan = 0L
-    private var interceptedFeatureKey: String? = null
+    @Volatile private var interceptedFeatureKey: String? = null
 
     // Cache blocking-active + enabled features so scroll-heavy apps don't hammer DataStore/DB
     // on every content-changed event. Refreshed at most once per CACHE_TTL_MS.
@@ -60,16 +70,14 @@ class AppBlockAccessibilityService : AccessibilityService() {
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         val type = event?.eventType ?: return
         val pkg = event.packageName?.toString() ?: return
-        if (pkg == packageName) {
-            // Our own screen (e.g. the pause screen) is in front: the app behind it gets decided
-            // again when it comes back — that's what starts the timer for a "Continue for 1 min".
-            if (type == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) lastPackage = pkg
-            return
-        }
 
+        // Only a window *state* change can mean "another app came to the front". Content
+        // changes fire constantly — also from widgets on the home screen — and never block.
         if (type == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
-            handleAppBlock(pkg)
+            val confirmed = isActivityOf(pkg, event.className?.toString())
+            evaluate(pkg, confirmed, attempt = 0)
         }
+        if (pkg == packageName) return
         if (type == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED ||
             type == AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED
         ) {
@@ -78,16 +86,37 @@ class AppBlockAccessibilityService : AccessibilityService() {
     }
 
     // --- Whole-app blocking ---
-    private fun handleAppBlock(pkg: String) {
-        if (pkg == lastPackage) return
-        lastPackage = pkg
-        grantRecheck?.cancel() // another app in front: an earlier grant's timer is moot
-        // Never lock the user out of their own phone (launcher, settings, dialer, us).
-        if (CriticalApps.isCritical(this, pkg)) { interceptedFeatureKey = null; return }
-        interceptedFeatureKey = null // new app in front; allow feature re-detection
+    private fun evaluate(pkg: String, confirmed: Boolean, attempt: Int) {
+        val before = gate.foreground
+        val verdict = gate.onWindowStateChanged(
+            eventPkg = pkg,
+            activeAppPkg = activeAppPackage(),
+            confirmed = confirmed,
+            isCritical = ::isCritical,
+            now = SystemClock.uptimeMillis(),
+            attempt = attempt,
+        )
+        if (gate.foreground != before) {
+            interceptedFeatureKey = null // new app in front; allow feature re-detection
+            grantRecheck?.cancel() // and an earlier grant's timer is moot
+        }
+        when (verdict) {
+            ForegroundGate.Verdict.Ignore -> Unit
+            is ForegroundGate.Verdict.RecheckAt ->
+                handler.postAtTime({ evaluate(verdict.pkg, verdict.confirmed, verdict.attempt) }, verdict.atMs)
+            is ForegroundGate.Verdict.Check -> checkAccess(verdict.pkg, verdict.confirmed)
+        }
+    }
+
+    private fun checkAccess(pkg: String, confirmed: Boolean) {
         scope.launch {
-            when (val decision = wardenContainer.accessController.decideForPackage(pkg)) {
-                is AccessDecision.Allow -> recheckWhenGrantEnds(pkg)
+            val decision = wardenContainer.accessController.decideForPackage(pkg)
+            if (decision is AccessDecision.Allow) { recheckWhenGrantEnds(pkg); return@launch }
+            // The lookup took a moment: make sure the user is still in that app, not back Home.
+            if (activeAppPackage() != pkg) { gate.forget(pkg); return@launch }
+            if (!passLoopGuard(pkg, confirmed)) return@launch
+            when (decision) {
+                is AccessDecision.Allow -> Unit
                 is AccessDecision.Pause -> launchIntercept(InterceptActivity.KIND_PAUSE, decision.item.id, null, null)
                 is AccessDecision.HardBlock -> launchIntercept(InterceptActivity.KIND_BLOCK, decision.item.id, null, null)
                 is AccessDecision.LimitReached -> launchIntercept(InterceptActivity.KIND_LIMIT, decision.item.id, decision.reason, null)
@@ -105,16 +134,50 @@ class AppBlockAccessibilityService : AccessibilityService() {
         val item = repo.appItem(pkg) ?: return
         val endsAt = repo.activeGrant(item.id, System.currentTimeMillis())?.expiresAt ?: return
         withContext(Dispatchers.Main) {
-            if (lastPackage != pkg) return@withContext
+            if (gate.foreground != pkg) return@withContext
             grantRecheck?.cancel()
             grantRecheck = scope.launch(Dispatchers.Main) {
                 delay(endsAt - System.currentTimeMillis() + GRANT_RECHECK_MARGIN_MS)
-                if (lastPackage != pkg) return@launch
-                lastPackage = null
-                handleAppBlock(pkg)
+                if (gate.foreground != pkg) return@launch
+                // Still in the app: let the gate treat it as freshly opened, with all its checks.
+                gate.forget(pkg)
+                evaluate(pkg, confirmed = true, attempt = 0)
             }
         }
     }
+
+    private fun passLoopGuard(key: String, confirmed: Boolean): Boolean =
+        when (gate.allowIntercept(key, confirmed, SystemClock.uptimeMillis())) {
+            ForegroundGate.Intercept.SHOW -> true
+            ForegroundGate.Intercept.SUPPRESS -> false
+            ForegroundGate.Intercept.SUPPRESS_AND_NOTIFY -> { BlockLoopAlert.notifyPaused(this, key); false }
+        }
+
+    /**
+     * Package of the app window the user is actually using — not of a widget, overlay,
+     * keyboard, notification shade or picture-in-picture window. Null if Android can't say.
+     */
+    private fun activeAppPackage(): String? = runCatching {
+        val window = windows.firstOrNull {
+            it.type == AccessibilityWindowInfo.TYPE_APPLICATION &&
+                (it.isActive || it.isFocused) && !it.isInPictureInPictureMode
+        } ?: return@runCatching null
+        // A window that just appeared may not have its content yet; it is the active one, though.
+        (window.root ?: rootInActiveWindow)?.packageName?.toString()
+    }.getOrNull()
+
+    /** Whether [className] is one of [pkg]'s activities, i.e. the app itself was opened. */
+    private fun isActivityOf(pkg: String, className: String?): Boolean {
+        if (className.isNullOrEmpty()) return false
+        val key = "$pkg/$className"
+        return synchronized(activityCache) {
+            activityCache.getOrPut(key) {
+                runCatching { packageManager.getActivityInfo(ComponentName(pkg, className), 0) }.isSuccess
+            }.also { if (activityCache.size > 512) activityCache.clear() }
+        }
+    }
+
+    private fun isCritical(pkg: String): Boolean = CriticalApps.isCritical(this, pkg)
 
     // --- In-app feature blocking ---
     private fun maybeScanFeatures(pkg: String) {
@@ -134,13 +197,18 @@ class AppBlockAccessibilityService : AccessibilityService() {
             val active = features.filter { it.key in cachedFeatureKeys }
             if (active.isEmpty()) return@launch
 
-            val hit = FeatureDetector.detect(active, A11yNode(rootInActiveWindow))
+            // Only inside the app's own window: a YouTube widget on the home screen is not YouTube.
+            val root = rootInActiveWindow
+            if (!gate.mayScanFeatures(pkg, root?.packageName?.toString(), ::isCritical, SystemClock.uptimeMillis())) return@launch
+            val hit = FeatureDetector.detect(active, A11yNode(root))
             if (hit == null) {
                 interceptedFeatureKey = null
                 return@launch
             }
             if (hit.key == interceptedFeatureKey) return@launch // already handled; avoid re-launch loop
             interceptedFeatureKey = hit.key
+            // Seen inside the app's own window, so it counts as a deliberate open for the loop guard.
+            if (!passLoopGuard("feature:${hit.key}", confirmed = true)) return@launch
             launchIntercept(InterceptActivity.KIND_FEATURE, -1L, null, hit)
         }
     }
@@ -158,6 +226,7 @@ class AppBlockAccessibilityService : AccessibilityService() {
     override fun onInterrupt() {}
 
     override fun onDestroy() {
+        handler.removeCallbacksAndMessages(null)
         scope.cancel()
         super.onDestroy()
     }

@@ -2,6 +2,7 @@ package com.warden.blocker.ui
 
 import android.app.Activity
 import android.os.Build
+import android.view.Window
 import android.view.WindowManager
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -23,11 +24,20 @@ fun SecureScreen() {
         val applySecure = !BuildConfig.DEBUG
         if (applySecure) window?.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
         window?.decorView?.filterTouchesWhenObscured = true
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) window?.setHideOverlayWindows(true)
+        window?.let { hideOverlayWindows(it, true) }
         onDispose {
             if (applySecure) window?.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
             window?.decorView?.filterTouchesWhenObscured = false
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) window?.setHideOverlayWindows(false)
+            window?.let { hideOverlayWindows(it, false) }
         }
     }
+}
+
+/**
+ * Hides other apps' overlays over [window] (Android 12+). Needs HIDE_OVERLAY_WINDOWS in the
+ * manifest — without it the call throws a SecurityException, which crashed the block screen
+ * and the PIN screen in 0.2.1. Still guarded: an anti-tapjacking extra must never crash.
+ */
+fun hideOverlayWindows(window: Window, hide: Boolean) {
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) runCatching { window.setHideOverlayWindows(hide) }
 }

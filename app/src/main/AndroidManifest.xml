@@ -13,6 +13,9 @@
         tools:ignore="ProtectedPermissions" />
     <!-- In-app updater: hand downloaded Warden+ releases to the system installer (user confirms). -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+    <!-- Anti-tapjacking on the block and PIN screens: hide other apps' overlays (Android 12+).
+         Without it Window.setHideOverlayWindows throws and those screens crashed. -->
+    <uses-permission android:name="android.permission.HIDE_OVERLAY_WINDOWS" />
 
     <!-- Least privilege: see only launchable apps (for the picker) and the launcher (to keep
          it un-blockable) instead of requesting QUERY_ALL_PACKAGES. -->

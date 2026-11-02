@@ -160,7 +160,7 @@ object TourPath {
         TourRoutes.HOSTS_LISTS to Sub(TourRoutes.BLOCKLIST, TourIds.BLOCKLIST_HOSTS, "Import blocklists"),
         TourRoutes.APP_PICKER to Sub(TourRoutes.BLOCKLIST, TourIds.BLOCKLIST_ADD_APPS, "Add apps to block"),
         TourRoutes.FEATURES to Sub(TourRoutes.BLOCKLIST, TourIds.BLOCKLIST_FEEDS, "Block in-app feeds"),
-        TourRoutes.PROTECTION to Sub(TourRoutes.SETTINGS, TourIds.SETTINGS_BLOCK_PROTECTION, "Block protection"),
+        TourRoutes.PROTECTION to Sub(TourRoutes.SETTINGS, TourIds.SETTINGS_BLOCK_PROTECTION, "Protection"),
     )
 
     fun isTab(route: String?) = route in tabs

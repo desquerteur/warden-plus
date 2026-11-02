@@ -12,7 +12,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -174,9 +173,9 @@ fun SpanSection(from: Long?, until: Long?, onChange: (Long?, Long?) -> Unit) {
         } else {
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 quickUntilChoices(now, zone, is24Hour).forEach { q ->
-                    AssistChip(onClick = { onChange(from, q.at) }, label = { Text(q.label) })
+                    OutlinedButton(onClick = { onChange(from, q.at) }) { Text(q.label) }
                 }
-                AssistChip(onClick = { onChange(from, nextHour(now) + 2 * HOUR) }, label = { Text("Pick an end…") })
+                OutlinedButton(onClick = { onChange(from, nextHour(now) + 2 * HOUR) }) { Text("Pick an end…") }
             }
         }
         if (from != null) {

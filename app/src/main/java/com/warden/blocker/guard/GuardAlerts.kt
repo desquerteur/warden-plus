@@ -34,7 +34,7 @@ object GuardAlerts {
                 NotificationCompat.BigTextStyle().bigText(
                     "You get a hint when a system page that could switch Warden+ off is opened " +
                         "(its App info, Accessibility, Device admin, VPN). The page stays usable. " +
-                        "Turn it off in Warden+ → Settings → Settings guard.",
+                        "Turn it off in Warden+ → Settings → Protection → Settings guard.",
                 ),
             )
             .setOngoing(true)
@@ -60,7 +60,7 @@ object GuardAlerts {
                 NotificationCompat.BigTextStyle().bigText(
                     "$what$zones, with automatic time switched off. Schedules and time limits follow " +
                         "the phone's clock, so changing it is a way around them. Warden+ counts it in " +
-                        "Settings → Settings guard.",
+                        "Settings → Protection → Settings guard.",
                 ),
             )
             .setPriority(NotificationCompat.PRIORITY_HIGH)

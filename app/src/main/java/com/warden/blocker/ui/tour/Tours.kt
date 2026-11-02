@@ -60,20 +60,20 @@ object Tours {
             step(T.BLOCKLIST_HOSTS, BLOCKLIST, "Big blocklists", "Import ready-made lists (hosts files) to block thousands of sites at once."),
             step(T.SCHEDULES_NEW, SCHEDULES, "Schedules", "Block only at set times, like work hours. Then turn off “Always on” in Settings."),
             step(T.STATS_HEADER, STATS, "Usage", "Your screen time, app opens and how often Warden+ stepped in."),
-            step(T.SETTINGS_UPDATES, SETTINGS, "Settings & updates", "Block protection, PIN and app updates live in Settings. “Restart guides” below shows these tours again."),
+            step(T.SETTINGS_GUIDES, SETTINGS, "Settings & help", "Protection, PIN and updates live in Settings. Forgot something? “Restart guide” here shows this tour again."),
         ),
     )
 
     val protection = Tour(
         PROTECTION, "Protection",
         listOf(
-            step(T.SETTINGS_BLOCK_PROTECTION, SETTINGS, "Block protection", "How hard it is to weaken blocking on impulse."),
+            step(T.SETTINGS_BLOCK_PROTECTION, SETTINGS, "Protection", "Everything that makes blocking hard to switch off on impulse is on this page."),
             step(T.PROTECTION_MODES, PROTECTION_SCREEN, "Choose a mode", "Off, PIN, Delay (a waiting time) or Locked until a date."),
+            step(T.SETTINGS_PIN, PROTECTION_SCREEN, "PIN lock", "Guards Settings and switching off. Tip: let a friend pick it."),
             step(T.SETTINGS_PROTECTION_CHECKLIST, PROTECTION_SCREEN, "Protection checklist", "Uninstall protection, battery, Always-on VPN, Accessibility. All ticked = hard to switch off."),
             step(T.SETTINGS_UNINSTALL, PROTECTION_SCREEN, "Uninstall protection", "Device admin: Warden+ can't be uninstalled on impulse and “Force stop” is greyed out.", SettingsGuide.DEVICE_ADMIN),
-            step(T.SETTINGS_GUARD_SYSTEM, SETTINGS, "Settings guard", "Warns you when an Android page that could switch Warden+ off opens, like Force stop or VPN. The page stays usable."),
-            step(T.SETTINGS_DEVICE_OWNER, SETTINGS, "Maximum protection", "Expert mode, set up once with a computer. Android itself then enforces the blocks."),
-            step(T.SETTINGS_PIN, SETTINGS, "PIN lock", "Guards Settings and switching off. Tip: let a friend pick it."),
+            step(T.SETTINGS_GUARD_SYSTEM, PROTECTION_SCREEN, "Settings guard", "Warns you when an Android page that could switch Warden+ off opens, like Force stop or VPN. The page stays usable."),
+            step(T.SETTINGS_DEVICE_OWNER, PROTECTION_SCREEN, "Maximum protection", "Expert mode, set up once with a computer. Android itself then enforces the blocks."),
             step(T.HOME_FOCUS, HOME, "Strict focus", "Tick Strict before you start a focus session — then it can't be ended early, not even with the PIN."),
             step(T.HOME_BLOCK_UNTIL, HOME, "Block until …", "Block until a time you pick — tonight, tomorrow morning or a date. Strict: no way out early."),
         ),
@@ -103,8 +103,8 @@ object Tours {
             "page_settings", "Settings tips",
             listOf(
                 step(T.SETTINGS_ALWAYS_ON, SETTINGS, "Always on", "Off = blocking only during your schedules."),
-                step(T.SETTINGS_BLOCK_PROTECTION, SETTINGS, "Block protection", "PIN, a waiting time or a lock for every change that weakens blocking."),
-                step(T.SETTINGS_GUIDES, SETTINGS, "Guides", "Restart any guide here."),
+                step(T.SETTINGS_BLOCK_PROTECTION, SETTINGS, "Protection", "PIN, a waiting time or a lock for every change that weakens blocking."),
+                step(T.SETTINGS_GUIDES, SETTINGS, "Restart guide", "Shows the Getting started tour again. “Other guides” has the rest."),
             ),
         ),
     )

@@ -28,13 +28,11 @@ import androidx.compose.material.icons.filled.RadioButtonUnchecked
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -189,12 +187,11 @@ private fun PageTitle(title: String, text: String) {
 private fun DoneBadge(done: Boolean, text: String = "Done — on to the next step") {
     if (!done) return
     Row(verticalAlignment = Alignment.CenterVertically) {
-        Icon(Icons.Filled.CheckCircle, contentDescription = null, tint = DoneGreen)
-        Text(text, style = MaterialTheme.typography.titleSmall, color = DoneGreen, modifier = Modifier.padding(start = 8.dp))
+        Icon(Icons.Filled.CheckCircle, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+        Text(text, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(start = 8.dp))
     }
 }
 
-private val DoneGreen = androidx.compose.ui.graphics.Color(0xFF2E7D32)
 
 /** One numbered part of a page: text, optional mini settings animation, a button. */
 @Composable
@@ -208,7 +205,7 @@ private fun GuideBlock(
 ) {
     val context = LocalContext.current
     val animate = remember { animationsEnabled(context) }
-    Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
+    Card(Modifier.fillMaxWidth()) {
         Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             Text(text, style = MaterialTheme.typography.bodyMedium)
@@ -231,13 +228,11 @@ private fun WelcomePage() {
         "Welcome to Warden+",
         "Warden+ blocks distracting apps and websites, right on your phone. This setup takes about 3 minutes — anything optional can wait.",
     )
-    Surface(color = MaterialTheme.colorScheme.secondaryContainer, shape = MaterialTheme.shapes.medium) {
-        Text(
-            "Unofficial fork of “Warden” by Christopher Laughlin — not affiliated with the original project.",
-            style = MaterialTheme.typography.bodySmall,
-            modifier = Modifier.padding(12.dp),
-        )
-    }
+    Text(
+        "Unofficial fork of “Warden” by Christopher Laughlin — not affiliated with the original project.",
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
 }
 
 @Composable
@@ -414,9 +409,9 @@ private fun ProtectionPage(vm: WardenViewModel, done: Boolean, onChosen: () -> U
     }
     GuideBlock(
         "Maximum protection (expert)",
-        if (isOwner) "On — Warden+ is device owner. Its rules and the emergency exit are in Settings › Maximum protection."
+        if (isOwner) "On — Warden+ is device owner. Its rules and the emergency exit are in Settings › Protection › Maximum protection."
         else "Needs a computer once. Can switch blocked apps off and lock app controls, VPN and date & time — " +
-            "with a 24-hour emergency exit. Later in Settings › Maximum protection.",
+            "with a 24-hour emergency exit. Later in Settings › Protection › Maximum protection.",
         primary = false,
     )
 }
@@ -478,7 +473,7 @@ private fun ColumnScope.DonePage(
                     Icon(
                         if (isDone) Icons.Filled.CheckCircle else Icons.Filled.RadioButtonUnchecked,
                         contentDescription = null,
-                        tint = if (isDone) DoneGreen else MaterialTheme.colorScheme.outline,
+                        tint = if (isDone) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
                     )
                     Text(step.title, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f).padding(start = 12.dp))
                     Text(
@@ -488,7 +483,7 @@ private fun ColumnScope.DonePage(
                             else -> "Open"
                         },
                         style = MaterialTheme.typography.labelLarge,
-                        color = if (isDone) DoneGreen else if (step.optional) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.error,
+                        color = if (isDone) MaterialTheme.colorScheme.primary else if (step.optional) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.error,
                     )
                 }
             }

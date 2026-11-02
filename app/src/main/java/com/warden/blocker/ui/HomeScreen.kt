@@ -121,18 +121,22 @@ fun HomeScreen(
                 onClick = onOpenSetup,
             )
             }
-        } else if (needsSetup) {
-            ElevatedCard(Modifier.fillMaxWidth().clickable { onOpenSetup() }.tourTarget(TourIds.HOME_SETUP)) {
-                Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text("Finish setup", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                    Text("Grant accessibility so Warden+ can block apps and feeds. Tap to fix.", style = MaterialTheme.typography.bodySmall)
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                        Text(stringResource(R.string.accessibility_help_hint), style = MaterialTheme.typography.bodySmall)
+        } else {
+            // One setup card at a time: the wizard's progress, or else the plain "Finish setup".
+            SetupProgressCard(vm, onOpen = onOpenSetup, modifier = Modifier.tourTarget(TourIds.HOME_SETUP)) {
+                if (needsSetup) {
+                    ElevatedCard(Modifier.fillMaxWidth().clickable { onOpenSetup() }.tourTarget(TourIds.HOME_SETUP)) {
+                        Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Text("Finish setup", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                            Text("Grant accessibility so Warden+ can block apps and feeds. Tap to fix.", style = MaterialTheme.typography.bodySmall)
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                                Text(stringResource(R.string.accessibility_help_hint), style = MaterialTheme.typography.bodySmall)
+                            }
+                        }
                     }
                 }
             }
         }
-        SetupProgressCard(vm, onOpen = onOpenSetup)
         if (protecting && showPaused && otherVpn) {
             // Android allows one VPN at a time; another app (Tailscale & co.) holds it, often as
             // "Always-on VPN", which makes Android close our consent dialog without showing it.

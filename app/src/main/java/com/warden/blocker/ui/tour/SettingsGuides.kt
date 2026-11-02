@@ -92,11 +92,11 @@ enum class SettingsGuide(
     ),
     DEVICE_ADMIN(
         listOf(
-            MiniFrame("Block protection", listOf("Off", "PIN", "Delay", "Uninstall protection"), tap = 3),
+            MiniFrame("Protection", listOf("Block protection", "PIN lock", "Uninstall protection", "Settings guard"), tap = 2),
             MiniFrame("Uninstall protection?", listOf("Android will ask to make Warden+ a device admin.", "Continue"), tap = 1, dialog = true),
             MiniFrame("Device admin app", listOf("Warden+ can't be uninstalled while this is on.", "Activate"), tap = 1, dialog = true),
         ),
-        note = "Turn it off again under Settings › Block protection when you want to uninstall.",
+        note = "Turn it off again under Settings › Protection when you want to uninstall.",
         openLabel = "Turn on now",
     ),
     ;

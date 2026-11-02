@@ -34,7 +34,7 @@ Done (summary ✓/○, "Turn on blocking now", "Take a 1-minute tour", "Finish")
 Shows the current Block protection (Off / PIN / Delay / Locked until) and opens its screen
 (route `protection`, back returns to the wizard). The page counts as done once a mode other than
 Off is set, or after "Keep it off". Below: Uninstall protection (device admin; hidden as device
-owner) and a pointer to Settings › Maximum protection (device owner).
+owner) and a pointer to Settings › Protection › Maximum protection (device owner).
 
 - A new permission page = one entry in `WizardStep` (+ its check in `WizardChecks.systemDone`
   and its page in `SetupWizardScreen`). Unit tests: `WizardLogicTest`.

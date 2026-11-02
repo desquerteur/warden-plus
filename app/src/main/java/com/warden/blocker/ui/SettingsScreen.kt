@@ -16,7 +16,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Switch
@@ -32,15 +31,17 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.warden.blocker.block.ProtectionMode
-import com.warden.blocker.ui.guard.SettingsGuardSection
-import com.warden.blocker.ui.owner.MaxProtectionSection
 import com.warden.blocker.ui.owner.OwnerLockedExit
-import com.warden.blocker.ui.tour.RestartGuidesButton
+import com.warden.blocker.ui.tour.RestartGuideCard
 import com.warden.blocker.ui.tour.TourIds
 import com.warden.blocker.ui.tour.tourTarget
 import com.warden.blocker.ui.update.UpdateSection
 
+/**
+ * Settings in the original card style: the blocking mode on top, then Protection (its own page
+ * with block protection, PIN, uninstall protection, Settings guard and maximum protection),
+ * Blocking, Help and About & updates.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(vm: WardenViewModel, onOpenSetup: () -> Unit, onOpenProtection: () -> Unit) {
@@ -53,8 +54,6 @@ fun SettingsScreen(vm: WardenViewModel, onOpenSetup: () -> Unit, onOpenProtectio
 
     var unlocked by remember { mutableStateOf(false) }
     var showUnlock by remember { mutableStateOf(false) }
-    var showSetPin by remember { mutableStateOf(false) }
-    var showRemovePin by remember { mutableStateOf(false) }
 
     // PIN gate: settings are locked until the PIN is entered.
     if (hasPin && !unlocked) {
@@ -92,19 +91,22 @@ fun SettingsScreen(vm: WardenViewModel, onOpenSetup: () -> Unit, onOpenProtectio
             }
         }
 
-        // Block protection (replaces "Strict mode"): how hard it is to weaken blocking.
+        SectionHeader("Protection")
+        // Everything that makes blocking hard to switch off lives on its own page.
         Card(Modifier.fillMaxWidth().clickable(onClick = onOpenProtection).tourTarget(TourIds.SETTINGS_BLOCK_PROTECTION)) {
             Column(Modifier.fillMaxWidth().padding(16.dp)) {
-                Text("Block protection", style = MaterialTheme.typography.titleMedium)
+                Text("Protection", style = MaterialTheme.typography.titleMedium)
+                Text(protectionSummary(protection, System.currentTimeMillis(), vm::whenText), style = MaterialTheme.typography.bodySmall)
                 Text(
-                    protectionSummary(protection, System.currentTimeMillis(), vm::whenText),
+                    (if (hasPin) "PIN set." else "No PIN.") + " Also uninstall protection, Settings guard and maximum protection.",
                     style = MaterialTheme.typography.bodySmall,
                 )
                 Spacer(Modifier.height(8.dp))
-                OutlinedButton(onClick = onOpenProtection) { Text("Set up") }
+                OutlinedButton(onClick = onOpenProtection) { Text("Open") }
             }
         }
 
+        SectionHeader("Blocking")
         // Close the DNS-over-HTTPS bypass
         Card(Modifier.fillMaxWidth()) {
             Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -135,41 +137,18 @@ fun SettingsScreen(vm: WardenViewModel, onOpenSetup: () -> Unit, onOpenProtectio
             }
         }
 
-        // PIN
-        Card(Modifier.fillMaxWidth().tourTarget(TourIds.SETTINGS_PIN)) {
+        SectionHeader("Help")
+        RestartGuideCard()
+        Card(Modifier.fillMaxWidth()) {
             Column(Modifier.fillMaxWidth().padding(16.dp)) {
-                Text("PIN lock", style = MaterialTheme.typography.titleMedium)
-                Text(if (hasPin) "A PIN is required to change settings or stop blocking." else "Protect settings and disabling with a 4-digit PIN.", style = MaterialTheme.typography.bodySmall)
+                Text("Setup wizard", style = MaterialTheme.typography.titleMedium)
+                Text("Permissions and setup, step by step.", style = MaterialTheme.typography.bodySmall)
                 Spacer(Modifier.height(8.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Button(onClick = { showSetPin = true }) { Text(if (hasPin) "Change PIN" else "Set PIN") }
-                    if (hasPin) OutlinedButton(onClick = { showRemovePin = true }) { Text("Remove PIN") }
-                }
+                OutlinedButton(onClick = onOpenSetup, modifier = Modifier.tourTarget(TourIds.SETTINGS_SETUP)) { Text("Setup wizard") }
             }
         }
 
-        SettingsGuardSection(Modifier.tourTarget(TourIds.SETTINGS_GUARD_SYSTEM))
-
-        MaxProtectionSection(Modifier.tourTarget(TourIds.SETTINGS_DEVICE_OWNER))
-
+        SectionHeader("About & updates")
         UpdateSection(Modifier.tourTarget(TourIds.SETTINGS_UPDATES))
-
-        HorizontalDivider()
-        OutlinedButton(onClick = onOpenSetup, modifier = Modifier.fillMaxWidth().tourTarget(TourIds.SETTINGS_SETUP)) {
-            Text("Setup wizard")
-        }
-        RestartGuidesButton()
-    }
-
-    if (showSetPin) {
-        SetPinDialog(onDone = { vm.setPin(it) }, onDismiss = { showSetPin = false })
-    }
-    if (showRemovePin) {
-        VerifyPinDialog(
-            if (protection.mode == ProtectionMode.PIN) "Enter PIN to remove (Block protection goes off too)" else "Enter PIN to remove",
-            vm::verifyPin,
-            onSuccess = { vm.clearPin(); showRemovePin = false },
-            onDismiss = { showRemovePin = false },
-        )
     }
 }

@@ -26,7 +26,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.background
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -337,7 +336,7 @@ private fun TourCard(
 ) {
     val context = LocalContext.current
     Surface(
-        shape = RoundedCornerShape(20.dp),
+        shape = MaterialTheme.shapes.extraLarge,
         tonalElevation = 6.dp,
         shadowElevation = 10.dp,
         modifier = Modifier.semantics { paneTitle = "Guide: ${tour.title}" },
@@ -452,7 +451,7 @@ private fun PageTipsOffer(controller: TourController, route: String?, running: B
             exit = fadeOut() + slideOutVertically { it / 2 },
             modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 96.dp),
         ) {
-            Surface(shape = RoundedCornerShape(24.dp), tonalElevation = 6.dp, shadowElevation = 6.dp) {
+            Surface(shape = MaterialTheme.shapes.extraLarge, tonalElevation = 6.dp, shadowElevation = 6.dp) {
                 Row(Modifier.padding(start = 14.dp), verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Outlined.Lightbulb, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                     Text("Tips for this page?", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(start = 8.dp))

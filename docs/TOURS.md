@@ -11,7 +11,7 @@ of its own.
 | `TourHost.kt` | Overlay over the whole app: spotlight, finger animation, guide card, auto-start, page tips |
 | `SettingsGuides.kt` / `SettingsPathAnimation.kt` | Drawn mini settings screens for steps outside the app |
 | `TourController.kt` / `TourStore.kt` | Running tour and saved state (own DataStore file `warden_tours`) |
-| `TourButtons.kt` | "Restart guides" (Settings) |
+| `TourButtons.kt` | "Restart guide" card (Settings › Help) |
 
 ## Add a step
 
@@ -33,9 +33,9 @@ That's all. The guide walks there by itself (finger taps the tab/button, the app
 navigates) using `TourPath`. A new sub-screen needs one entry in `TourPath.subScreens`
 (parent tab + the button that opens it).
 
-Steps whose target isn't on screen are skipped (e.g. the PIN card while Settings is locked).
-The "Protection" tour walks Settings › Block protection (modes, checklist, uninstall
-protection), Settings guard (warn only), Maximum protection, PIN, strict focus and "Block until".
+Steps whose target isn't on screen are skipped (e.g. the Protection card while Settings is locked).
+The "Protection" tour walks Settings › Protection (block protection modes, PIN, checklist,
+uninstall protection, Settings guard, Maximum protection), then strict focus and "Block until".
 
 ## Rules
 
@@ -53,5 +53,6 @@ protection), Settings guard (warn only), Maximum protection, PIN, strict focus a
 - The Android-settings walk-throughs are also used by the setup wizard.
 - People who skipped "Getting started" get a small "Tips for this page?" chip on the first
   visit of Blocklist, Schedules, Usage and Settings.
-- Settings › "Restart guides" starts a guide again or shows the page tips again.
+- Settings › Help › "Restart guide" starts Getting started again at once; "Other guides" picks
+  another guide or shows the page tips again.
 - System back = one step back (on the first step: close).

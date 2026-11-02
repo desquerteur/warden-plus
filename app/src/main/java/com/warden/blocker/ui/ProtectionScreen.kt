@@ -9,6 +9,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -16,21 +18,15 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.DatePicker
-import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.RadioButton
-import androidx.compose.material3.SelectableDates
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TimeInput
-import androidx.compose.material3.rememberDatePickerState
-import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
@@ -44,7 +40,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -58,16 +53,19 @@ import com.warden.blocker.system.AdminManager
 import com.warden.blocker.owner.DeviceOwnerManager
 import com.warden.blocker.owner.OwnerPolicy
 import com.warden.blocker.owner.OwnerPrefs
+import com.warden.blocker.ui.guard.SettingsGuardSection
+import com.warden.blocker.ui.owner.MaxProtectionSection
+import com.warden.blocker.ui.times.PickDateDialog
+import com.warden.blocker.ui.times.PickTimeDialog
 import com.warden.blocker.ui.tour.TourIds
 import com.warden.blocker.ui.tour.tourTarget
 import com.warden.blocker.system.Hardening
 import com.warden.blocker.util.PermissionsHelper
 import com.warden.blocker.vpn.VpnController
 import com.warden.blocker.vpn.WardenVpnService
-import java.time.Instant
 import java.time.LocalDate
+import java.time.LocalTime
 import java.time.ZoneId
-import java.time.ZoneOffset
 
 /** One line for Settings: "PIN – weakening blocking asks for your PIN.", "Locked until Fri 18:00", … */
 internal fun protectionSummary(p: ProtectionSettings, now: Long, whenText: (Long) -> String): String =
@@ -114,7 +112,7 @@ fun ProtectionScreen(vm: WardenViewModel, onBack: () -> Unit, onOpenSetup: () ->
     val adminActive = remember(resumes, protection) { AdminManager.isActive(context) }
     val batteryOk = remember(resumes) { Hardening.ignoresBatteryOptimizations(context) }
     val accessibilityOn = remember(resumes) { PermissionsHelper.isAccessibilityEnabled(context) }
-    // As device owner ("Maximum protection" in Settings) uninstalling, Force stop and the always-on VPN
+    // As device owner ("Maximum protection" below) uninstalling, Force stop and the always-on VPN
     // are handled there; the device-admin switch here would do nothing.
     val isOwner = remember(resumes) { DeviceOwnerManager.isDeviceOwner(context) }
     val ownerPolicies by OwnerPrefs.get(context).policies.collectAsStateWithLifecycle()
@@ -125,6 +123,8 @@ fun ProtectionScreen(vm: WardenViewModel, onBack: () -> Unit, onOpenSetup: () ->
     var showAdminExplain by remember { mutableStateOf(false) }
     var pickDate by remember { mutableStateOf(false) }
     var pickTimeOn by remember { mutableStateOf<LocalDate?>(null) }
+    var showSetPin by remember { mutableStateOf(false) }
+    var showRemovePin by remember { mutableStateOf(false) }
 
     val adminLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { resumes++ }
 
@@ -137,22 +137,20 @@ fun ProtectionScreen(vm: WardenViewModel, onBack: () -> Unit, onOpenSetup: () ->
     }
 
     Column(Modifier.fillMaxSize()) {
-        SubScreenTopBar("Block protection", onBack = onBack)
+        SubScreenTopBar("Protection", onBack = onBack)
         Column(
             Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(start = 20.dp, end = 20.dp, bottom = 20.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Text(
-                "Makes it harder to weaken blocking on impulse: turning blocking off, removing, pausing or " +
-                    "loosening blocklist entries, lists and schedules, ending a focus session early, and " +
-                    "changing this protection, the PIN or uninstall protection. Adding or tightening always " +
-                    "works right away.",
+                "Makes it harder to weaken blocking on impulse. Adding or tightening always works right away.",
                 style = MaterialTheme.typography.bodyMedium,
             )
+
+            SectionHeader("Block protection")
             Text(
                 protectionSummary(protection, now, vm::whenText),
                 style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
                 modifier = Modifier.tourTarget(TourIds.PROTECTION_MODES),
             )
             if (focusStrict && focusEndsAt > now) {
@@ -172,7 +170,7 @@ fun ProtectionScreen(vm: WardenViewModel, onBack: () -> Unit, onOpenSetup: () ->
                 selected = mode == ProtectionMode.PIN,
             ) { choose(ProtectionSettings(ProtectionMode.PIN, protection.delayMinutes, 0L)) }
             ModeOption(
-                "Delay", "Weakening only takes effect after a wait, and you can cancel it until then. Enough time for the urge to pass.",
+                "Delay", "Weakening waits a while and can be cancelled until then.",
                 selected = mode == ProtectionMode.DELAY || expanded == ProtectionMode.DELAY,
             ) { expanded = ProtectionMode.DELAY }
             if (mode == ProtectionMode.DELAY || expanded == ProtectionMode.DELAY) {
@@ -205,19 +203,27 @@ fun ProtectionScreen(vm: WardenViewModel, onBack: () -> Unit, onOpenSetup: () ->
 
             PendingChangesCard(vm)
 
-            Text(
-                "Keep Warden+ from being switched off",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.tourTarget(TourIds.SETTINGS_PROTECTION_CHECKLIST),
-            )
+            // PIN
+            Card(Modifier.fillMaxWidth().tourTarget(TourIds.SETTINGS_PIN)) {
+                Column(Modifier.fillMaxWidth().padding(16.dp)) {
+                    Text("PIN lock", style = MaterialTheme.typography.titleMedium)
+                    Text(if (hasPin) "A PIN is required to change settings or stop blocking." else "Protect settings and disabling with a 4-digit PIN.", style = MaterialTheme.typography.bodySmall)
+                    Spacer(Modifier.height(8.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Button(onClick = { showSetPin = true }) { Text(if (hasPin) "Change PIN" else "Set PIN") }
+                        if (hasPin) OutlinedButton(onClick = { showRemovePin = true }) { Text("Remove PIN") }
+                    }
+                }
+            }
+
+            SectionHeader("Keep Warden+ running", Modifier.tourTarget(TourIds.SETTINGS_PROTECTION_CHECKLIST))
             Box(Modifier.tourTarget(TourIds.SETTINGS_UNINSTALL)) {
                 if (isOwner) {
                     CheckRow(
                         ok = true,
                         title = "Uninstall protection",
                         text = "Warden+ is device owner: it can't be uninstalled and \"Force stop\" is greyed out. " +
-                            "Managed under Settings → Maximum protection (with its emergency exit).",
+                            "Managed under Maximum protection below (with its emergency exit).",
                         action = null,
                     )
                 } else {
@@ -247,7 +253,7 @@ fun ProtectionScreen(vm: WardenViewModel, onBack: () -> Unit, onOpenSetup: () ->
                 CheckRow(
                     ok = true,
                     title = "Always-on VPN",
-                    text = "Kept on by Settings → Maximum protection (device owner).",
+                    text = "Kept on by Maximum protection below (device owner).",
                     action = null,
                 )
             } else CheckRow(
@@ -266,6 +272,9 @@ fun ProtectionScreen(vm: WardenViewModel, onBack: () -> Unit, onOpenSetup: () ->
                 action = "Open setup",
                 onAction = onOpenSetup,
             )
+
+            SettingsGuardSection(Modifier.tourTarget(TourIds.SETTINGS_GUARD_SYSTEM))
+            MaxProtectionSection(Modifier.tourTarget(TourIds.SETTINGS_DEVICE_OWNER))
 
             val offCount = offCountSince(offEvents, now)
             Text(
@@ -318,49 +327,40 @@ fun ProtectionScreen(vm: WardenViewModel, onBack: () -> Unit, onOpenSetup: () ->
         )
     }
     if (pickDate) {
-        val zone = ZoneId.systemDefault()
-        val today = LocalDate.now(zone)
-        val last = today.plusDays(MAX_LOCK_DAYS.toLong())
-        val dateState = rememberDatePickerState(
-            initialSelectedDateMillis = today.plusDays(1).atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli(),
-            selectableDates = object : SelectableDates {
-                // The picker hands over UTC midnights.
-                override fun isSelectableDate(utcTimeMillis: Long): Boolean {
-                    val d = Instant.ofEpochMilli(utcTimeMillis).atZone(ZoneOffset.UTC).toLocalDate()
-                    return !d.isBefore(today) && !d.isAfter(last)
-                }
-                override fun isSelectableYear(year: Int) = year in today.year..last.year
-            },
+        val today = LocalDate.now(ZoneId.systemDefault())
+        PickDateDialog(
+            initial = today.plusDays(1),
+            minDate = today,
+            maxDate = today.plusDays(MAX_LOCK_DAYS.toLong()),
+            onPick = { pickTimeOn = it },
+            onDismiss = { pickDate = false },
+            confirmLabel = "Next",
         )
-        DatePickerDialog(
-            onDismissRequest = { pickDate = false },
-            confirmButton = {
-                TextButton(onClick = {
-                    pickDate = false
-                    pickTimeOn = dateState.selectedDateMillis?.let { Instant.ofEpochMilli(it).atZone(ZoneOffset.UTC).toLocalDate() }
-                }) { Text("Next") }
-            },
-            dismissButton = { TextButton(onClick = { pickDate = false }) { Text("Cancel") } },
-        ) { DatePicker(state = dateState, showModeToggle = true) }
     }
     pickTimeOn?.let { date ->
-        val timeState = rememberTimePickerState(initialHour = 18, initialMinute = 0, is24Hour = DateFormat.is24HourFormat(context))
-        AlertDialog(
-            onDismissRequest = { pickTimeOn = null },
-            properties = DialogProperties(usePlatformDefaultWidth = false),
-            modifier = Modifier.padding(horizontal = 16.dp).fillMaxWidth(),
-            title = { Text("Locked until … (time)") },
-            text = { TimeInput(state = timeState) },
-            confirmButton = {
-                TextButton(onClick = {
-                    val until = date.atTime(timeState.hour, timeState.minute).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
-                    pickTimeOn = null
-                    if (until > System.currentTimeMillis()) {
-                        choose(ProtectionSettings(ProtectionMode.LOCKED, protection.delayMinutes, until))
-                    }
-                }) { Text("Lock") }
+        PickTimeDialog(
+            title = "Locked until (time)",
+            initial = LocalTime.of(18, 0),
+            is24Hour = DateFormat.is24HourFormat(context),
+            onPick = { t ->
+                val until = date.atTime(t).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
+                if (until > System.currentTimeMillis()) {
+                    choose(ProtectionSettings(ProtectionMode.LOCKED, protection.delayMinutes, until))
+                }
             },
-            dismissButton = { TextButton(onClick = { pickTimeOn = null }) { Text("Cancel") } },
+            onDismiss = { pickTimeOn = null },
+            confirmLabel = "Lock",
+        )
+    }
+    if (showSetPin) {
+        SetPinDialog(onDone = { vm.setPin(it) }, onDismiss = { showSetPin = false })
+    }
+    if (showRemovePin) {
+        VerifyPinDialog(
+            if (protection.mode == ProtectionMode.PIN) "Enter PIN to remove (Block protection goes off too)" else "Enter PIN to remove",
+            vm::verifyPin,
+            onSuccess = { vm.clearPin(); showRemovePin = false },
+            onDismiss = { showRemovePin = false },
         )
     }
 }
@@ -379,16 +379,20 @@ private fun ModeOption(title: String, text: String, selected: Boolean, onClick: 
     }
 }
 
-/** A checklist line: ✓/✗, what it is, and a button to the right Android setting. */
+/**
+ * A checklist line: ✓/✗, what it is, and a button to the right Android setting. A missing
+ * item gets its title in the theme's error colour. [action] null: nothing to do here (e.g.
+ * managed by device-owner mode).
+ */
 @Composable
-/** [action] null: nothing to do here (e.g. managed by device-owner mode). */
 private fun CheckRow(ok: Boolean, title: String, text: String, action: String?, onAction: () -> Unit = {}) {
-    Card(
-        Modifier.fillMaxWidth(),
-        colors = if (ok) CardDefaults.cardColors() else CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
-    ) {
+    Card(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text((if (ok) "✓ " else "✗ ") + title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+            Text(
+                (if (ok) "✓ " else "✗ ") + title,
+                style = MaterialTheme.typography.titleMedium,
+                color = if (ok) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.error,
+            )
             Text(text, style = MaterialTheme.typography.bodySmall)
             if (action != null) OutlinedButton(onClick = onAction) { Text(action) }
         }

@@ -106,3 +106,14 @@ internal fun daysLabel(mask: Int): String {
     val names = listOf("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
     return names.filterIndexed { i, _ -> (mask shr i) and 1 == 1 }.joinToString(" ")
 }
+
+/** Small heading above a group of cards, e.g. "Protection" or "Help" in Settings. */
+@Composable
+internal fun SectionHeader(text: String, modifier: Modifier = Modifier) {
+    Text(
+        text,
+        style = MaterialTheme.typography.titleSmall,
+        color = MaterialTheme.colorScheme.primary,
+        modifier = modifier.padding(top = 8.dp),
+    )
+}

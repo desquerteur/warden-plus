@@ -1,13 +1,20 @@
 package com.warden.blocker.ui.tour
 
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Explore
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.Card
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -33,15 +40,25 @@ fun TourLaunchButton(tourId: String, label: String, modifier: Modifier = Modifie
     }
 }
 
-/** "Restart guides" in Settings: pick a guide to see again, or reset all of them. */
+/**
+ * "Restart guide" in Settings: one tap starts the Getting started tour again. "Other guides"
+ * picks a single guide or brings back the page tips.
+ */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun RestartGuidesButton(modifier: Modifier = Modifier.fillMaxWidth()) {
+fun RestartGuideCard(modifier: Modifier = Modifier) {
     val controller = LocalTourController.current ?: return
     var open by remember { mutableStateOf(false) }
-    OutlinedButton(onClick = { open = true }, modifier = modifier.tourTarget(TourIds.SETTINGS_GUIDES)) {
-        Icon(Icons.Outlined.Explore, contentDescription = null, modifier = Modifier.size(18.dp))
-        Spacer(Modifier.width(8.dp))
-        Text("Restart guides")
+    Card(modifier.fillMaxWidth().tourTarget(TourIds.SETTINGS_GUIDES)) {
+        Column(Modifier.fillMaxWidth().padding(16.dp)) {
+            Text("Restart guide", style = MaterialTheme.typography.titleMedium)
+            Text("Forgot how it works? Shows the Getting started tour again.", style = MaterialTheme.typography.bodySmall)
+            Spacer(Modifier.height(8.dp))
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(onClick = { controller.start(Tours.GETTING_STARTED) }) { Text("Restart guide") }
+                TextButton(onClick = { open = true }) { Text("Other guides") }
+            }
+        }
     }
     if (!open) return
     AlertDialog(

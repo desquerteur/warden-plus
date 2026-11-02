@@ -101,4 +101,21 @@ class ToursDefinitionTest {
         assertEquals(716f, beside.offset.x)
         assertTrue(beside.offset.y in 24f..(2100f - 600f - 24f))
     }
+
+    @Test fun protectionDetailsLiveOnTheProtectionPage() {
+        val byTarget = Tours.protection.steps.associateBy { it.target }
+        listOf(TourIds.SETTINGS_PIN, TourIds.SETTINGS_GUARD_SYSTEM, TourIds.SETTINGS_DEVICE_OWNER).forEach {
+            assertEquals(it, TourRoutes.PROTECTION, byTarget.getValue(it).route)
+        }
+        // Settings › Protection: the way there taps the Protection card.
+        val hops = TourPath.plan(TourRoutes.HOME, TourRoutes.PROTECTION)
+        assertEquals(listOf(TourRoutes.SETTINGS, TourRoutes.PROTECTION), hops.map { it.route })
+        assertEquals(TourIds.SETTINGS_BLOCK_PROTECTION, hops.last().target)
+    }
+
+    @Test fun gettingStartedEndsAtRestartGuide() {
+        val last = Tours.gettingStarted.steps.last()
+        assertEquals(TourIds.SETTINGS_GUIDES, last.target)
+        assertEquals(TourRoutes.SETTINGS, last.route)
+    }
 }

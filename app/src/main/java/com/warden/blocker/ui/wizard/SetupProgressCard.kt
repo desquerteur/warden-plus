@@ -29,19 +29,28 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.warden.blocker.ui.WardenViewModel
 
-/** "Setup 5/7 – continue" on Home while a setup page is neither done nor put off. */
+/**
+ * "Setup 5/7 – continue" on Home while a setup page is neither done nor put off; otherwise
+ * [orElse] (Home's plain "Finish setup" card), so the two never show together.
+ */
 @Composable
-fun SetupProgressCard(vm: WardenViewModel, onOpen: () -> Unit, wizardVm: WizardViewModel = viewModel()) {
+fun SetupProgressCard(
+    vm: WardenViewModel,
+    onOpen: () -> Unit,
+    modifier: Modifier = Modifier,
+    wizardVm: WizardViewModel = viewModel(),
+    orElse: @Composable () -> Unit = {},
+) {
     val wizard = wizardVm.controller
     val state by wizard.state.collectAsStateWithLifecycle()
     val sdk = Build.VERSION.SDK_INT
     val done = rememberWizardDone(vm, state)
     val skipped = state?.skipped ?: return
-    if (!WizardLogic.showHomeCard(sdk, done, skipped)) return
+    if (!WizardLogic.showHomeCard(sdk, done, skipped)) { orElse(); return }
     val open = WizardLogic.open(sdk, done, skipped)
     val (count, total) = WizardLogic.progress(sdk, done)
     ElevatedCard(
-        Modifier.fillMaxWidth().clickable {
+        modifier.fillMaxWidth().clickable {
             wizard.resumeAt(open.first())
             onOpen()
         },

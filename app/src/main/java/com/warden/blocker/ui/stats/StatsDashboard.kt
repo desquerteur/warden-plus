@@ -36,7 +36,6 @@ import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material.icons.outlined.TouchApp
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -247,7 +246,6 @@ private data class TileModel(val icon: ImageVector, val label: String, val value
 private fun StatTile(t: TileModel, modifier: Modifier = Modifier) {
     Card(
         modifier.semantics(mergeDescendants = true) {},
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
     ) {
         Column(Modifier.padding(12.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -411,7 +409,7 @@ private fun LazyListScope.appList(state: StatsUiState, expanded: String?, onTogg
     val data = (state.usage as? UsageState.Ready)?.data ?: return
     item(key = "apps-title") {
         Text(
-            "Apps", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold,
+            "Apps", style = MaterialTheme.typography.titleMedium,
             modifier = Modifier.padding(top = 4.dp).semantics { heading() },
         )
     }
@@ -452,7 +450,6 @@ private fun AppRowItem(
             role = Role.Button,
             onClick = onClick,
         ),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
     ) {
         Column(Modifier.padding(horizontal = 12.dp, vertical = 10.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -529,11 +526,10 @@ private fun AppRowItem(
 private fun SectionCard(title: String, content: @Composable () -> Unit) {
     Card(
         Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
     ) {
         Column(Modifier.padding(16.dp)) {
             Text(
-                title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold,
+                title, style = MaterialTheme.typography.titleMedium,
                 modifier = Modifier.semantics { heading() },
             )
             Spacer(Modifier.height(4.dp))
@@ -547,10 +543,9 @@ private fun PermissionCard() {
     val context = LocalContext.current
     Card(
         Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
     ) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("See where your time goes", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            Text("See where your time goes", style = MaterialTheme.typography.titleMedium)
             Text(
                 "Warden+ needs \"Usage access\" to show screen time, unlocks and your top apps. " +
                     "Everything stays on this phone.",

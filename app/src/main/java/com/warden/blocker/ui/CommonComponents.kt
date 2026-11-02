@@ -1,5 +1,6 @@
 package com.warden.blocker.ui
 
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -27,6 +28,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -54,8 +56,12 @@ internal fun FocusCard(focusEndsAt: Long, strict: Boolean, onStart: (Int, Boolea
                 Text("Start a focus session", style = MaterialTheme.typography.titleMedium)
                 Text("Force blocking on for a set time — great for deep work.", style = MaterialTheme.typography.bodySmall)
                 var strictChoice by remember { mutableStateOf(false) }
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Checkbox(checked = strictChoice, onCheckedChange = { strictChoice = it })
+                // The whole row toggles, not just the box (tapping the label used to do nothing).
+                Row(
+                    Modifier.toggleable(value = strictChoice, role = Role.Checkbox, onValueChange = { strictChoice = it }),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Checkbox(checked = strictChoice, onCheckedChange = null)
                     Text("Strict (no early exit)", style = MaterialTheme.typography.bodyMedium)
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {

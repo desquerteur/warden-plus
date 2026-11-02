@@ -1,8 +1,12 @@
 package com.warden.blocker.ui
 
 import android.content.Intent
+import android.net.Uri
+import android.os.Build
 import android.provider.Settings
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -13,7 +17,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.RadioButtonUnchecked
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -26,16 +32,17 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.compose.runtime.DisposableEffect
+import com.warden.blocker.R
 import com.warden.blocker.util.PermissionsHelper
 
 @Composable
-fun SetupScreen() {
+fun SetupScreen(onBack: () -> Unit) {
     val context = LocalContext.current
     // Re-check statuses whenever we come back to the foreground (e.g. from system settings).
     var refresh by remember { mutableIntStateOf(0) }
@@ -53,36 +60,74 @@ fun SetupScreen() {
     val usage = PermissionsHelper.hasUsageAccess(context)
     val notifications = PermissionsHelper.hasNotifications(context)
 
-    Column(Modifier.fillMaxSize().padding(20.dp)) {
-        Text("Setup", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
-        Spacer(Modifier.height(8.dp))
-        Text("Grant these so Warden can do its job. Only accessibility is required.", style = MaterialTheme.typography.bodyMedium)
-        Spacer(Modifier.height(16.dp))
+    Column(Modifier.fillMaxSize()) {
+        SubScreenTopBar("Setup", onBack = onBack)
+        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(start = 20.dp, end = 20.dp, bottom = 20.dp)) {
+            Text("Grant these so Warden can do its job. Only accessibility is required.", style = MaterialTheme.typography.bodyMedium)
+            Spacer(Modifier.height(16.dp))
 
-        SetupRow(
-            title = "App blocking (Accessibility)",
-            subtitle = "Required — detects blocked apps and in-app feeds.",
-            granted = accessibility,
-            actionLabel = "Open",
-        ) { context.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)) }
+            SetupRow(
+                title = "App blocking (Accessibility)",
+                subtitle = "Required — detects blocked apps and in-app feeds.",
+                granted = accessibility,
+                actionLabel = "Open",
+            ) { context.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)) }
 
-        SetupRow(
-            title = "Usage access",
-            subtitle = "For screen-time and daily time limits.",
-            granted = usage,
-            actionLabel = "Open",
-        ) { context.startActivity(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS)) }
+            if (!accessibility && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                RestrictedSettingHelp()
+            }
 
-        SetupRow(
-            title = "Notifications",
-            subtitle = "Shows the ongoing 'blocking active' notice.",
-            granted = notifications,
-            actionLabel = "Open",
-        ) {
-            context.startActivity(
-                Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
-                    .putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName),
-            )
+            SetupRow(
+                title = "Usage access",
+                subtitle = "For screen-time and daily time limits.",
+                granted = usage,
+                actionLabel = "Open",
+            ) { context.startActivity(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS)) }
+
+            SetupRow(
+                title = "Notifications",
+                subtitle = "Shows the ongoing 'blocking active' notice.",
+                granted = notifications,
+                actionLabel = "Open",
+            ) {
+                context.startActivity(
+                    Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                        .putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName),
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Android 13+ blocks the accessibility switch ("restricted setting") for sideloaded APKs until
+ * the user allows it from the app-info page. Walks through the three steps.
+ */
+@Composable
+private fun RestrictedSettingHelp() {
+    val context = LocalContext.current
+    Card(
+        Modifier.fillMaxWidth().padding(bottom = 10.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
+    ) {
+        Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text(stringResource(R.string.accessibility_help_title), style = MaterialTheme.typography.titleMedium)
+            Text(stringResource(R.string.accessibility_help_intro), style = MaterialTheme.typography.bodySmall)
+            Text(stringResource(R.string.accessibility_help_step1), style = MaterialTheme.typography.bodySmall)
+            Text(stringResource(R.string.accessibility_help_step2), style = MaterialTheme.typography.bodySmall)
+            Text(stringResource(R.string.accessibility_help_step3), style = MaterialTheme.typography.bodySmall)
+            OutlinedButton(
+                onClick = { context.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)) },
+                modifier = Modifier.fillMaxWidth(),
+            ) { Text(stringResource(R.string.accessibility_help_open_accessibility)) }
+            Button(
+                onClick = {
+                    context.startActivity(
+                        Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", context.packageName, null)),
+                    )
+                },
+                modifier = Modifier.fillMaxWidth(),
+            ) { Text(stringResource(R.string.accessibility_help_open_app_info)) }
         }
     }
 }

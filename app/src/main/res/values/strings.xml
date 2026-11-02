@@ -5,5 +5,14 @@
     <string name="vpn_notification_channel">Blocking active</string>
     <string name="vpn_notification_title">Warden is protecting your focus</string>
     <string name="vpn_notification_text">Blocked sites are being filtered.</string>
+    <!-- Android 13+ "restricted setting" help for APK installs (Setup screen) -->
+    <string name="accessibility_help_title">Accessibility switch greyed out?</string>
+    <string name="accessibility_help_intro">Android 13 and newer lock this setting for apps installed from an APK file. To unlock it:</string>
+    <string name="accessibility_help_step1">1. Open Settings → Accessibility → Warden, tap it once and confirm the message.</string>
+    <string name="accessibility_help_step2">2. Tap “Open app info” below → ⋮ (top right) → “Allow restricted settings”.</string>
+    <string name="accessibility_help_step3">3. Go back to Accessibility and turn Warden on.</string>
+    <string name="accessibility_help_open_accessibility">Open Accessibility</string>
+    <string name="accessibility_help_open_app_info">Open app info</string>
+    <string name="accessibility_help_hint">Switch greyed out? Setup shows how to unlock it.</string>
     <string name="device_admin_description">Prevents Warden from being uninstalled while blocking is active. Warden requests no other admin powers.</string>
 </resources>

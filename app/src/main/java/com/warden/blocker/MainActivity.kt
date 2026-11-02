@@ -126,6 +126,10 @@ private fun WardenScaffold(
                     NavigationBarItem(
                         selected = dest?.hierarchy?.any { it.route == tab.route } == true,
                         onClick = {
+                            // Leave a sub-screen (app picker, feeds, setup) first. Otherwise it is
+                            // saved into the tab's state and restored, so tapping "Blocklist" from
+                            // the app picker would land right back in the app picker.
+                            if (dest != null && Tab.entries.none { it.route == dest.route }) navController.popBackStack()
                             navController.navigate(tab.route) {
                                 popUpTo(navController.graph.findStartDestination().id) { saveState = true }
                                 launchSingleTop = true
@@ -139,11 +143,15 @@ private fun WardenScaffold(
             }
         },
     ) { padding ->
+        // Pops only while [route] is still on the stack, so a double tap on back/"Done"
+        // can't also pop the screen underneath.
+        fun leave(route: String) { navController.popBackStack(route, inclusive = true) }
+
         NavHost(navController, startDestination = Tab.HOME.route, modifier = Modifier.padding(padding)) {
             composable(Tab.HOME.route) {
                 HomeScreen(vm, onToggleBlocking, onStartFocus, onCancelFocus, onOpenSetup = { navController.navigate("setup") })
             }
-            composable("setup") { SetupScreen() }
+            composable("setup") { SetupScreen(onBack = { leave("setup") }) }
             composable(Tab.BLOCKLIST.route) {
                 BlocklistScreen(
                     vm,
@@ -151,8 +159,8 @@ private fun WardenScaffold(
                     onOpenFeatures = { navController.navigate("features") },
                 )
             }
-            composable("apppicker") { AppPickerScreen(vm) }
-            composable("features") { FeaturesScreen(vm) }
+            composable("apppicker") { AppPickerScreen(vm, onBack = { leave("apppicker") }) }
+            composable("features") { FeaturesScreen(vm, onBack = { leave("features") }) }
             composable(Tab.SCHEDULES.route) { SchedulesScreen(vm) }
             composable(Tab.STATS.route) { StatsScreen(vm) }
             composable(Tab.SETTINGS.route) { SettingsScreen(vm, onOpenSetup = { navController.navigate("setup") }) }

@@ -16,8 +16,10 @@ import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -49,60 +51,71 @@ fun ItemEditorSheet(item: BlockedItem, onSave: (BlockedItem) -> Unit, onDismiss:
     var activeFrom by remember { mutableStateOf(item.activeFrom) }
     var activeUntil by remember { mutableStateOf(item.activeUntil) }
 
-    ModalBottomSheet(onDismissRequest = onDismiss) {
-        Column(
-            // Scrolls: with the time limit the sheet is taller than a fold cover display.
-            Modifier.verticalScroll(rememberScrollState()).padding(20.dp).padding(bottom = 24.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp),
-        ) {
-            Text(item.label, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+    // Fully open at once: half open, "Save" sat below the screen edge on a 344 dp cover display
+    // and Back threw the change away unnoticed (M2).
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
+        Column(Modifier.fillMaxWidth()) {
+            Column(
+                // Scrolls: with the time limit the sheet is taller than a fold cover display. The
+                // buttons below stay in sight.
+                Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState()).padding(start = 20.dp, end = 20.dp, top = 4.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp),
+            ) {
+                Text(item.label, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
 
-            Text("When opened", style = MaterialTheme.typography.labelLarge)
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                FilterChip(selected = mode == InterceptMode.PAUSE, onClick = { mode = InterceptMode.PAUSE }, label = { Text("Mindful pause") })
-                FilterChip(selected = mode == InterceptMode.BLOCK, onClick = { mode = InterceptMode.BLOCK }, label = { Text("Hard block") })
-            }
+                Text("When opened", style = MaterialTheme.typography.labelLarge)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FilterChip(selected = mode == InterceptMode.PAUSE, onClick = { mode = InterceptMode.PAUSE }, label = { Text("Mindful pause") })
+                    FilterChip(selected = mode == InterceptMode.BLOCK, onClick = { mode = InterceptMode.BLOCK }, label = { Text("Hard block") })
+                }
 
-            if (mode == InterceptMode.PAUSE && item.type == BlockType.APP) {
-                Stepper("Breathe for (seconds)", pauseSeconds, step = 5, min = 0, max = 120) { pauseSeconds = it }
-                OutlinedTextField(
-                    value = prompt, onValueChange = { prompt = it },
-                    label = { Text("Pause prompt (optional)") },
-                    placeholder = { Text("Why are you opening this?") },
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                Stepper("Opens per day (0 = unlimited)", openLimit, step = 1, min = 0, max = 30) { openLimit = it }
-                Stepper("Daily time limit, min (0 = off)", timeLimit, step = 5, min = 0, max = 240) { timeLimit = it }
-                Stepper("Cooldown between opens, min", cooldown, step = 5, min = 0, max = 240) { cooldown = it }
-            } else if (mode == InterceptMode.PAUSE) {
-                Text(
-                    "Mindful pause applies to apps. Websites are hard-blocked at the network layer.",
-                    style = MaterialTheme.typography.bodyMedium,
-                )
-            }
-
-            SpanSection(activeFrom, activeUntil) { f, u -> activeFrom = f; activeUntil = u }
-
-            Spacer(Modifier.height(4.dp))
-            Button(
-                enabled = spanValid(activeFrom, activeUntil),
-                onClick = {
-                    onSave(
-                        item.copy(
-                            interceptMode = mode,
-                            pauseSeconds = pauseSeconds,
-                            customPrompt = prompt.ifBlank { null },
-                            openLimitPerDay = openLimit,
-                            dailyLimitMinutes = timeLimit,
-                            cooldownMinutes = cooldown,
-                            activeFrom = activeFrom,
-                            activeUntil = activeUntil,
-                        ),
+                if (mode == InterceptMode.PAUSE && item.type == BlockType.APP) {
+                    Stepper("Breathe for (seconds)", pauseSeconds, step = 5, min = 0, max = 120) { pauseSeconds = it }
+                    OutlinedTextField(
+                        value = prompt, onValueChange = { prompt = it },
+                        label = { Text("Pause prompt (optional)") },
+                        placeholder = { Text("Why are you opening this?") },
+                        modifier = Modifier.fillMaxWidth(),
                     )
-                    onDismiss()
-                },
-                modifier = Modifier.fillMaxWidth(),
-            ) { Text("Save") }
+                    Stepper("Opens per day (0 = unlimited)", openLimit, step = 1, min = 0, max = 30) { openLimit = it }
+                    Stepper("Daily time limit, min (0 = off)", timeLimit, step = 5, min = 0, max = 240) { timeLimit = it }
+                    Stepper("Cooldown between opens, min", cooldown, step = 5, min = 0, max = 240) { cooldown = it }
+                } else if (mode == InterceptMode.PAUSE) {
+                    Text(
+                        "Mindful pause applies to apps. Websites are hard-blocked at the network layer.",
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                }
+
+                SpanSection(activeFrom, activeUntil) { f, u -> activeFrom = f; activeUntil = u }
+                Spacer(Modifier.height(4.dp))
+            }
+            Row(
+                Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, top = 12.dp, bottom = 24.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                OutlinedButton(onClick = onDismiss, modifier = Modifier.weight(1f)) { Text("Cancel") }
+                Button(
+                    enabled = spanValid(activeFrom, activeUntil),
+                    onClick = {
+                        onSave(
+                            item.copy(
+                                interceptMode = mode,
+                                pauseSeconds = pauseSeconds,
+                                customPrompt = prompt.ifBlank { null },
+                                openLimitPerDay = openLimit,
+                                dailyLimitMinutes = timeLimit,
+                                cooldownMinutes = cooldown,
+                                activeFrom = activeFrom,
+                                activeUntil = activeUntil,
+                            ),
+                        )
+                        onDismiss()
+                    },
+                    modifier = Modifier.weight(1f),
+                ) { Text("Save") }
+            }
         }
     }
 }

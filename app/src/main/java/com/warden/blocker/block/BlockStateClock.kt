@@ -23,6 +23,24 @@ object BlockStateClock {
         return minOf(toMinute, focusEndsAt - nowMillis + MARGIN_MS)
     }
 
+    /**
+     * Whether the filter (VPN) should be running: whenever the main switch is on or a focus
+     * session / "Block until" runs — also outside a schedule's window, where it lets everything
+     * through. Then a window that starts later is enforced at once by the VPN's own clock, with
+     * nothing having to start it in the background. (Same rule as Home's "Protection paused".)
+     */
+    fun filterShouldRun(masterEnabled: Boolean, focusEndsAt: Long, nowMillis: Long): Boolean =
+        masterEnabled || focusEndsAt > nowMillis
+
+    /**
+     * When to check next that the filter runs: the next schedule start while the main switch is
+     * on and blocking isn't "Always on" (then the filter runs anyway). Null = no check needed.
+     */
+    fun nextFilterCheck(masterEnabled: Boolean, alwaysOn: Boolean, nextScheduleStart: Long?, nowMillis: Long): Long? {
+        if (!masterEnabled || alwaysOn) return null
+        return nextScheduleStart?.takeIf { it > nowMillis }
+    }
+
     /** True when the blocklist was built for a different state than [activeNow] (or never). */
     fun needsRebuild(builtFor: Boolean?, activeNow: Boolean): Boolean = builtFor != activeNow
 }

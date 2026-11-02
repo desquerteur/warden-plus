@@ -13,7 +13,7 @@ import java.util.concurrent.TimeUnit
 
 /**
  * Runs when a focus session is scheduled to end. Clears the (expired) session and, if
- * blocking is no longer active for any other reason, tears the VPN back down.
+ * the main switch is off, tears the VPN back down.
  */
 class FocusEndWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
     override suspend fun doWork(): Result {
@@ -23,7 +23,9 @@ class FocusEndWorker(context: Context, params: WorkerParameters) : CoroutineWork
             container.settings.clearFocus()
             container.settings.incrementFocusSessions() // count only sessions that ran to completion
         }
-        if (!container.blockEngine.isBlockingActiveNow()) {
+        // With the main switch on the filter keeps running (it lets everything through outside
+        // schedules), so a schedule that starts later is enforced without anything restarting it.
+        if (!container.blockEngine.filterShouldRun()) {
             VpnController.stop(applicationContext)
         }
         return Result.success()

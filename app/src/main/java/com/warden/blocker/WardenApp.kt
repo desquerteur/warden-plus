@@ -15,6 +15,7 @@ import com.warden.blocker.data.SettingsStore
 import com.warden.blocker.data.WardenDatabase
 import com.warden.blocker.hosts.HostsListRepository
 import com.warden.blocker.owner.OwnerSync
+import com.warden.blocker.system.FilterKeeper
 import com.warden.blocker.update.UpdateCheckWorker
 import com.warden.blocker.usage.AppsHelper
 import com.warden.blocker.usage.UsageStatsHelper
@@ -36,6 +37,7 @@ class WardenApp : Application() {
         createNotificationChannel()
         UpdateCheckWorker.sync(this)
         OwnerSync.start(this) // device-owner rules follow the blocking state
+        FilterKeeper.start(this) // re-arms the website filter when a schedule starts
     }
 
     private fun createNotificationChannel() {

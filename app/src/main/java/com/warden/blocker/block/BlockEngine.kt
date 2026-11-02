@@ -30,6 +30,10 @@ class BlockEngine(
         return ScheduleEvaluator.anyActive(repo.enabledSchedules(), now)
     }
 
+    /** See [BlockStateClock.filterShouldRun]. */
+    suspend fun filterShouldRun(now: Long = System.currentTimeMillis()): Boolean =
+        BlockStateClock.filterShouldRun(settings.masterEnabled.first(), settings.focusEndsAt.first(), now)
+
     suspend fun blockedDomains(): List<String> {
         if (!isBlockingActiveNow()) return emptyList()
         return manualAndDohDomains()

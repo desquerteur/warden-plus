@@ -107,7 +107,7 @@ class MainActivity : ComponentActivity() {
                     // own (it then reports the gap), instead of waiting for "Tap to restart".
                     val c = wardenContainer
                     if (!WardenVpnService.running && VpnController.consentIntent(this@MainActivity) == null &&
-                        c.blockEngine.isBlockingActiveNow()
+                        c.blockEngine.filterShouldRun()
                     ) {
                         runCatching { VpnController.start(this@MainActivity) }
                     }

@@ -4,7 +4,6 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import com.warden.blocker.util.PermissionsHelper
-import com.warden.blocker.vpn.VpnController
 import com.warden.blocker.wardenContainer
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -24,12 +23,11 @@ class BootReceiver : BroadcastReceiver() {
         CoroutineScope(Dispatchers.Default).launch {
             try {
                 val c = context.wardenContainer
-                // Re-arm if blocking is active for any reason — master, schedule, or an
-                // in-progress focus session. Consent must have been granted previously.
-                val active = c.blockEngine.isBlockingActiveNow()
-                if (active && VpnController.consentIntent(context) == null) {
-                    runCatching { VpnController.start(context) }
-                }
+                // Re-arm whenever the filter should run (main switch on or a focus session) —
+                // also outside a schedule, so it switches on by itself when one starts.
+                // Consent must have been granted previously.
+                FilterKeeper.ensureRunning(context, notifyOnFailure = true)
+                FilterKeeper.scheduleNext(context)
                 if (action == Intent.ACTION_MY_PACKAGE_REPLACED) {
                     val warn = AccessibilityAlert.shouldWarn(
                         accessibilityOn = PermissionsHelper.isAccessibilityEnabled(context),

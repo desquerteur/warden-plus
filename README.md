@@ -1,123 +1,73 @@
-# Warden
+# Warden+
 
-**A free, open-source website & app blocker for Android.** No subscriptions, no ads, no
-account, no data collection. A community-owned alternative to closed blockers like AppBlock.
+> [!IMPORTANT]
+> **This is NOT the original Warden project.**
+> Warden+ is an unofficial, community-maintained fork of
+> **[ChristopherLaughlin/warden](https://github.com/ChristopherLaughlin/warden)**.
+> All credit for the original app — its architecture, blocking engine and most of the code —
+> goes to the original author. This fork only adds a few improvements on top.
+> It is not affiliated with or endorsed by the original project.
+> Please report bugs in the added features **here**, not upstream.
 
-> Working name — "Warden" is a placeholder and easy to rename (see [Renaming](#renaming)).
+**A free, open-source website & app blocker for Android** — no subscriptions, no ads, no
+account, no data collection. Warden+ keeps everything the original does and adds the
+features listed below.
 
 ---
 
-## Why
+## What Warden+ adds
 
-Most Android blockers gate their most useful features (strict mode, multiple schedules,
-website blocking) behind a subscription. Warden makes the whole feature set free and the
-code auditable — important for an app that, by design, needs deep device permissions.
+| Change | Details |
+|---|---|
+| **Hosts-list import** | Import blocklists such as [StevenBlack/hosts](https://github.com/StevenBlack/hosts) from a file on the phone or from an https URL. One-tap presets for StevenBlack *Unified* plus the *fakenews / gambling / porn / social* extensions. Every domain in an active list (and its subdomains) is blocked by the local DNS filter. URL lists refresh weekly. ~78 000 domains use about 1 MB of RAM. |
+| **New statistics dashboard** | Today / week / month view with screen-time bar charts, a top-apps ring chart, trends compared to the previous period, unlocks, number of blocked apps and websites, focus streak, and a per-app history. Works on narrow and wide screens. |
+| **In-app updates** | *Settings → Updates* checks this repository's latest GitHub Release, shows the release notes and downloads + installs the new version (after verifying it is signed with the same key). Optional daily check with a notification. |
+| **Automatic builds** | GitHub Actions run the tests on every push and build a signed release APK for every `v*` tag. See [`docs/RELEASING.md`](docs/RELEASING.md). |
+| **Narrow-screen fixes** | The schedule editor shows all seven weekdays on narrow phones (e.g. Galaxy Z Fold cover screen); bottom navigation labels no longer wrap. |
+| **Navigation fix** | You can always leave *Add apps* / *In-app feeds* (back arrow, *Done* button, back gesture). |
+| **Accessibility help** | On Android 13+ the setup screen explains how to unlock the "restricted setting" so app blocking can be enabled for an app installed from an APK. |
 
-## How blocking works
+The full original feature set (DNS-based website blocking, accessibility-based app blocking,
+mindful pause, per-app limits, schedules, strict mode, PIN lock, focus sessions, notification
+blocking, DoH blocking, …) is described in the
+[original README](https://github.com/ChristopherLaughlin/warden#readme) and in
+[`SPEC.md`](SPEC.md).
 
-Warden uses **two independent layers**, so there's no single point of bypass:
+## Install
 
-| Layer | Mechanism | Blocks |
-|-------|-----------|--------|
-| **Website filtering** | A local, on-device `VpnService` that intercepts DNS and blackholes queries for blocked domains. Non-blocked queries are forwarded to an upstream resolver. | Websites in **every** browser and app |
-| **App blocking** | An `AccessibilityService` detects when a blocked app comes to the foreground and shows a full-screen block screen. | Native apps |
+1. Download the newest `warden-plus-<version>.apk` from
+   **[Releases](https://github.com/desquerteur/warden-plus/releases/latest)**.
+2. Open it on your phone and allow *Install unknown apps* for the app you opened it with.
+   - If you have the original Warden or an older debug build of Warden+ installed, **uninstall
+     it first** — the package name is the same but the signing key differs.
+3. Grant the permissions in the setup screen (VPN, Accessibility, Usage access, Notifications).
+   - **Android 13+:** if the Accessibility switch is greyed out ("Restricted setting"), tap it
+     once, then open *Settings → Apps → Warden+ → ⋮ → Allow restricted settings*, and switch
+     Accessibility on again. The in-app setup screen walks you through this.
 
-The VPN is **local-only** — no traffic is proxied off-device, nothing is logged, and Warden
-adds itself to the disallowed-apps list so it never filters its own traffic. See
-[`SPEC.md`](SPEC.md) for the full architecture and privacy model.
-
-## Feature status
-
-**Implemented:**
-- [x] Website blocking via local DNS-filtering VPN (all browsers/apps, no root)
-- [x] App blocking via accessibility service
-- [x] **Mindful pause** (ScreenZen-style): breathe + intention prompt + wait, then earn
-      time-boxed access — *"Continue for 1 / 5 / 15 min"*
-- [x] **Per-app limits**: opens-per-day, daily time limit, cooldown between opens
-- [x] Installed-app picker + per-item config editor (hard block vs pause + limits)
-- [x] Full **schedule editor** (name, per-day toggles, start/end time pickers, overnight windows)
-- [x] **Strict mode** + **device-admin uninstall protection**
-- [x] **PIN lock** (PBKDF2, salted) gating settings and disabling
-- [x] **Focus streak** + screen-time dashboard ("track your wins")
-- [x] **In-app feed blocking** — block just Reels / Shorts / Explore / For You / Spotlight
-      while the rest of the app keeps working (accessibility node detection)
-- [x] **Protection-health indicator** — Home warns you (with one-tap re-arm) if the OS kills
-      the filter, so you're never *silently* unblocked (the #1 complaint about AppBlock & ScreenZen)
-- [x] **Never locks you out** — launcher, settings, dialer and Warden itself can't be blocked
-- [x] **Hardened security** — local-only DNS to *your* resolver, PBKDF2-310k PIN + lockout,
-      FLAG_SECURE + anti-tapjacking, no cleartext, no logging of domains. See [SECURITY.md](SECURITY.md)
-- [x] **Quick Settings tile** — one-tap blocking toggle from the shade (respects the PIN gate)
-- [x] **Focus sessions** — a Pomodoro-style timer that forces blocking on for a set duration
-      (optional strict mode with no early exit), independent of the master switch
-- [x] **Notification blocking** — silence notifications from blocked apps while blocking is active
-- [x] **DNS-over-HTTPS blocking** — optionally sinkhole encrypted-DNS resolvers to close the browser bypass
-- [x] **Always-on or schedule-only** modes, a first-run **setup** screen, app icons throughout,
-      and **data-loss-safe upgrades** (real Room migrations)
-- [x] Master on/off with VPN consent flow, restart-after-reboot
-
-**Roadmap (see `SPEC.md`):**
-- [ ] Conditions beyond time: Wi-Fi network, location, launch-count
-- [ ] Tune in-app feed detection signals against current app versions (needs real devices —
-      see [DEVICE_TESTING.md](DEVICE_TESTING.md))
-- [ ] Adult-content category blocking (curated domain lists)
-- [ ] Notification blocking for blocked apps during active windows
-- [ ] Quick-settings tile + Pomodoro focus sessions
-- [ ] Per-item schedule assignment
-- [ ] Import/export & optional end-to-end encrypted sync
-
-### How it compares
-| | AppBlock | ScreenZen | **Warden** |
-|---|---|---|---|
-| Website blocking (all apps) | ✓ | limited | ✓ (DNS VPN) |
-| App blocking | ✓ | ✓ | ✓ |
-| Mindful pause / intention | — | ✓ | ✓ |
-| In-app feed blocking (Reels/Shorts) | — | ✓ | ✓ |
-| Open/time/cooldown limits | ✓ | ✓ | ✓ |
-| Schedules | ✓ | ✓ | ✓ |
-| Strict mode + uninstall lock | ✓ | ✓ | ✓ |
-| Focus / Pomodoro sessions | — | ✓ | ✓ |
-| Notification blocking | ✓ | — | ✓ |
-| Encrypted-DNS (DoH) blocking | — | — | ✓ |
-| Warns when enforcement stops | — | — | ✓ |
-| Can't accidentally lock you out | — | — | ✓ |
-| Open-source & auditable | — | — | ✓ |
-| PIN lock | ✓ | — | ✓ |
-| Streaks | — | ✓ | ✓ |
-| Price | freemium | free | **free + open-source** |
+Later updates can be installed directly from *Settings → Updates* inside the app.
 
 ## Building
 
-You'll need the **JDK 17** and the **Android SDK** (both easiest via Android Studio).
+You need **JDK 17+** and the **Android SDK (API 34)** — easiest via Android Studio.
 
 ```bash
-# 1. Install Android Studio (bundles JDK + SDK):
-#    https://developer.android.com/studio
-# 2. Open this folder in Android Studio — it will sync Gradle and write local.properties.
-# 3. Or from the command line, once ANDROID_HOME points at your SDK:
-./gradlew assembleDebug
-./gradlew installDebug   # to a connected device / emulator
+./gradlew testDebugUnitTest assembleDebug   # app/build/outputs/apk/debug/app-debug.apk
 ```
 
-> This machine currently has no JDK or Android SDK installed — install Android Studio first.
+Signed release builds and the GitHub release workflow are described in
+[`docs/RELEASING.md`](docs/RELEASING.md). See [`SETUP.md`](SETUP.md) for running on a device.
 
-### Required permissions (all granted by the user, none abused)
-- **VPN consent** — for the local DNS filter (system dialog on first enable).
-- **Accessibility** — to detect the foreground app. Warden reads only the package name.
-- **Usage access** — for the screen-time dashboard.
-- **Notifications** — for the ongoing "blocking active" notice (required for a foreground service).
+## Staying in sync with upstream
 
-## Renaming
-
-Everything keys off `com.warden.blocker`. To rebrand: change `applicationId`/`namespace` in
-[`app/build.gradle.kts`](app/build.gradle.kts), the package folders, `rootProject.name` in
-[`settings.gradle.kts`](settings.gradle.kts), and `app_name` in `res/values/strings.xml`.
-Android Studio's *Refactor → Rename* handles the package move cleanly.
+```bash
+git remote add upstream https://github.com/ChristopherLaughlin/warden.git
+git fetch upstream
+git merge upstream/main
+```
 
 ## License
 
-[GPL-3.0](LICENSE) — Warden is free software; derivatives must stay free too.
-
-## Contributing
-
-Issues and PRs welcome. Please read `SPEC.md` first for the architecture and the privacy
-constraints that any change must preserve.
+[GPL-3.0](LICENSE), the same license as the original project. Warden+ is a modified version
+of Warden by Christopher Laughlin; the modifications are listed above and in the git history
+(everything after commit `ad62876`). See [`NOTICE`](NOTICE).

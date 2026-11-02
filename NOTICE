@@ -1,0 +1,17 @@
+Warden+
+Copyright (C) the Warden+ contributors
+
+This program is a modified version of "Warden"
+  https://github.com/ChristopherLaughlin/warden
+  Copyright (C) Christopher Laughlin and contributors
+
+Warden+ is NOT the original project and is not affiliated with or endorsed by it.
+
+Modifications (started 2026-11-02): hosts-list import, a new statistics dashboard,
+in-app updates from GitHub Releases, GitHub Actions build/release workflows,
+narrow-screen and navigation fixes, Android 13+ accessibility setup help.
+The exact changes are recorded in the git history after upstream commit ad62876.
+
+This program is free software: you can redistribute it and/or modify it under the terms
+of the GNU General Public License as published by the Free Software Foundation, either
+version 3 of the License, or (at your option) any later version. See the LICENSE file.

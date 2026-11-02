@@ -101,7 +101,9 @@ class AppBlockAccessibilityService : AccessibilityService() {
      * timer, no polling; it's cancelled as soon as another app comes to the front.
      */
     private suspend fun recheckWhenGrantEnds(pkg: String) {
-        val endsAt = wardenContainer.accessController.activeGrantEndsAt(pkg) ?: return
+        val repo = wardenContainer.repository
+        val item = repo.appItem(pkg) ?: return
+        val endsAt = repo.activeGrant(item.id, System.currentTimeMillis())?.expiresAt ?: return
         withContext(Dispatchers.Main) {
             if (lastPackage != pkg) return@withContext
             grantRecheck?.cancel()

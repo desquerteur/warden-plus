@@ -86,11 +86,16 @@ class SettingsStore(private val context: Context) {
         p[Keys.PROTECTION_OFF_EVENTS].orEmpty().mapNotNull { it.toLongOrNull() }.sorted()
     }
 
+    /**
+     * One "Force stop" ends the filter and accessibility at once; reports within 10 minutes
+     * of the last one count as the same switch-off.
+     */
     suspend fun recordProtectionOff(at: Long) =
         context.dataStore.edit { p ->
             val keep = at - 35L * 24 * 60 * 60_000L
-            p[Keys.PROTECTION_OFF_EVENTS] = (p[Keys.PROTECTION_OFF_EVENTS].orEmpty()
-                .filter { (it.toLongOrNull() ?: 0L) >= keep } + at.toString()).toSet()
+            val events = p[Keys.PROTECTION_OFF_EVENTS].orEmpty().filter { (it.toLongOrNull() ?: 0L) >= keep }
+            if (events.any { (it.toLongOrNull() ?: 0L) > at - 10 * 60_000L }) return@edit
+            p[Keys.PROTECTION_OFF_EVENTS] = (events + at.toString()).toSet()
         }.let { }
 
     /** Whether Warden's accessibility service has ever been connected — so its later absence

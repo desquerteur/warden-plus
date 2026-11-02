@@ -25,7 +25,7 @@ object AccessibilityAlert {
         !accessibilityOn && (usedBefore || blockingOn || hasBlockedApps)
 
     fun notifyTurnedOff(context: Context, afterUpdate: Boolean = true) {
-        val why = if (afterUpdate) "Android switched it off after the update" else "It was switched off in Android settings"
+        val why = if (afterUpdate) "Android switched it off after the update" else "It was switched off (by \"Force stop\" or in Android settings)"
         val pi = PendingIntent.getActivity(
             context, NOTIF_ID, MainActivity.requestIntent(context, openSetup = true),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,

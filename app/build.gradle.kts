@@ -44,8 +44,8 @@ android {
         targetSdk = 34
         // CI overrides both from the git tag: v1.2.3 -> versionName 1.2.3, versionCode 10203
         // (major*10000 + minor*100 + patch). The defaults follow the same scheme.
-        versionCode = providers.gradleProperty("versionCode").orNull?.toInt() ?: 300
-        versionName = providers.gradleProperty("versionName").orNull ?: "0.3.0"
+        versionCode = providers.gradleProperty("versionCode").orNull?.toInt() ?: 301
+        versionName = providers.gradleProperty("versionName").orNull ?: "0.3.1"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         // GitHub repository ("owner/name") the in-app updater checks for new releases.
         val updateRepo = providers.gradleProperty("updateRepo").orNull ?: "desquerteur/warden-plus"

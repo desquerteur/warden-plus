@@ -54,6 +54,9 @@ import com.warden.blocker.block.MAX_LOCK_DAYS
 import com.warden.blocker.block.ProtectionMode
 import com.warden.blocker.block.ProtectionSettings
 import com.warden.blocker.system.AdminManager
+import com.warden.blocker.owner.DeviceOwnerManager
+import com.warden.blocker.owner.OwnerPolicy
+import com.warden.blocker.owner.OwnerPrefs
 import com.warden.blocker.system.Hardening
 import com.warden.blocker.util.PermissionsHelper
 import com.warden.blocker.vpn.VpnController
@@ -108,6 +111,10 @@ fun ProtectionScreen(vm: WardenViewModel, onBack: () -> Unit, onOpenSetup: () ->
     val adminActive = remember(resumes, protection) { AdminManager.isActive(context) }
     val batteryOk = remember(resumes) { Hardening.ignoresBatteryOptimizations(context) }
     val accessibilityOn = remember(resumes) { PermissionsHelper.isAccessibilityEnabled(context) }
+    // As device owner ("Maximum protection" in Settings) uninstalling, Force stop and the always-on VPN
+    // are handled there; the device-admin switch here would do nothing.
+    val isOwner = remember(resumes) { DeviceOwnerManager.isDeviceOwner(context) }
+    val ownerPolicies by OwnerPrefs.get(context).policies.collectAsStateWithLifecycle()
 
     // Delay / Locked show their choices first; the mode switches once one is picked.
     var expanded by remember { mutableStateOf<ProtectionMode?>(null) }
@@ -195,12 +202,22 @@ fun ProtectionScreen(vm: WardenViewModel, onBack: () -> Unit, onOpenSetup: () ->
             PendingChangesCard(vm)
 
             Text("Keep Warden+ from being switched off", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-            CheckRow(
-                ok = adminActive,
-                title = "Uninstall protection",
-                text = "Android won't uninstall Warden+, and \"Force stop\" in App info is greyed out.",
-                action = if (adminActive) "Turn off" else "Turn on",
-            ) { if (adminActive) vm.disableUninstallProtection() else showAdminExplain = true }
+            if (isOwner) {
+                CheckRow(
+                    ok = true,
+                    title = "Uninstall protection",
+                    text = "Warden+ is device owner: it can't be uninstalled and \"Force stop\" is greyed out. " +
+                        "Managed under Settings → Maximum protection (with its emergency exit).",
+                    action = null,
+                )
+            } else {
+                CheckRow(
+                    ok = adminActive,
+                    title = "Uninstall protection",
+                    text = "Android won't uninstall Warden+, and \"Force stop\" in App info is greyed out.",
+                    action = if (adminActive) "Turn off" else "Turn on",
+                ) { if (adminActive) vm.disableUninstallProtection() else showAdminExplain = true }
+            }
             CheckRow(
                 ok = batteryOk,
                 title = "Battery: never put to sleep",
@@ -215,7 +232,14 @@ fun ProtectionScreen(vm: WardenViewModel, onBack: () -> Unit, onOpenSetup: () ->
                     context.startActivity(if (batteryOk) Hardening.appInfoIntent(context) else Hardening.batteryExemptionIntent(context))
                 }
             }
-            CheckRow(
+            if (isOwner && OwnerPolicy.ALWAYS_ON_VPN in ownerPolicies) {
+                CheckRow(
+                    ok = true,
+                    title = "Always-on VPN",
+                    text = "Kept on by Settings → Maximum protection (device owner).",
+                    action = null,
+                )
+            } else CheckRow(
                 ok = alwaysOnVpn == true,
                 title = "Always-on VPN",
                 text = when (alwaysOnVpn) {
@@ -241,9 +265,11 @@ fun ProtectionScreen(vm: WardenViewModel, onBack: () -> Unit, onOpenSetup: () ->
             )
             Text(
                 "Honest limits: no app can fully stop this. Turning off accessibility or the VPN in Android " +
-                    "settings, or uninstalling without uninstall protection, stays possible — and some phones " +
-                    "(e.g. Samsung's \"Active apps → Stop\") can still stop Warden+. Warden+ notices, tells you, " +
-                    "and counts it here and in Usage. Phone, Settings and your home screen are never blocked.",
+                    "settings stays possible, uninstall protection only adds a \"Deactivate & uninstall\" step, " +
+                    "and some phones (e.g. Samsung's \"Active apps → Stop\") can still stop Warden+. After a stop, " +
+                    "Android also switches app blocking (accessibility) off until you turn it on again. Warden+ " +
+                    "notices, tells you, and counts it here and in Usage. Phone, Settings and your home screen " +
+                    "are never blocked.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -344,7 +370,8 @@ private fun ModeOption(title: String, text: String, selected: Boolean, onClick: 
 
 /** A checklist line: ✓/✗, what it is, and a button to the right Android setting. */
 @Composable
-private fun CheckRow(ok: Boolean, title: String, text: String, action: String, onAction: () -> Unit) {
+/** [action] null: nothing to do here (e.g. managed by device-owner mode). */
+private fun CheckRow(ok: Boolean, title: String, text: String, action: String?, onAction: () -> Unit = {}) {
     Card(
         Modifier.fillMaxWidth(),
         colors = if (ok) CardDefaults.cardColors() else CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
@@ -352,7 +379,7 @@ private fun CheckRow(ok: Boolean, title: String, text: String, action: String, o
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text((if (ok) "✓ " else "✗ ") + title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
             Text(text, style = MaterialTheme.typography.bodySmall)
-            OutlinedButton(onClick = onAction) { Text(action) }
+            if (action != null) OutlinedButton(onClick = onAction) { Text(action) }
         }
     }
 }

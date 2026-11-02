@@ -40,7 +40,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.lifecycleScope
 import com.warden.blocker.block.LimitReason
+import com.warden.blocker.data.BlockType
 import com.warden.blocker.data.BlockedItem
+import com.warden.blocker.stats.StatsRecorder
 import com.warden.blocker.ui.theme.WardenTheme
 import com.warden.blocker.wardenContainer
 import kotlinx.coroutines.delay
@@ -64,6 +66,8 @@ class InterceptActivity : ComponentActivity() {
         val itemId = intent.getLongExtra(EXTRA_ITEM_ID, -1L)
         val reason = intent.getStringExtra(EXTRA_REASON)?.let { runCatching { LimitReason.valueOf(it) }.getOrNull() }
         val featureLabel = intent.getStringExtra(EXTRA_FEATURE_LABEL)
+        // Count each interception once — not again when the Fold unfolds or the screen rotates.
+        if (savedInstanceState == null) recordIntercept(kind, itemId, featureLabel)
 
         setContent {
             WardenTheme {
@@ -84,6 +88,18 @@ class InterceptActivity : ComponentActivity() {
                     }
                 }
             }
+        }
+    }
+
+    /** Feeds the stats dashboard; in-app feature blocks are keyed by feature, not package. */
+    private fun recordIntercept(kind: String, itemId: Long, featureLabel: String?) {
+        lifecycleScope.launch {
+            val key = if (kind == KIND_FEATURE) {
+                "feature:${featureLabel ?: "feed"}"
+            } else {
+                wardenContainer.repository.item(itemId)?.takeIf { it.type == BlockType.APP }?.value
+            }
+            key?.let { StatsRecorder.get(this@InterceptActivity).recordAppBlocked(it) }
         }
     }
 

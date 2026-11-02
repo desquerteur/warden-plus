@@ -47,6 +47,9 @@ import com.warden.blocker.data.BlockType
 import com.warden.blocker.data.BlockedItem
 import com.warden.blocker.data.InterceptMode
 import com.warden.blocker.ui.hosts.HostsListsEntryButton
+import com.warden.blocker.ui.times.SpanLabel
+import com.warden.blocker.ui.times.TimesViewModel
+import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlinx.coroutines.delay
 
 @Composable
@@ -55,6 +58,7 @@ fun BlocklistScreen(
     onOpenAppPicker: () -> Unit,
     onOpenFeatures: () -> Unit,
     onOpenHostsLists: () -> Unit,
+    timesVm: TimesViewModel = viewModel(),
 ) {
     val items by vm.items.collectAsStateWithLifecycle()
     val justAdded by vm.justAdded.collectAsStateWithLifecycle()
@@ -149,6 +153,7 @@ fun BlocklistScreen(
                     Column(Modifier.weight(1f)) {
                         Text(item.label, style = MaterialTheme.typography.titleMedium)
                         Text(itemSummary(item), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline)
+                        SpanLabel(item.activeFrom, item.activeUntil)
                     }
                     Switch(checked = item.enabled, onCheckedChange = { vm.toggleItem(item) })
                     IconButton(onClick = { vm.removeItem(item) }) { Icon(Icons.Filled.Delete, contentDescription = "Remove") }
@@ -160,7 +165,8 @@ fun BlocklistScreen(
     editing?.let { current ->
         ItemEditorSheet(
             item = current,
-            onSave = { vm.saveItem(it) },
+            // A shorter "until …" or a later "from …" asks Block protection first.
+            onSave = { timesVm.saveItem(current, it) { s -> vm.saveItem(s) } },
             onDismiss = { editing = null },
         )
     }

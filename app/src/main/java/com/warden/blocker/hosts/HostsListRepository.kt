@@ -3,6 +3,7 @@ package com.warden.blocker.hosts
 import android.content.Context
 import android.net.Uri
 import android.provider.OpenableColumns
+import com.warden.blocker.block.TimeWindows
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -64,9 +65,12 @@ class HostsListRepository(
     private val _progress = MutableStateFlow<ImportProgress?>(null)
     val progress: StateFlow<ImportProgress?> = _progress.asStateFlow()
 
-    /** Changes exactly when the set of blocked list-domains changes (toggle, refresh, delete). */
-    val activeKey: Flow<List<Pair<String, Long>>> =
-        _sources.map { list -> list.filter { it.enabled }.map { it.id to it.updatedAt } }.distinctUntilChanged()
+    /** Changes exactly when the set of blocked list-domains changes (toggle, refresh, delete,
+     *  a new "from … / until …" span; the span starting or ending is noticed by the VPN's clock). */
+    val activeKey: Flow<List<List<Any?>>> =
+        _sources.map { list ->
+            list.filter { it.enabled }.map { listOf(it.id, it.updatedAt, it.activeFrom, it.activeUntil) }
+        }.distinctUntilChanged()
 
     @Volatile private var cacheKey: List<Pair<String, Long>>? = null
     @Volatile private var cache: DomainHashSet? = null
@@ -153,6 +157,10 @@ class HostsListRepository(
     suspend fun setEnabled(id: String, enabled: Boolean) =
         updateMeta { list -> list.map { if (it.id == id) it.copy(enabled = enabled) else it } }
 
+    /** Limit when list [id] blocks (epoch millis, null = no limit). */
+    suspend fun setActiveSpan(id: String, from: Long?, until: Long?) =
+        updateMeta { list -> list.map { if (it.id == id) it.copy(activeFrom = from, activeUntil = until) else it } }
+
     suspend fun delete(id: String) {
         updateMeta { list -> list.filterNot { it.id == id } }
         withContext(Dispatchers.IO) { domainsFile(id).delete() }
@@ -161,13 +169,16 @@ class HostsListRepository(
     // --- Blocking ---
 
     /**
-     * All domains of enabled lists as one compact set (null if none). Built from the files
-     * on first use and cached until a list changes, so repeated VPN refreshes are free.
+     * All domains of enabled lists (inside their time span, if set) as one compact set (null
+     * if none). Built from the files on first use and cached until that set of lists changes,
+     * so repeated VPN refreshes are free — and a new set object means the lists changed.
      */
-    suspend fun activeDomainSet(): DomainHashSet? {
+    suspend fun activeDomainSet(now: Long = System.currentTimeMillis()): DomainHashSet? {
         ensureLoaded()
         return cacheLock.withLock {
-            val active = _sources.value.filter { it.enabled && it.domainCount > 0 }
+            val active = _sources.value.filter {
+                it.enabled && it.domainCount > 0 && TimeWindows.inEffect(it.activeFrom, it.activeUntil, now)
+            }
             val key = active.map { it.id to it.updatedAt }
             if (key == cacheKey) return@withLock cache
             cache = null // let the old set be collected before building the new one
@@ -269,6 +280,8 @@ class HostsListRepository(
                 domainCount = o.optInt("domainCount", 0),
                 updatedAt = o.optLong("updatedAt", 0L),
                 lastError = if (o.isNull("lastError")) null else o.optString("lastError"),
+                activeFrom = if (o.isNull("activeFrom")) null else o.optLong("activeFrom"),
+                activeUntil = if (o.isNull("activeUntil")) null else o.optLong("activeUntil"),
             )
         }
     }.getOrDefault(emptyList())
@@ -284,7 +297,9 @@ class HostsListRepository(
                     .put("enabled", s.enabled)
                     .put("domainCount", s.domainCount)
                     .put("updatedAt", s.updatedAt)
-                    .put("lastError", s.lastError ?: JSONObject.NULL),
+                    .put("lastError", s.lastError ?: JSONObject.NULL)
+                    .put("activeFrom", s.activeFrom ?: JSONObject.NULL)
+                    .put("activeUntil", s.activeUntil ?: JSONObject.NULL),
             )
         }
         val tmp = File(dir, "sources.json.tmp")

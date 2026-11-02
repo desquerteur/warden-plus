@@ -8,6 +8,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalIconButton
@@ -28,6 +30,8 @@ import androidx.compose.ui.unit.dp
 import com.warden.blocker.data.BlockType
 import com.warden.blocker.data.BlockedItem
 import com.warden.blocker.data.InterceptMode
+import com.warden.blocker.ui.times.SpanSection
+import com.warden.blocker.ui.times.spanValid
 
 /**
  * Bottom-sheet editor for a blocked item's enforcement: hard block vs mindful pause, and
@@ -42,10 +46,13 @@ fun ItemEditorSheet(item: BlockedItem, onSave: (BlockedItem) -> Unit, onDismiss:
     var openLimit by remember { mutableStateOf(item.openLimitPerDay) }
     var timeLimit by remember { mutableStateOf(item.dailyLimitMinutes) }
     var cooldown by remember { mutableStateOf(item.cooldownMinutes) }
+    var activeFrom by remember { mutableStateOf(item.activeFrom) }
+    var activeUntil by remember { mutableStateOf(item.activeUntil) }
 
     ModalBottomSheet(onDismissRequest = onDismiss) {
         Column(
-            Modifier.padding(20.dp).padding(bottom = 24.dp),
+            // Scrolls: with the time limit the sheet is taller than a fold cover display.
+            Modifier.verticalScroll(rememberScrollState()).padding(20.dp).padding(bottom = 24.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
             Text(item.label, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
@@ -74,8 +81,11 @@ fun ItemEditorSheet(item: BlockedItem, onSave: (BlockedItem) -> Unit, onDismiss:
                 )
             }
 
+            SpanSection(activeFrom, activeUntil) { f, u -> activeFrom = f; activeUntil = u }
+
             Spacer(Modifier.height(4.dp))
             Button(
+                enabled = spanValid(activeFrom, activeUntil),
                 onClick = {
                     onSave(
                         item.copy(
@@ -85,6 +95,8 @@ fun ItemEditorSheet(item: BlockedItem, onSave: (BlockedItem) -> Unit, onDismiss:
                             openLimitPerDay = openLimit,
                             dailyLimitMinutes = timeLimit,
                             cooldownMinutes = cooldown,
+                            activeFrom = activeFrom,
+                            activeUntil = activeUntil,
                         ),
                     )
                     onDismiss()

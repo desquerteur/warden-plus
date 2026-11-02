@@ -3,6 +3,7 @@ package com.warden.blocker.ui
 import com.warden.blocker.block.ScheduleEvaluator
 import com.warden.blocker.data.Schedule
 import com.warden.blocker.hosts.HostsSource
+import com.warden.blocker.ui.times.dateTimeLabel
 import java.util.Calendar
 
 /**
@@ -19,9 +20,15 @@ internal fun blockingHeadline(
     is24Hour: Boolean,
 ): String {
     val nowMillis = now.timeInMillis
+    // Longer than an hour ("Block until Sunday 18:00") reads better as an end time.
+    if (focusEndsAt - nowMillis > 60 * 60_000L) return "Blocked until ${dayAndTime(focusEndsAt, now, is24Hour)}"
     if (focusEndsAt > nowMillis) return "Focus session – ${durationLeft(focusEndsAt - nowMillis)} left"
     if (!masterEnabled) return "Blocking is OFF"
-    if (alwaysOn || ScheduleEvaluator.anyActive(schedules, now)) return "Blocking is ON"
+    if (alwaysOn) return "Blocking is ON"
+    if (ScheduleEvaluator.anyActive(schedules, now)) {
+        val until = ScheduleEvaluator.activeUntil(schedules, now) ?: return "Blocking is ON"
+        return "Blocked until ${dayAndTime(until, now, is24Hour)}"
+    }
     val next = ScheduleEvaluator.nextStart(schedules, now) ?: return "On – no schedule set"
     return "On – waiting for schedule (next: ${dayAndTime(next, now, is24Hour)})"
 }
@@ -36,15 +43,13 @@ internal fun durationLeft(millis: Long): String {
     }
 }
 
-private val WEEKDAYS = listOf("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
+/** "today 09:00", "Mon 09:00", "Mon 17 Nov 09:00" (more than six days ahead) or, with a
+ *  12-hour clock, "Mon 9:00 AM". */
+internal fun dayAndTime(at: Calendar, now: Calendar, is24Hour: Boolean): String =
+    dayAndTime(at.timeInMillis, now, is24Hour)
 
-/** "today 09:00", "Mon 09:00" or, with a 12-hour clock, "Mon 9:00 AM". */
-internal fun dayAndTime(at: Calendar, now: Calendar, is24Hour: Boolean): String {
-    val sameDay = at.get(Calendar.YEAR) == now.get(Calendar.YEAR) &&
-        at.get(Calendar.DAY_OF_YEAR) == now.get(Calendar.DAY_OF_YEAR)
-    val day = if (sameDay) "today" else WEEKDAYS[(at.get(Calendar.DAY_OF_WEEK) + 5) % 7]
-    return "$day ${clockTime(at.get(Calendar.HOUR_OF_DAY) * 60 + at.get(Calendar.MINUTE), is24Hour)}"
-}
+internal fun dayAndTime(at: Long, now: Calendar, is24Hour: Boolean): String =
+    dateTimeLabel(at, now.timeInMillis, now.timeZone.toZoneId(), is24Hour)
 
 /** Minutes since midnight as "17:00" or "5:00 PM", following the phone's 12/24-hour setting. */
 internal fun clockTime(minuteOfDay: Int, is24Hour: Boolean): String {

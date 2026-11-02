@@ -38,12 +38,33 @@ class BlockEngine(
      * Pass [active] when the caller has just evaluated [isBlockingActiveNow] itself.
      */
     suspend fun blocklist(active: Boolean? = null): DomainMatcher {
-        if (!(active ?: isBlockingActiveNow())) return DomainMatcher.EMPTY
-        return DomainMatcher(manualAndDohDomains(), listDomains())
+        if (!(active ?: isBlockingActiveNow())) {
+            builtTimed = null
+            return DomainMatcher.EMPTY
+        }
+        val now = System.currentTimeMillis()
+        val lists = listDomains()
+        builtTimed = BuiltTimed(repo.timedItemsInEffect(now), lists)
+        return DomainMatcher(manualAndDohDomains(now), lists)
     }
 
-    private suspend fun manualAndDohDomains(): List<String> {
-        val domains = repo.enabledDomains().toMutableList()
+    /** What time-limited content the last active [blocklist] contained (null = built inactive). */
+    private class BuiltTimed(val itemIds: List<Long>, val lists: DomainHashSet?)
+
+    @Volatile private var builtTimed: BuiltTimed? = null
+
+    /**
+     * True when an entry or hosts list with a "from … / until …" span started or stopped
+     * blocking since the last [blocklist] — the VPN's clock then rebuilds, like it does when a
+     * schedule starts or ends. A new list set object means the active lists changed.
+     */
+    suspend fun timedContentChanged(now: Long = System.currentTimeMillis()): Boolean {
+        val built = builtTimed ?: return false
+        return built.itemIds != repo.timedItemsInEffect(now) || built.lists !== listDomains()
+    }
+
+    private suspend fun manualAndDohDomains(now: Long = System.currentTimeMillis()): List<String> {
+        val domains = repo.enabledDomains(now).toMutableList()
         if (settings.blockDoh.first()) domains += DohHosts.ALL
         return domains
     }

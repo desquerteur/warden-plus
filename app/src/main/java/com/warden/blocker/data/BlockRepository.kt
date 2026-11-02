@@ -1,5 +1,6 @@
 package com.warden.blocker.data
 
+import com.warden.blocker.block.TimeWindows
 import kotlinx.coroutines.flow.Flow
 import java.util.Calendar
 
@@ -9,13 +10,30 @@ class BlockRepository(private val dao: BlockDao) {
     val items: Flow<List<BlockedItem>> = dao.observeItems()
     val schedules: Flow<List<Schedule>> = dao.observeSchedules()
 
-    suspend fun enabledDomains(): List<String> =
-        dao.enabledItemsOfType(BlockType.WEBSITE).map { it.value.lowercase().removePrefix("www.") }
+    /** Domains to block right now: enabled, and inside their "from … / until …" span if set. */
+    suspend fun enabledDomains(now: Long = System.currentTimeMillis()): List<String> =
+        dao.enabledItemsOfType(BlockType.WEBSITE)
+            .filter { TimeWindows.inEffect(it, now) }
+            .map { it.value.lowercase().removePrefix("www.") }
 
     suspend fun enabledApps(): List<BlockedItem> = dao.enabledItemsOfType(BlockType.APP)
 
-    suspend fun appItem(packageName: String): BlockedItem? =
-        dao.itemByValue(BlockType.APP, packageName)
+    /**
+     * The blocklist entry for [packageName] if it blocks at [now] — null outside its
+     * "from … / until …" span, so blocking decisions let the app through. Use [findApp] to
+     * look an entry up regardless of time.
+     */
+    suspend fun appItem(packageName: String, now: Long = System.currentTimeMillis()): BlockedItem? =
+        dao.itemByValue(BlockType.APP, packageName)?.takeIf { TimeWindows.inEffect(it, now) }
+
+    suspend fun findApp(packageName: String): BlockedItem? = dao.itemByValue(BlockType.APP, packageName)
+
+    /**
+     * Ids of the enabled entries with a time limit that block at [now]. Changes exactly when
+     * such an entry starts or stops blocking, so the VPN knows to rebuild its list.
+     */
+    suspend fun timedItemsInEffect(now: Long): List<Long> =
+        dao.enabledTimedItems().filter { TimeWindows.inEffect(it, now) }.map { it.id }
 
     suspend fun websiteItem(domain: String): BlockedItem? =
         dao.itemByValue(BlockType.WEBSITE, domain)

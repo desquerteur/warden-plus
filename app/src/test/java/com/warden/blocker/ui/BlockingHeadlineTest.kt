@@ -40,8 +40,25 @@ class BlockingHeadlineTest {
         assertEquals("Blocking is OFF", headline(enabled = false, focusEndsAt = now.timeInMillis, now = now))
     }
 
-    @Test fun duringAScheduleItIsOn() {
-        assertEquals("Blocking is ON", headline(alwaysOn = false, schedules = listOf(work), now = monday(10)))
+    @Test fun duringAScheduleItSaysUntilWhen() {
+        assertEquals("Blocked until today 17:00", headline(alwaysOn = false, schedules = listOf(work), now = monday(10)))
+        // "Always on" has no end.
+        assertEquals("Blocking is ON", headline(alwaysOn = true, schedules = listOf(work), now = monday(10)))
+    }
+
+    @Test fun longBlockUntilShowsTheEnd() {
+        val now = monday(12)
+        val sunday18 = monday(18).apply { add(Calendar.DAY_OF_YEAR, 6) }.timeInMillis
+        assertEquals("Blocked until Sun 18:00", headline(enabled = false, focusEndsAt = sunday18, now = now))
+    }
+
+    @Test fun oneTimeBlockFarAheadShowsTheDate() {
+        val start = monday(9).apply { add(Calendar.DAY_OF_YEAR, 14) }.timeInMillis
+        val trip = Schedule(id = 5, name = "Trip", daysMask = 0, startMinute = 0, endMinute = 0, onceStartAt = start, onceEndAt = start + 3_600_000L)
+        assertEquals(
+            "On – waiting for schedule (next: Mon 17 Nov 09:00)",
+            headline(alwaysOn = false, schedules = listOf(trip), now = monday(12)),
+        )
     }
 
     @Test fun outsideTheSchedulesItWaits() {

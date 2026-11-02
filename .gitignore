@@ -13,3 +13,8 @@ local.properties
 !debug.keystore
 /app/build/
 /app/release/
+
+# Release signing (see docs/RELEASING.md) — never commit keys or passwords.
+keystore.properties
+*.jks
+github-secrets.txt

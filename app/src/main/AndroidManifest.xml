@@ -11,6 +11,8 @@
     <!-- Usage stats + accessibility are special-access permissions granted via Settings, not requestable at runtime. -->
     <uses-permission android:name="android.permission.PACKAGE_USAGE_STATS"
         tools:ignore="ProtectedPermissions" />
+    <!-- In-app updater: hand downloaded Warden+ releases to the system installer (user confirms). -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
     <!-- Least privilege: see only launchable apps (for the picker) and the launcher (to keep
          it un-blockable) instead of requesting QUERY_ALL_PACKAGES. -->
@@ -130,5 +132,9 @@
                 <action android:name="android.app.action.DEVICE_ADMIN_ENABLED" />
             </intent-filter>
         </receiver>
+        <!-- Result of the in-app update install session (PackageInstaller). -->
+        <receiver
+            android:name=".update.InstallResultReceiver"
+            android:exported="false" />
     </application>
 </manifest>

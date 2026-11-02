@@ -1,0 +1,149 @@
+name: Release
+
+# Builds a signed release APK and publishes it as a GitHub release.
+# Trigger: push a tag like v1.2.3, or run manually (Actions -> Release -> Run workflow).
+# Setup and signing secrets: see docs/RELEASING.md.
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to release, e.g. 1.2.3 (creates the tag v1.2.3 on the selected branch)"
+        required: true
+        type: string
+
+permissions:
+  contents: write # create the release and upload the APK
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Build and publish signed APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Work out version
+        id: version
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_VERSION: ${{ inputs.version }}
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then raw="$INPUT_VERSION"; else raw="$REF_NAME"; fi
+          version="${raw#v}"
+          if [[ ! "$version" =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
+            echo "::error title=Invalid version::'$raw' is not a version like v1.2.3 (only MAJOR.MINOR.PATCH is supported)."
+            exit 1
+          fi
+          major=$((10#${BASH_REMATCH[1]})); minor=$((10#${BASH_REMATCH[2]})); patch=$((10#${BASH_REMATCH[3]}))
+          if [ "$minor" -gt 99 ] || [ "$patch" -gt 99 ] || [ "$major" -gt 200000 ]; then
+            echo "::error title=Invalid version::minor and patch must be 0-99 (versionCode = major*10000 + minor*100 + patch)."
+            exit 1
+          fi
+          if [ "$version" != "$major.$minor.$patch" ]; then
+            echo "::error title=Invalid version::Write '$raw' without leading zeros, e.g. v$major.$minor.$patch."
+            exit 1
+          fi
+          code=$((major * 10000 + minor * 100 + patch))
+          if [ "$code" -lt 1 ]; then
+            echo "::error title=Invalid version::0.0.0 is not a valid release version."
+            exit 1
+          fi
+          echo "Releasing $version (versionCode $code)"
+          {
+            echo "name=$version"
+            echo "code=$code"
+            echo "tag=v$version"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Check signing secrets
+        env:
+          WARDEN_KEYSTORE_BASE64: ${{ secrets.WARDEN_KEYSTORE_BASE64 }}
+          WARDEN_KEYSTORE_PASSWORD: ${{ secrets.WARDEN_KEYSTORE_PASSWORD }}
+          WARDEN_KEY_ALIAS: ${{ secrets.WARDEN_KEY_ALIAS }}
+          WARDEN_KEY_PASSWORD: ${{ secrets.WARDEN_KEY_PASSWORD }}
+        run: |
+          missing=""
+          for name in WARDEN_KEYSTORE_BASE64 WARDEN_KEYSTORE_PASSWORD WARDEN_KEY_ALIAS WARDEN_KEY_PASSWORD; do
+            if [ -z "${!name}" ]; then missing="$missing $name"; fi
+          done
+          if [ -n "$missing" ]; then
+            echo "::error title=Signing secrets missing::Missing repository secrets:$missing. Run scripts/create-signing-key.ps1 and add the values under Settings -> Secrets and variables -> Actions (see docs/RELEASING.md)."
+            exit 1
+          fi
+
+      - name: Check out
+        uses: actions/checkout@v7.0.1
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v6.1.0
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v4.0.4
+
+      - name: Set up Gradle (with cache)
+        uses: gradle/actions/setup-gradle@v6.4.1
+        with:
+          cache-read-only: true
+
+      - name: Decode keystore
+        env:
+          WARDEN_KEYSTORE_BASE64: ${{ secrets.WARDEN_KEYSTORE_BASE64 }}
+        run: |
+          keystore="$RUNNER_TEMP/warden-release.jks"
+          printf '%s' "$WARDEN_KEYSTORE_BASE64" | tr -d ' \r\n' | base64 --decode > "$keystore"
+          if [ ! -s "$keystore" ]; then
+            echo "::error title=Invalid keystore::WARDEN_KEYSTORE_BASE64 could not be decoded."
+            exit 1
+          fi
+          echo "WARDEN_KEYSTORE_FILE=$keystore" >> "$GITHUB_ENV"
+
+      - name: Run unit tests and build signed release APK
+        env:
+          WARDEN_KEYSTORE_PASSWORD: ${{ secrets.WARDEN_KEYSTORE_PASSWORD }}
+          WARDEN_KEY_ALIAS: ${{ secrets.WARDEN_KEY_ALIAS }}
+          WARDEN_KEY_PASSWORD: ${{ secrets.WARDEN_KEY_PASSWORD }}
+          VERSION_NAME: ${{ steps.version.outputs.name }}
+          VERSION_CODE: ${{ steps.version.outputs.code }}
+        run: >-
+          ./gradlew --no-daemon testDebugUnitTest assembleRelease
+          -PversionName="$VERSION_NAME" -PversionCode="$VERSION_CODE"
+
+      - name: Verify signature and rename APK
+        env:
+          VERSION_NAME: ${{ steps.version.outputs.name }}
+        run: |
+          apk="app/build/outputs/apk/release/app-release.apk"
+          if [ ! -f "$apk" ]; then
+            echo "::error title=APK missing::$apk was not built (is the release build signed?)."
+            exit 1
+          fi
+          build_tools="$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -n 1)"
+          "$build_tools/apksigner" verify --print-certs "$apk"
+          mkdir -p dist
+          cp "$apk" "dist/warden-plus-$VERSION_NAME.apk"
+          (cd dist && sha256sum "warden-plus-$VERSION_NAME.apk" > "warden-plus-$VERSION_NAME.apk.sha256")
+
+      - name: Publish GitHub release
+        uses: softprops/action-gh-release@v2.6.2
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: Warden+ ${{ steps.version.outputs.name }}
+          target_commitish: ${{ github.sha }}
+          generate_release_notes: true
+          fail_on_unmatched_files: true
+          files: |
+            dist/warden-plus-${{ steps.version.outputs.name }}.apk
+            dist/warden-plus-${{ steps.version.outputs.name }}.apk.sha256
+
+      - name: Remove keystore
+        if: always()
+        run: rm -f "$RUNNER_TEMP/warden-release.jks"

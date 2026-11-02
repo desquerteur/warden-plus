@@ -26,7 +26,7 @@ object ProtectionWatch {
     private const val LAST_BEAT = "last_beat"
     private const val CLEAN_STOP = "clean_stop"
     private const val A11Y_ON = "a11y_on"
-    private const val NOTIF_ID = 1003
+    private const val NOTIF_ID = NotificationIds.PROTECTION_WATCH
 
     /** Gaps up to this long are normal (a minute between beats, a slow restart). */
     const val MIN_GAP_MS = 3 * 60_000L

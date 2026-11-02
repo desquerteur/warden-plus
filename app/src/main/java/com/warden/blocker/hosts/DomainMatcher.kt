@@ -5,15 +5,15 @@ package com.warden.blocker.hosts
  * the manual list ([exact]) or in an imported hosts list ([lists]). Work is O(number of
  * labels) — one hash lookup per suffix — no matter how many domains are blocked.
  */
-class DomainMatcher(
+open class DomainMatcher(
     exactDomains: Collection<String>,
     private val lists: DomainHashSet? = null,
 ) {
     private val exact: Set<String> = exactDomains.mapTo(HashSet()) { it.lowercase().removeSuffix(".") }
 
-    val isEmpty: Boolean get() = exact.isEmpty() && (lists == null || lists.size == 0)
+    open val isEmpty: Boolean get() = exact.isEmpty() && (lists == null || lists.size == 0)
 
-    fun isBlocked(host: String): Boolean {
+    open fun isBlocked(host: String): Boolean {
         if (isEmpty) return false
         val h = host.lowercase().removeSuffix(".")
         var start = 0

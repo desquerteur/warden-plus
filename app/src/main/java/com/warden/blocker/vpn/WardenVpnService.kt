@@ -15,6 +15,7 @@ import com.warden.blocker.WardenApp
 import com.warden.blocker.block.BlockStateClock
 import com.warden.blocker.hosts.DomainMatcher
 import com.warden.blocker.stats.StatsRecorder
+import com.warden.blocker.system.NotificationIds
 import com.warden.blocker.system.ProtectionWatch
 import com.warden.blocker.wardenContainer
 import kotlinx.coroutines.CoroutineScope
@@ -139,6 +140,7 @@ class WardenVpnService : VpnService() {
         val inputs = listOf<Flow<Any?>>(
             c.repository.items, c.repository.schedules, c.hostsLists.activeKey,
             c.settings.blockDoh, c.settings.masterEnabled, c.settings.alwaysOn, c.settings.focusEndsAt,
+            c.allowStore.config,
         ).map { it.distinctUntilChanged() } // settings flows re-emit on every unrelated pref write
         combine(inputs) { }
             .drop(1) // the initial values are covered by the refresh before the packet loop
@@ -154,7 +156,9 @@ class WardenVpnService : VpnService() {
             val focusEndsAt = runCatching { c.settings.focusEndsAt.first() }.getOrDefault(0L)
             delay(BlockStateClock.delayUntilNextCheck(System.currentTimeMillis(), focusEndsAt))
             val active = runCatching { c.blockEngine.isBlockingActiveNow() }.getOrNull() ?: continue
-            if (BlockStateClock.needsRebuild(builtForActive, active)) refreshBlocklist()
+            // Website "Allow only" limited to schedules/focus can start or end while blocking stays on.
+            val allowOnlyFlipped = active && runCatching { c.allowGate.webModeStale() }.getOrDefault(false)
+            if (BlockStateClock.needsRebuild(builtForActive, active) || allowOnlyFlipped) refreshBlocklist()
             ProtectionWatch.beat(this@WardenVpnService)
             runCatching { ProtectionWatch.checkAccessibility(this@WardenVpnService) }
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) _alwaysOn.value = isAlwaysOn
@@ -330,6 +334,6 @@ class WardenVpnService : VpnService() {
         // Used only if the OS exposes no resolver (rare); prefer the device's own DNS.
         private const val FALLBACK_DNS = "1.1.1.1"
         private const val MTU = 32767
-        private const val NOTIF_ID = 1001
+        private const val NOTIF_ID = NotificationIds.VPN
     }
 }

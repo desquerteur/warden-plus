@@ -1,5 +1,6 @@
 package com.warden.blocker.block
 
+import com.warden.blocker.allow.AllowEdit
 import com.warden.blocker.data.BlockType
 import com.warden.blocker.data.BlockedItem
 import com.warden.blocker.data.InterceptMode
@@ -29,6 +30,8 @@ sealed class ProtectedChange(val kind: Loosening) {
     data object DisableUninstallProtection : ProtectedChange(Loosening.DISABLE_UNINSTALL_PROTECTION)
     data class ChangePin(val hash: String, val salt: String) : ProtectedChange(Loosening.CHANGE_PIN)
     data object RemovePin : ProtectedChange(Loosening.REMOVE_PIN)
+    /** A loosening of "Allow only" or the category blocks (see [com.warden.blocker.allow.AllowPolicy.loosenings]). */
+    data class LoosenAllow(val edit: AllowEdit) : ProtectedChange(Loosening.LOOSEN_ALLOW)
 
     enum class Setting(val label: String) { ALWAYS_ON("Always on"), BLOCK_DOH("Block DNS-over-HTTPS"), BLOCK_NOTIFICATIONS("Block notifications") }
 
@@ -48,6 +51,7 @@ sealed class ProtectedChange(val kind: Loosening) {
         DisableUninstallProtection -> "Uninstall protection will be turned off"
         is ChangePin -> "Your PIN will change"
         RemovePin -> "Your PIN will be removed"
+        is LoosenAllow -> edit.describe()
     }
 
     /** Stable names (not class names, which a minified build would rename). */
@@ -66,6 +70,7 @@ sealed class ProtectedChange(val kind: Loosening) {
         DisableUninstallProtection -> "DisableUninstallProtection"
         is ChangePin -> "ChangePin"
         RemovePin -> "RemovePin"
+        is LoosenAllow -> "LoosenAllow"
     }
 
     fun toJson(): JSONObject = JSONObject().put("type", typeName()).also { o ->
@@ -82,6 +87,7 @@ sealed class ProtectedChange(val kind: Loosening) {
             is SetProtection -> o.put("mode", settings.mode.name)
                 .put("delay", settings.delayMinutes).put("until", settings.lockedUntil)
             is ChangePin -> o.put("hash", hash).put("salt", salt)
+            is LoosenAllow -> o.put("edit", edit.toJson())
         }
     }
 
@@ -105,6 +111,7 @@ sealed class ProtectedChange(val kind: Loosening) {
                     ProtectionSettings(ProtectionMode.valueOf(o.getString("mode")), o.getInt("delay"), o.getLong("until")),
                 )
                 "ChangePin" -> ChangePin(o.getString("hash"), o.getString("salt"))
+                "LoosenAllow" -> LoosenAllow(AllowEdit.fromJson(o.getJSONObject("edit")))
                 else -> null
             }
         }.getOrNull()

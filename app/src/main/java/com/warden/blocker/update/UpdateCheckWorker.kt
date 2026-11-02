@@ -18,6 +18,7 @@ import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import com.warden.blocker.R
+import com.warden.blocker.system.NotificationIds
 import java.util.concurrent.TimeUnit
 
 /** Once a day: looks for a new GitHub release and posts a notification for it (once per version). */
@@ -68,7 +69,7 @@ class UpdateCheckWorker(context: Context, params: WorkerParameters) : CoroutineW
     companion object {
         private const val UNIQUE = "update_check"
         private const val CHANNEL_ID = "warden_updates"
-        private const val NOTIFICATION_ID = 4201
+        private const val NOTIFICATION_ID = NotificationIds.UPDATE
 
         /** Starts or stops the daily check to match [UpdatePrefs.autoCheck]. Safe to call often. */
         fun sync(context: Context) {

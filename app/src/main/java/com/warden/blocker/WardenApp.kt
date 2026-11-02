@@ -3,6 +3,10 @@ package com.warden.blocker
 import android.app.Application
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import com.warden.blocker.allow.AllowGate
+import com.warden.blocker.allow.AllowStore
+import com.warden.blocker.allow.InstalledAppsInfo
+import com.warden.blocker.allow.NewAppWatcher
 import com.warden.blocker.block.AccessController
 import com.warden.blocker.block.BlockEngine
 import com.warden.blocker.system.ProtectionGuard
@@ -11,6 +15,7 @@ import com.warden.blocker.data.SettingsStore
 import com.warden.blocker.data.WardenDatabase
 import com.warden.blocker.hosts.HostsListRepository
 import com.warden.blocker.update.UpdateCheckWorker
+import com.warden.blocker.usage.AppsHelper
 import com.warden.blocker.usage.UsageStatsHelper
 
 /**
@@ -26,6 +31,7 @@ class WardenApp : Application() {
     override fun onCreate() {
         super.onCreate()
         container = AppContainer(this)
+        container.newAppWatcher.start()
         createNotificationChannel()
         UpdateCheckWorker.sync(this)
     }
@@ -51,11 +57,17 @@ class AppContainer(app: Application) {
     val settings = SettingsStore(app)
     val repository = BlockRepository(WardenDatabase.get(app).blockDao())
     val hostsLists = HostsListRepository(app)
-    val blockEngine = BlockEngine(repository, settings) { hostsLists.activeDomainSet() }
+    val allowStore = AllowStore(app)
+    val installedApps = InstalledAppsInfo(app)
+    val allowGate = AllowGate(allowStore, settings, repository, installedApps) { AppsHelper.labelFor(app, it) }
+    val newAppWatcher = NewAppWatcher(app, allowStore, installedApps)
+    val blockEngine = BlockEngine(repository, settings, { hostsLists.activeDomainSet() }, allowGate::webMatcher)
     val protection = ProtectionGuard(app, this)
-    val accessController = AccessController(repository, blockEngine) { pkg ->
-        UsageStatsHelper.todayUsageMinutesFor(app, pkg)
-    }
+    val accessController = AccessController(
+        repository, blockEngine,
+        usageMinutesToday = { pkg -> UsageStatsHelper.todayUsageMinutesFor(app, pkg) },
+        allowGate = allowGate::appDecision,
+    )
 }
 
 /** Convenience accessor from any Context. */

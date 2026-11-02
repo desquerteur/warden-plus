@@ -46,6 +46,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.warden.blocker.data.BlockType
 import com.warden.blocker.data.BlockedItem
 import com.warden.blocker.data.InterceptMode
+import com.warden.blocker.ui.allow.AllowEntryButtons
 import com.warden.blocker.ui.hosts.HostsListsEntryButton
 import kotlinx.coroutines.delay
 
@@ -55,6 +56,8 @@ fun BlocklistScreen(
     onOpenAppPicker: () -> Unit,
     onOpenFeatures: () -> Unit,
     onOpenHostsLists: () -> Unit,
+    onOpenAllowOnly: () -> Unit = {},
+    onOpenCategories: () -> Unit = {},
 ) {
     val items by vm.items.collectAsStateWithLifecycle()
     val justAdded by vm.justAdded.collectAsStateWithLifecycle()
@@ -129,6 +132,8 @@ fun BlocklistScreen(
                 OutlinedButton(onClick = onOpenFeatures, modifier = Modifier.fillMaxWidth()) { Text("Block in-app feeds (Reels, Shorts…)") }
                 Spacer(Modifier.height(8.dp))
                 HostsListsEntryButton(onClick = onOpenHostsLists)
+                Spacer(Modifier.height(8.dp))
+                AllowEntryButtons(onOpenAllowOnly, onOpenCategories)
                 Spacer(Modifier.height(8.dp))
                 if (items.isEmpty()) {
                     Text("Nothing blocked yet — add a website above or tap “Add apps”.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.outline)

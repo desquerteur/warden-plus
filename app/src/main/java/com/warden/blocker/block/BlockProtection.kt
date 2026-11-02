@@ -23,6 +23,8 @@ enum class Loosening {
     DISABLE_UNINSTALL_PROTECTION,
     CHANGE_PIN,
     REMOVE_PIN,
+    /** "Allow only" back to the block list, adding to an allow list, a category off, "not a game" … */
+    LOOSEN_ALLOW,
 }
 
 /**

@@ -160,6 +160,7 @@ class ProtectionGuard(private val context: Context, private val c: AppContainer)
                 ProtectedChange.Setting.BLOCK_DOH -> s.setBlockDoh(false)
                 ProtectedChange.Setting.BLOCK_NOTIFICATIONS -> s.setBlockNotifications(false)
             }
+            is ProtectedChange.LoosenAllow -> c.allowStore.update(change.edit::applyTo)
             is ProtectedChange.SetProtection -> s.setProtection(change.settings)
             ProtectedChange.DisableUninstallProtection -> AdminManager.disable(context)
             is ProtectedChange.ChangePin -> s.setPin(change.hash, change.salt)

@@ -64,6 +64,8 @@ import com.warden.blocker.ui.SchedulesScreen
 import com.warden.blocker.ui.SettingsScreen
 import com.warden.blocker.ui.SetupScreen
 import com.warden.blocker.ui.WardenViewModel
+import com.warden.blocker.ui.allow.AllowOnlyScreen
+import com.warden.blocker.ui.allow.CategoriesScreen
 import com.warden.blocker.ui.hosts.HostsListsScreen
 import com.warden.blocker.ui.stats.StatsDashboard
 import com.warden.blocker.ui.theme.WardenTheme
@@ -370,12 +372,16 @@ private fun WardenScaffold(
                         onOpenAppPicker = { navController.navigate("apppicker") },
                         onOpenFeatures = { navController.navigate("features") },
                         onOpenHostsLists = { navController.navigate("hostslists") },
+                        onOpenAllowOnly = { navController.navigate("allowonly") },
+                        onOpenCategories = { navController.navigate("categories") },
                     )
                 }
             }
             composable("apppicker") { AppPickerScreen(vm, onBack = { leave("apppicker") }) }
             composable("features") { FeaturesScreen(vm, onBack = { leave("features") }) }
             composable("hostslists") { HostsListsScreen(onBack = { leave("hostslists") }) }
+            composable("allowonly") { AllowOnlyScreen(onBack = { leave("allowonly") }) }
+            composable("categories") { CategoriesScreen(onBack = { leave("categories") }) }
             composable(Tab.SCHEDULES.route) { TabContent(Tab.SCHEDULES, reselected) { SchedulesScreen(vm) } }
             composable(Tab.STATS.route) { TabContent(Tab.STATS, reselected) { StatsDashboard() } }
             composable(Tab.SETTINGS.route) {

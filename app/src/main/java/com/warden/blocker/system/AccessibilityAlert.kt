@@ -14,7 +14,7 @@ import com.warden.blocker.WardenApp
  */
 object AccessibilityAlert {
 
-    private const val NOTIF_ID = 1002
+    private const val NOTIF_ID = NotificationIds.ACCESSIBILITY
 
     /**
      * Whether a missing accessibility service is worth an alarm: it was in use before, or the

@@ -38,6 +38,9 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.warden.blocker.block.Loosening
 import com.warden.blocker.system.AdminManager
+import com.warden.blocker.ui.tour.RestartGuidesButton
+import com.warden.blocker.ui.tour.TourIds
+import com.warden.blocker.ui.tour.tourTarget
 import com.warden.blocker.ui.update.UpdateSection
 import kotlinx.coroutines.launch
 
@@ -87,7 +90,7 @@ fun SettingsScreen(vm: WardenViewModel, onOpenSetup: () -> Unit) {
         Text("Settings", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
 
         // Blocking mode: always-on vs schedule-driven
-        Card(Modifier.fillMaxWidth()) {
+        Card(Modifier.fillMaxWidth().tourTarget(TourIds.SETTINGS_ALWAYS_ON)) {
             Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
                     Text("Always on", style = MaterialTheme.typography.titleMedium)
@@ -101,7 +104,7 @@ fun SettingsScreen(vm: WardenViewModel, onOpenSetup: () -> Unit) {
         }
 
         // Strict mode: only works with a PIN — without one, it could simply be switched off here.
-        Card(Modifier.fillMaxWidth()) {
+        Card(Modifier.fillMaxWidth().tourTarget(TourIds.SETTINGS_STRICT)) {
             Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
                     Text("Strict mode", style = MaterialTheme.typography.titleMedium)
@@ -159,7 +162,7 @@ fun SettingsScreen(vm: WardenViewModel, onOpenSetup: () -> Unit) {
         }
 
         // Uninstall protection (device admin)
-        Card(Modifier.fillMaxWidth()) {
+        Card(Modifier.fillMaxWidth().tourTarget(TourIds.SETTINGS_UNINSTALL)) {
             Column(Modifier.fillMaxWidth().padding(16.dp)) {
                 Text("Uninstall protection", style = MaterialTheme.typography.titleMedium)
                 Text(
@@ -185,7 +188,7 @@ fun SettingsScreen(vm: WardenViewModel, onOpenSetup: () -> Unit) {
         }
 
         // PIN
-        Card(Modifier.fillMaxWidth()) {
+        Card(Modifier.fillMaxWidth().tourTarget(TourIds.SETTINGS_PIN)) {
             Column(Modifier.fillMaxWidth().padding(16.dp)) {
                 Text("PIN lock", style = MaterialTheme.typography.titleMedium)
                 Text(if (hasPin) "A PIN is required to change settings or stop blocking." else "Protect settings and disabling with a 4-digit PIN.", style = MaterialTheme.typography.bodySmall)
@@ -197,12 +200,13 @@ fun SettingsScreen(vm: WardenViewModel, onOpenSetup: () -> Unit) {
             }
         }
 
-        UpdateSection()
+        UpdateSection(Modifier.tourTarget(TourIds.SETTINGS_UPDATES))
 
         HorizontalDivider()
-        OutlinedButton(onClick = onOpenSetup, modifier = Modifier.fillMaxWidth()) {
+        OutlinedButton(onClick = onOpenSetup, modifier = Modifier.fillMaxWidth().tourTarget(TourIds.SETTINGS_SETUP)) {
             Text("Setup & permissions")
         }
+        RestartGuidesButton()
     }
 
     if (showSetPin) {

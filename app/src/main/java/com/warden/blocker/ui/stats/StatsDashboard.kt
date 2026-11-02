@@ -71,6 +71,8 @@ import com.warden.blocker.stats.TimeRange
 import com.warden.blocker.stats.UsageEventsSource
 import com.warden.blocker.ui.AppIcon
 import com.warden.blocker.ui.ScrollToTopOnReselect
+import com.warden.blocker.ui.tour.TourIds
+import com.warden.blocker.ui.tour.tourTarget
 import java.time.ZoneId
 
 /**
@@ -102,7 +104,7 @@ fun StatsDashboard(vm: StatsViewModel = viewModel()) {
                     Modifier.weight(1f).fillMaxSize().verticalScroll(scroll).padding(vertical = gutter),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    Header(state.period, vm::selectPeriod)
+                    Box(Modifier.tourTarget(TourIds.STATS_HEADER)) { Header(state.period, vm::selectPeriod) }
                     Tiles(state)
                     UsageSections(state)
                 }
@@ -122,7 +124,7 @@ fun StatsDashboard(vm: StatsViewModel = viewModel()) {
                 contentPadding = PaddingValues(gutter),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                item(key = "header") { Header(state.period, vm::selectPeriod) }
+                item(key = "header") { Box(Modifier.tourTarget(TourIds.STATS_HEADER)) { Header(state.period, vm::selectPeriod) } }
                 item(key = "tiles") { Tiles(state) }
                 item(key = "usage") { Column(verticalArrangement = Arrangement.spacedBy(12.dp)) { UsageSections(state) } }
                 appList(state, expanded, onToggle)

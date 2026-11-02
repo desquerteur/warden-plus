@@ -34,6 +34,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.warden.blocker.data.Schedule
+import com.warden.blocker.ui.tour.TourIds
+import com.warden.blocker.ui.tour.tourTarget
 
 @Composable
 fun SchedulesScreen(vm: WardenViewModel) {
@@ -49,7 +51,7 @@ fun SchedulesScreen(vm: WardenViewModel) {
         Spacer(Modifier.height(8.dp))
         Text("With 'always-on' off, the blocklist is only enforced during these windows.", style = MaterialTheme.typography.bodyMedium)
         Spacer(Modifier.height(12.dp))
-        OutlinedButton(onClick = { creating = true }, modifier = Modifier.fillMaxWidth()) { Text("+ New schedule") }
+        OutlinedButton(onClick = { creating = true }, modifier = Modifier.fillMaxWidth().tourTarget(TourIds.SCHEDULES_NEW)) { Text("+ New schedule") }
         Spacer(Modifier.height(16.dp))
         if (schedules.isEmpty()) {
             Text("No schedules yet. Add one, then turn off “Always on” in Settings to use them.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.outline)

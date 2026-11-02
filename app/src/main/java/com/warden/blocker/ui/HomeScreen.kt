@@ -6,6 +6,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
@@ -47,6 +48,8 @@ import com.warden.blocker.data.BlockType
 import com.warden.blocker.data.Schedule
 import com.warden.blocker.system.AccessibilityAlert
 import com.warden.blocker.ui.stats.shownFocusStreak
+import com.warden.blocker.ui.tour.TourIds
+import com.warden.blocker.ui.tour.tourTarget
 import com.warden.blocker.util.PermissionsHelper
 import com.warden.blocker.vpn.VpnController
 import com.warden.blocker.vpn.WardenVpnService
@@ -113,14 +116,16 @@ fun HomeScreen(
         if (needsSetup && AccessibilityAlert.shouldWarn(false, accessibilityUsed, enabled, items.any { it.type == BlockType.APP && it.enabled })) {
             // It worked before (or is clearly relied on) — typically Android switched it off after
             // Warden+ was updated from an APK file. Make that impossible to miss.
+            Box(Modifier.tourTarget(TourIds.HOME_SETUP)) {
             WarningCard(
                 title = "⚠ App blocking is off",
                 text = "Warden+ has no accessibility access, so apps aren't blocked. Android switches it " +
                     "off after an update from an APK file. Tap to turn it on.",
                 onClick = onOpenSetup,
             )
+            }
         } else if (needsSetup) {
-            ElevatedCard(Modifier.fillMaxWidth().clickable { onOpenSetup() }) {
+            ElevatedCard(Modifier.fillMaxWidth().clickable { onOpenSetup() }.tourTarget(TourIds.HOME_SETUP)) {
                 Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text("Finish setup", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                     Text("Grant accessibility so Warden+ can block apps and feeds. Tap to fix.", style = MaterialTheme.typography.bodySmall)
@@ -154,7 +159,7 @@ fun HomeScreen(
                 onClick = onRetryVpn,
             )
         }
-        ElevatedCard(Modifier.fillMaxWidth()) {
+        ElevatedCard(Modifier.fillMaxWidth().tourTarget(TourIds.HOME_MASTER)) {
             Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
@@ -187,7 +192,7 @@ fun HomeScreen(
                 )
             }
         }
-        FocusCard(focusEndsAt = focusEndsAt, strict = focusStrict, onStart = onStartFocus, onCancel = onCancelFocus)
+        Box(Modifier.tourTarget(TourIds.HOME_FOCUS)) { FocusCard(focusEndsAt = focusEndsAt, strict = focusStrict, onStart = onStartFocus, onCancel = onCancelFocus) }
         if (shownFocusStreak(streak, focusSessions) > 0) {
             ElevatedCard(Modifier.fillMaxWidth()) {
                 Row(Modifier.fillMaxWidth().padding(20.dp), verticalAlignment = Alignment.CenterVertically) {

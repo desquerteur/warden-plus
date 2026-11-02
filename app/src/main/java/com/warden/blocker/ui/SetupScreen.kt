@@ -5,6 +5,7 @@ import android.net.Uri
 import android.os.Build
 import android.provider.Settings
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Column
@@ -39,6 +40,10 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.compose.runtime.DisposableEffect
 import com.warden.blocker.R
+import com.warden.blocker.ui.tour.TourIds
+import com.warden.blocker.ui.tour.TourLaunchButton
+import com.warden.blocker.ui.tour.Tours
+import com.warden.blocker.ui.tour.tourTarget
 import com.warden.blocker.util.PermissionsHelper
 
 @Composable
@@ -64,25 +69,31 @@ fun SetupScreen(onBack: () -> Unit) {
         SubScreenTopBar("Setup", onBack = onBack)
         Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(start = 20.dp, end = 20.dp, bottom = 20.dp)) {
             Text("Grant these so Warden+ can do its job. Only accessibility is required.", style = MaterialTheme.typography.bodyMedium)
+            Spacer(Modifier.height(12.dp))
+            TourLaunchButton(Tours.SETUP_ID, "Show me how", Modifier.fillMaxWidth().tourTarget(TourIds.SETUP_GUIDE))
             Spacer(Modifier.height(16.dp))
 
+            Box(Modifier.tourTarget(TourIds.SETUP_ACCESSIBILITY)) {
             SetupRow(
                 title = "App blocking (Accessibility)",
                 subtitle = "Required — detects blocked apps and in-app feeds.",
                 granted = accessibility,
                 actionLabel = "Open",
             ) { context.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)) }
-
-            if (!accessibility && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                RestrictedSettingHelp()
             }
 
+            if (!accessibility && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                Box(Modifier.tourTarget(TourIds.SETUP_RESTRICTED)) { RestrictedSettingHelp() }
+            }
+
+            Box(Modifier.tourTarget(TourIds.SETUP_USAGE)) {
             SetupRow(
                 title = "Usage access",
                 subtitle = "For screen-time and daily time limits.",
                 granted = usage,
                 actionLabel = "Open",
             ) { context.startActivity(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS)) }
+            }
 
             SetupRow(
                 title = "Notifications",

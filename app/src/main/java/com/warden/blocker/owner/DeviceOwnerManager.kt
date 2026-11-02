@@ -60,11 +60,11 @@ object DeviceOwnerManager {
         }
         step("Always-on VPN") {
             val ours = dpm.getAlwaysOnVpnPackage(admin) == context.packageName
-            if (plan.alwaysOnVpn && !ours) {
+            when (OwnerPolicyPlanner.alwaysOnVpnAction(plan.alwaysOnVpn, ours, prefs.alwaysOnVpnSet)) {
                 // No lockdown: without the VPN the internet still works (and Warden's updater too).
-                dpm.setAlwaysOnVpnPackage(admin, context.packageName, false)
-            } else if (!plan.alwaysOnVpn && ours) {
-                dpm.setAlwaysOnVpnPackage(admin, null, false)
+                AlwaysOnVpnAction.SET -> { dpm.setAlwaysOnVpnPackage(admin, context.packageName, false); prefs.alwaysOnVpnSet = true }
+                AlwaysOnVpnAction.CLEAR -> { dpm.setAlwaysOnVpnPackage(admin, null, false); prefs.alwaysOnVpnSet = false }
+                AlwaysOnVpnAction.NONE -> Unit
             }
         }
         step("Uninstall block") {

@@ -53,7 +53,20 @@ object OwnerPolicyPlanner {
         )
     }
 
+    /**
+     * What to do with Android's always-on VPN. Being the always-on VPN isn't enough: if the user
+     * switched it on by hand (Protection checklist), it can be switched off again in Android's VPN
+     * settings. Only once Warden+ set it as device owner ([setByUs]) does Android lock it (D3).
+     */
+    fun alwaysOnVpnAction(want: Boolean, currentlyOurs: Boolean, setByUs: Boolean): AlwaysOnVpnAction = when {
+        want && !(currentlyOurs && setByUs) -> AlwaysOnVpnAction.SET
+        !want && (currentlyOurs || setByUs) -> AlwaysOnVpnAction.CLEAR
+        else -> AlwaysOnVpnAction.NONE
+    }
+
     /** Everything off: what has to happen before Warden+ stops being device owner. */
     fun releaseAll(suspendedByUs: Set<String>): OwnerPlan =
         plan(enabled = emptySet(), wantSuspended = emptySet(), suspendedByUs = suspendedByUs, protected = emptySet())
 }
+
+enum class AlwaysOnVpnAction { SET, CLEAR, NONE }

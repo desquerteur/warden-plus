@@ -28,6 +28,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -49,6 +50,7 @@ import com.warden.blocker.ui.AppPickerScreen
 import com.warden.blocker.ui.BlocklistScreen
 import com.warden.blocker.ui.FeaturesScreen
 import com.warden.blocker.ui.HomeScreen
+import com.warden.blocker.ui.LocalTabReselected
 import com.warden.blocker.ui.SchedulesScreen
 import com.warden.blocker.ui.SettingsScreen
 import com.warden.blocker.ui.SetupScreen
@@ -57,6 +59,10 @@ import com.warden.blocker.ui.hosts.HostsListsScreen
 import com.warden.blocker.ui.stats.StatsDashboard
 import com.warden.blocker.ui.theme.WardenTheme
 import com.warden.blocker.vpn.VpnController
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.map
 
 class MainActivity : ComponentActivity() {
 
@@ -133,12 +139,21 @@ private fun CompactNavigationBar(content: @Composable RowScope.() -> Unit) {
             Modifier
                 .fillMaxWidth()
                 .windowInsetsPadding(NavigationBarDefaults.windowInsets)
+                // Keeps the outer tabs' pills clear of the (often rounded) screen edge.
+                .padding(horizontal = 8.dp)
                 .defaultMinSize(minHeight = 80.dp)
                 .selectableGroup(),
             verticalAlignment = Alignment.CenterVertically,
             content = content,
         )
     }
+}
+
+/** Hands [tab]'s screen the "tapped again" events, see [ScrollToTopOnReselect]. */
+@Composable
+private fun TabContent(tab: Tab, reselected: SharedFlow<String>, content: @Composable () -> Unit) {
+    val events = remember(tab, reselected) { reselected.filter { it == tab.route }.map { } }
+    CompositionLocalProvider(LocalTabReselected provides events, content = content)
 }
 
 @Composable
@@ -149,6 +164,7 @@ private fun WardenScaffold(
     onCancelFocus: () -> Unit,
 ) {
     val navController = rememberNavController()
+    val reselected = remember { MutableSharedFlow<String>(extraBufferCapacity = 1) }
     Scaffold(
         bottomBar = {
             CompactNavigationBar {
@@ -158,6 +174,11 @@ private fun WardenScaffold(
                     NavigationBarItem(
                         selected = dest?.hierarchy?.any { it.route == tab.route } == true,
                         onClick = {
+                            // Tapping the tab that is already open scrolls it back to the top.
+                            if (dest?.route == tab.route) {
+                                reselected.tryEmit(tab.route)
+                                return@NavigationBarItem
+                            }
                             // Leave a sub-screen (app picker, feeds, hosts lists, setup) first. Otherwise it is
                             // saved into the tab's state and restored, so tapping "Blocklist" from
                             // the app picker would land right back in the app picker.
@@ -191,23 +212,29 @@ private fun WardenScaffold(
 
         NavHost(navController, startDestination = Tab.HOME.route, modifier = Modifier.padding(padding)) {
             composable(Tab.HOME.route) {
-                HomeScreen(vm, onToggleBlocking, onStartFocus, onCancelFocus, onOpenSetup = { navController.navigate("setup") })
+                TabContent(Tab.HOME, reselected) {
+                    HomeScreen(vm, onToggleBlocking, onStartFocus, onCancelFocus, onOpenSetup = { navController.navigate("setup") })
+                }
             }
             composable("setup") { SetupScreen(onBack = { leave("setup") }) }
             composable(Tab.BLOCKLIST.route) {
-                BlocklistScreen(
-                    vm,
-                    onOpenAppPicker = { navController.navigate("apppicker") },
-                    onOpenFeatures = { navController.navigate("features") },
-                    onOpenHostsLists = { navController.navigate("hostslists") },
-                )
+                TabContent(Tab.BLOCKLIST, reselected) {
+                    BlocklistScreen(
+                        vm,
+                        onOpenAppPicker = { navController.navigate("apppicker") },
+                        onOpenFeatures = { navController.navigate("features") },
+                        onOpenHostsLists = { navController.navigate("hostslists") },
+                    )
+                }
             }
             composable("apppicker") { AppPickerScreen(vm, onBack = { leave("apppicker") }) }
             composable("features") { FeaturesScreen(vm, onBack = { leave("features") }) }
             composable("hostslists") { HostsListsScreen(onBack = { leave("hostslists") }) }
-            composable(Tab.SCHEDULES.route) { SchedulesScreen(vm) }
-            composable(Tab.STATS.route) { StatsDashboard() }
-            composable(Tab.SETTINGS.route) { SettingsScreen(vm, onOpenSetup = { navController.navigate("setup") }) }
+            composable(Tab.SCHEDULES.route) { TabContent(Tab.SCHEDULES, reselected) { SchedulesScreen(vm) } }
+            composable(Tab.STATS.route) { TabContent(Tab.STATS, reselected) { StatsDashboard() } }
+            composable(Tab.SETTINGS.route) {
+                TabContent(Tab.SETTINGS, reselected) { SettingsScreen(vm, onOpenSetup = { navController.navigate("setup") }) }
+            }
         }
     }
 }

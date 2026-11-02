@@ -69,8 +69,10 @@ fun SettingsScreen(vm: WardenViewModel, onOpenSetup: () -> Unit) {
         return
     }
 
+    val scroll = rememberScrollState()
+    ScrollToTopOnReselect(scroll)
     Column(
-        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp),
+        Modifier.fillMaxSize().verticalScroll(scroll).padding(20.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         Text("Settings", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)

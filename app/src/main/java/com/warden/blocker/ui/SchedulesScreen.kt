@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.Card
@@ -37,6 +38,8 @@ fun SchedulesScreen(vm: WardenViewModel) {
     val schedules by vm.schedules.collectAsStateWithLifecycle()
     var editing by remember { mutableStateOf<Schedule?>(null) }
     var creating by remember { mutableStateOf(false) }
+    val listState = rememberLazyListState()
+    ScrollToTopOnReselect(listState)
 
     Column(Modifier.fillMaxSize().padding(20.dp)) {
         Text("Schedules", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
@@ -48,7 +51,7 @@ fun SchedulesScreen(vm: WardenViewModel) {
         if (schedules.isEmpty()) {
             Text("No schedules yet. Add one, then turn off “Always on” in Settings to use them.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.outline)
         }
-        LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        LazyColumn(state = listState, verticalArrangement = Arrangement.spacedBy(8.dp)) {
             items(schedules, key = { it.id }) { s ->
                 Card(Modifier.fillMaxWidth().clickable { editing = s }) {
                     Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {

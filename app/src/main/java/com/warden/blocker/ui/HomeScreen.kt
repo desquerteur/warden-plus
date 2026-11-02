@@ -51,9 +51,11 @@ fun HomeScreen(
     val items by vm.items.collectAsStateWithLifecycle()
     val activeCount = items.count { it.enabled }
     var showVerify by remember { mutableStateOf(false) }
+    val scroll = rememberScrollState()
+    ScrollToTopOnReselect(scroll)
 
     Column(
-        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp),
+        Modifier.fillMaxSize().verticalScroll(scroll).padding(20.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         Text(stringResource(R.string.app_name), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)

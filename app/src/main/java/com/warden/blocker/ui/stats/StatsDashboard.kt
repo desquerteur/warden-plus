@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
@@ -69,6 +70,7 @@ import com.warden.blocker.stats.StatsPeriod
 import com.warden.blocker.stats.TimeRange
 import com.warden.blocker.stats.UsageEventsSource
 import com.warden.blocker.ui.AppIcon
+import com.warden.blocker.ui.ScrollToTopOnReselect
 import java.time.ZoneId
 
 /**
@@ -86,13 +88,18 @@ fun StatsDashboard(vm: StatsViewModel = viewModel()) {
     }
     var expanded by rememberSaveable(state.period) { mutableStateOf<String?>(null) }
     val onToggle: (String) -> Unit = { pkg -> expanded = if (expanded == pkg) null else pkg }
+    // Tapping "Usage" again scrolls back to the period switcher.
+    val listState = rememberLazyListState()
+    ScrollToTopOnReselect(listState)
 
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val gutter = if (maxWidth < 360.dp) 12.dp else 20.dp
         if (maxWidth >= 600.dp) {
+            val scroll = rememberScrollState()
+            ScrollToTopOnReselect(scroll)
             Row(Modifier.fillMaxSize().padding(horizontal = gutter), horizontalArrangement = Arrangement.spacedBy(gutter)) {
                 Column(
-                    Modifier.weight(1f).fillMaxSize().verticalScroll(rememberScrollState()).padding(vertical = gutter),
+                    Modifier.weight(1f).fillMaxSize().verticalScroll(scroll).padding(vertical = gutter),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     Header(state.period, vm::selectPeriod)
@@ -101,6 +108,7 @@ fun StatsDashboard(vm: StatsViewModel = viewModel()) {
                 }
                 LazyColumn(
                     Modifier.weight(1f).fillMaxSize(),
+                    state = listState,
                     contentPadding = PaddingValues(vertical = gutter),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
@@ -110,6 +118,7 @@ fun StatsDashboard(vm: StatsViewModel = viewModel()) {
         } else {
             LazyColumn(
                 Modifier.fillMaxSize(),
+                state = listState,
                 contentPadding = PaddingValues(gutter),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {

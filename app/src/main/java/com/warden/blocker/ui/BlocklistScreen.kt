@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.Button
@@ -48,6 +49,8 @@ fun BlocklistScreen(
     val items by vm.items.collectAsStateWithLifecycle()
     var input by remember { mutableStateOf("") }
     var editing by remember { mutableStateOf<BlockedItem?>(null) }
+    val listState = rememberLazyListState()
+    ScrollToTopOnReselect(listState)
 
     Column(Modifier.fillMaxSize().padding(20.dp)) {
         Text("Blocklist", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
@@ -72,7 +75,7 @@ fun BlocklistScreen(
         if (items.isEmpty()) {
             Text("Nothing blocked yet — add a website above or tap “Add apps”.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.outline)
         }
-        LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        LazyColumn(state = listState, verticalArrangement = Arrangement.spacedBy(8.dp)) {
             items(items, key = { it.id }) { item ->
                 Card(Modifier.fillMaxWidth().clickable { editing = item }) {
                     Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {

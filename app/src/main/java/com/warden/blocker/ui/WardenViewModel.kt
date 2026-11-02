@@ -5,6 +5,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.warden.blocker.data.BlockType
 import com.warden.blocker.data.BlockedItem
+import com.warden.blocker.data.DomainInput
 import com.warden.blocker.data.InterceptMode
 import com.warden.blocker.data.Schedule
 import com.warden.blocker.hosts.HostsSource
@@ -12,8 +13,10 @@ import com.warden.blocker.security.PinHasher
 import com.warden.blocker.security.PinResult
 import com.warden.blocker.system.FocusEndWorker
 import com.warden.blocker.wardenContainer
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -93,21 +96,32 @@ class WardenViewModel(app: Application) : AndroidViewModel(app) {
         if (container.settings.masterEnabled.first()) container.settings.recordActiveDay()
     }
 
-    fun addWebsite(domain: String) {
-        val clean = domain.trim().lowercase()
-            .removePrefix("https://").removePrefix("http://")
-            .removePrefix("www.").substringBefore("/").ifBlank { return }
+    private val _justAdded = MutableStateFlow<Long?>(null)
+
+    /** Id of the item the user just added (or typed in again), so Blocklist can scroll to it and
+     *  highlight it — the list is sorted by name, so a new entry may land off-screen. */
+    val justAdded: StateFlow<Long?> = _justAdded.asStateFlow()
+
+    fun consumeJustAdded(id: Long) { _justAdded.compareAndSet(id, null) }
+
+    /** Returns false (and adds nothing) when [domain] isn't a usable website name. */
+    fun addWebsite(domain: String): Boolean {
+        val clean = DomainInput.normalize(domain) ?: return false
         viewModelScope.launch {
-            container.repository.addItem(
-                BlockedItem(type = BlockType.WEBSITE, value = clean, label = clean, createdAt = System.currentTimeMillis()),
-            )
+            // Typing a site that is already listed points at the existing entry instead of
+            // adding a second copy.
+            _justAdded.value = container.repository.websiteItem(clean)?.id
+                ?: container.repository.addItem(
+                    BlockedItem(type = BlockType.WEBSITE, value = clean, label = clean, createdAt = System.currentTimeMillis()),
+                )
         }
+        return true
     }
 
     /** New apps default to a mindful PAUSE (ScreenZen-style), not a hard block. */
     fun addApp(packageName: String, label: String) = viewModelScope.launch {
         if (container.repository.appItem(packageName) != null) return@launch
-        container.repository.addItem(
+        _justAdded.value = container.repository.addItem(
             BlockedItem(
                 type = BlockType.APP,
                 value = packageName,

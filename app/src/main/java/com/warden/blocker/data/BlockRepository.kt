@@ -17,9 +17,13 @@ class BlockRepository(private val dao: BlockDao) {
     suspend fun appItem(packageName: String): BlockedItem? =
         dao.itemByValue(BlockType.APP, packageName)
 
+    suspend fun websiteItem(domain: String): BlockedItem? =
+        dao.itemByValue(BlockType.WEBSITE, domain)
+
     suspend fun item(id: Long): BlockedItem? = dao.itemById(id)
 
-    suspend fun addItem(item: BlockedItem) = dao.upsertItem(item)
+    /** Returns the new row's id. */
+    suspend fun addItem(item: BlockedItem): Long = dao.upsertItem(item)
     suspend fun updateItem(item: BlockedItem) = dao.updateItem(item)
     suspend fun removeItem(item: BlockedItem) = dao.deleteItem(item)
 

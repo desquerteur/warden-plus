@@ -1,0 +1,195 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Warden+ intro</title>
+<!--
+  Intro video scene. Every frame is drawn by window.seek(t) (t in seconds), so the
+  video can be captured frame by frame (see build.mjs). Phone screens are real
+  emulator captures: frame sequences in frames/<segment>/0001.jpg … and still
+  screenshots in img/*.jpg. manifest.js (written by build.mjs) lists the frame counts.
+  Colours: the app's own theme (ui/theme/Theme.kt) – indigo #4F5BD5, coral #E86A5C.
+-->
+<style>
+  :root {
+    --indigo: #4F5BD5;
+    --indigo-dark: #3A44A8;
+    --coral: #E86A5C;
+    --ink: #1B1B21;
+    --muted: #55566A;
+    --bg: #F7F6FC;
+  }
+  html, body { margin: 0; width: 1920px; height: 1080px; overflow: hidden; background: var(--bg); }
+  body { font-family: "Segoe UI Variable Display", "Segoe UI", Roboto, Arial, sans-serif; color: var(--ink); }
+  #stage { position: absolute; inset: 0; overflow: hidden;
+    background:
+      radial-gradient(1100px 700px at 88% 8%, rgba(79,91,213,0.10), transparent 70%),
+      radial-gradient(900px 600px at 6% 96%, rgba(232,106,92,0.07), transparent 70%),
+      var(--bg); }
+  .scene { position: absolute; inset: 0; opacity: 0; }
+  .text { position: absolute; left: 150px; top: 0; bottom: 0; width: 760px;
+    display: flex; flex-direction: column; justify-content: center; }
+  .chap { font-size: 26px; font-weight: 600; letter-spacing: 3px; color: var(--coral); margin-bottom: 22px; }
+  .chap span { color: #A2A3B5; font-weight: 500; }
+  h1 { font-size: 70px; line-height: 1.08; margin: 0 0 26px; font-weight: 700; letter-spacing: -1px; }
+  p.sub { font-size: 32px; line-height: 1.45; margin: 0; color: var(--muted); max-width: 720px; }
+  .phones { position: absolute; top: 0; bottom: 0; left: 960px; right: 60px;
+    display: flex; align-items: center; justify-content: center; gap: 56px; }
+  .phone { position: relative; width: 344px; height: 880px; padding: 12px;
+    background: #1D1C22; border-radius: 52px;
+    box-shadow: 0 30px 70px rgba(40,44,110,0.22), 0 6px 18px rgba(0,0,0,0.12); }
+  .screen { position: relative; width: 344px; height: 880px; border-radius: 40px; overflow: hidden; background: #fff; }
+  .screen img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0; }
+  .icon { width: 132px; height: 132px; border-radius: 34px; background: var(--indigo);
+    display: flex; align-items: center; justify-content: center; margin-bottom: 34px;
+    box-shadow: 0 16px 40px rgba(79,91,213,0.30); }
+  .icon svg { width: 132px; height: 132px; }
+  .brand { font-size: 104px; font-weight: 700; letter-spacing: -2px; margin: 0 0 18px; line-height: 1; }
+  .outro { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
+  .outro .line { font-size: 34px; color: var(--muted); margin-top: 6px; }
+  .outro .url { font-size: 40px; font-weight: 600; color: var(--indigo); margin-top: 34px; }
+  .outro .tags { display: flex; gap: 18px; margin-top: 30px; }
+  .tag { font-size: 26px; padding: 10px 26px; border-radius: 999px; background: #E6E7FA; color: var(--indigo-dark); font-weight: 600; }
+  #bar { position: absolute; left: 150px; right: 150px; bottom: 44px; height: 4px; display: flex; gap: 10px; opacity: 0; }
+  #bar div { flex: 1; background: #E2E2EE; border-radius: 2px; overflow: hidden; }
+  #bar div i { display: block; height: 100%; width: 0; background: var(--indigo); }
+</style>
+</head>
+<body>
+<div id="stage"></div>
+<div id="bar"></div>
+<script src="manifest.js"></script>
+<script>
+const SHIELD = `<svg viewBox="18 18 72 72"><path fill="#fff" d="M54,30 L72,37 L72,54 C72,66 64,74 54,78 C44,74 36,66 36,54 L36,37 Z"/><path fill="#4F5BD5" d="M49,54 l4,4 l8,-9 l3,3 l-11,12 l-7,-7 z"/></svg>`;
+
+// Phone content: a list of items; each item is a frame sequence ("seg") or a still ("img"),
+// shown from `at` seconds after the scene starts (cross-fades into the next item).
+const SCENES = [
+  { start: 0.0, end: 5.4, kind: 'intro',
+    phones: [[{ seg: 'home-on', at: 0.4 }]] },
+  { start: 5.0, end: 11.4, n: 1, title: 'Block apps and websites',
+    sub: 'Add a site or an app in one tap. A blocked app can open with a calm breathing pause first.',
+    phones: [[{ seg: 'web-add', at: 0.2 }], [{ seg: 'pause', at: 0.5 }]] },
+  { start: 11.0, end: 16.6, n: 2, title: 'Hosts lists like StevenBlack',
+    sub: 'One-tap ready-made lists or your own hosts file: tens of thousands of domains, filtered on the phone.',
+    phones: [[{ seg: 'hosts', at: 0.2 }, { img: 'hosts-lists.jpg', at: 4.4 }]] },
+  { start: 16.2, end: 23.0, n: 3, title: 'Schedules, focus and “Block until”',
+    sub: 'Weekly windows like Mon–Fri 9–17, focus sessions, or blocking until a time you pick.',
+    phones: [[{ seg: 'schedule', at: 0.2 }], [{ seg: 'block-until', at: 0.5 }]] },
+  { start: 22.6, end: 28.2, n: 4, title: 'Allow only & block categories (e.g. games)',
+    sub: 'Block everything except what you allow — or every app of a kind, even ones installed later.',
+    phones: [[{ img: 'allow-only.jpg', at: 0 }], [{ img: 'categories.jpg', at: 0 }]] },
+  { start: 27.8, end: 33.4, n: 5, title: 'Block protection: PIN, delay or locked',
+    sub: 'Loosening the rules takes a PIN, a waiting time or a date. Tightening always works at once.',
+    phones: [[{ seg: 'protection', at: 0.2 }], [{ img: 'protection.jpg', at: 0 }]] },
+  { start: 33.0, end: 38.6, n: 6, title: 'Beautiful usage stats',
+    sub: 'Screen time, top apps, unlocks and your focus streak — today, this week or this month.',
+    phones: [[{ seg: 'usage', at: 0.2 }], [{ img: 'usage-dark.jpg', at: 0 }]] },
+  { start: 38.2, end: 43.8, n: 7, title: 'Guided setup & spotlight guides',
+    sub: 'A step-by-step setup wizard, and guides that point at the right button for you.',
+    phones: [[{ seg: 'wizard-done', at: 0.2 }], [{ seg: 'guide', at: 0.4 }]] },
+  { start: 43.4, end: 48.0, kind: 'outro', last: true },
+];
+const DURATION = 48.0;
+const CHAPTERS = SCENES.filter(s => s.n).length;
+
+const ease = x => 1 - Math.pow(1 - Math.min(Math.max(x, 0), 1), 3);
+const clamp01 = x => Math.min(Math.max(x, 0), 1);
+
+const stage = document.getElementById('stage');
+const bar = document.getElementById('bar');
+for (let i = 0; i < CHAPTERS; i++) bar.appendChild(Object.assign(document.createElement('div'), { innerHTML: '<i></i>' }));
+
+function phoneHTML(items) {
+  return `<div class="phone"><div class="screen">${items.map(() => '<img alt="">').join('')}</div></div>`;
+}
+
+for (const s of SCENES) {
+  const el = document.createElement('div');
+  el.className = 'scene';
+  if (s.kind === 'intro') {
+    el.innerHTML = `<div class="text"><div class="icon">${SHIELD}</div>
+      <div class="brand">Warden+</div>
+      <p class="sub" style="font-size:38px;max-width:700px">a free, open-source app &amp; website blocker for Android</p></div>
+      <div class="phones">${s.phones.map(phoneHTML).join('')}</div>`;
+  } else if (s.kind === 'outro') {
+    el.innerHTML = `<div class="outro"><div class="icon">${SHIELD}</div>
+      <div class="brand">Warden+</div>
+      <div class="line">Unofficial fork of ChristopherLaughlin/warden</div>
+      <div class="tags"><span class="tag">Free</span><span class="tag">Open source</span><span class="tag">GPL-3.0</span></div>
+      <div class="url">github.com/desquerteur/warden-plus</div></div>`;
+  } else {
+    el.innerHTML = `<div class="text"><div class="chap">${String(s.n).padStart(2, '0')} <span>/ ${String(CHAPTERS).padStart(2, '0')}</span></div>
+      <h1>${s.title.replace(/&(?!amp;)/g, '&amp;')}</h1><p class="sub">${s.sub}</p></div>
+      <div class="phones">${s.phones.map(phoneHTML).join('')}</div>`;
+  }
+  stage.appendChild(el);
+  s.el = el;
+  s.textEls = [...el.querySelectorAll('.chap, h1, p.sub, .icon, .brand, .line, .tags, .url')];
+  s.phoneEls = [...el.querySelectorAll('.phone')];
+  s.imgEls = s.phoneEls.map(p => [...p.querySelectorAll('img')]);
+}
+
+function frameSrc(seg, local) {
+  const count = MANIFEST.frames[seg];
+  if (!count) throw new Error('missing segment ' + seg);
+  const i = Math.min(Math.max(Math.floor(local * MANIFEST.fps), 0), count - 1);
+  return `frames/${seg}/${String(i + 1).padStart(4, '0')}.jpg`;
+}
+
+window.seek = async function (t) {
+  const loads = [];
+  for (const s of SCENES) {
+    const local = t - s.start;
+    const fadeIn = s.start === 0 ? 1 : ease(local / 0.6);
+    const fadeOut = s.last ? 1 : 1 - ease((t - (s.end - 0.5)) / 0.5);
+    const vis = (t >= s.start && t <= s.end) ? Math.min(fadeIn, fadeOut) : 0;
+    s.el.style.opacity = vis;
+    s.el.style.display = vis > 0 ? 'block' : 'none';
+    if (vis <= 0) continue;
+    // Text: rises gently, one line after the other.
+    s.textEls.forEach((e, i) => {
+      const k = s.start === 0 ? 1 : ease((local - 0.1 - i * 0.12) / 0.7);
+      e.style.opacity = k;
+      e.style.transform = `translateY(${(1 - k) * 22}px)`;
+    });
+    // Phones: fade and rise, the second one a little later.
+    s.phoneEls.forEach((p, i) => {
+      const k = s.start === 0 ? ease((local + 0.6) / 0.9) : ease((local - 0.15 - i * 0.18) / 0.8);
+      p.style.opacity = k;
+      p.style.transform = `translateY(${(1 - k) * 36}px) scale(${0.97 + 0.03 * k})`;
+    });
+    // Screen content.
+    (s.phones || []).forEach((items, pi) => {
+      items.forEach((it, ii) => {
+        const img = s.imgEls[pi][ii];
+        const next = items[ii + 1];
+        const a = ii === 0 ? 1 : ease((local - it.at) / 0.45);
+        const b = next ? 1 - ease((local - next.at) / 0.45) : 1;
+        const o = Math.min(a, b);
+        img.style.opacity = o;
+        if (o <= 0 && ii !== 0) return;
+        const src = it.seg ? frameSrc(it.seg, local - it.at) : 'img/' + it.img;
+        if (img.getAttribute('src') !== src) {
+          img.setAttribute('src', src);
+          loads.push(img.decode().catch(() => {}));
+        }
+      });
+    });
+  }
+  // Chapter progress bar (only during the chapters).
+  const chapters = SCENES.filter(s => s.n);
+  const first = chapters[0], lastC = chapters[chapters.length - 1];
+  const barVis = Math.min(ease((t - first.start) / 0.6), 1 - ease((t - (lastC.end - 0.5)) / 0.5));
+  bar.style.opacity = t < first.start ? 0 : barVis;
+  chapters.forEach((s, i) => {
+    const span = (s.end - 0.4) - s.start;
+    bar.children[i].firstChild.style.width = (clamp01((t - s.start) / span) * 100) + '%';
+  });
+  await Promise.all(loads);
+};
+window.DURATION = DURATION;
+window.ready = true;
+</script>
+</body>
+</html>

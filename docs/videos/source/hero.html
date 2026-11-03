@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Warden+ hero image</title>
+<!-- Rendered at 1600x980 into docs/images/hero.jpg (see build-images.mjs). Real screenshots only. -->
+<style>
+  html, body { margin: 0; width: 1600px; height: 980px; overflow: hidden; }
+  body { background:
+      radial-gradient(900px 600px at 85% 5%, rgba(79,91,213,0.13), transparent 70%),
+      radial-gradient(800px 520px at 8% 100%, rgba(232,106,92,0.08), transparent 70%),
+      #F7F6FC;
+    display: flex; align-items: center; justify-content: center; gap: 64px; }
+  .phone { width: 330px; height: 845px; padding: 11px; background: #1D1C22; border-radius: 50px;
+    box-shadow: 0 30px 60px rgba(40,44,110,0.22), 0 6px 16px rgba(0,0,0,0.12); }
+  .phone.mid { transform: translateY(-22px); }
+  .phone img { display: block; width: 330px; height: 845px; border-radius: 39px; object-fit: cover; }
+</style>
+</head>
+<body>
+  <div class="phone"><img src="../../images/home.jpg" alt="Home"></div>
+  <div class="phone mid"><img src="../../images/usage.jpg" alt="Usage"></div>
+  <div class="phone"><img src="../../images/blocklist.jpg" alt="Blocklist"></div>
+</body>
+</html>

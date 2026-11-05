@@ -167,7 +167,8 @@ private fun RelatedDomainsSection(domain: String, blocked: Boolean, onChange: (B
         }
         InfoNote(
             "Still seeing pictures? A page that was open before the block can stay in the browser's " +
-                "cache — close the tab or reload. Google image search thumbnails come from Google itself " +
+                "cache, and Android remembers addresses it looked up for a few minutes — close the tab " +
+                "and wait a moment. Google image search thumbnails come from Google itself " +
                 "(gstatic.com) and can't be blocked without breaking Google. Chrome's \"Secure DNS\" goes " +
                 "around the filter: turn on Block DNS-over-HTTPS in Settings.",
         )

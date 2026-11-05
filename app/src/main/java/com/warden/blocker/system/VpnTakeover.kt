@@ -27,8 +27,12 @@ object VpnTakeover {
     /** How long a VPN app the user had in front still counts as "probably the one". */
     private const val RECENT_MS = 2 * 60_000L
 
-    /** The other VPN needs a moment to come up after it took the slot. */
-    private const val SETTLE_MS = 1_500L
+    /**
+     * Android takes the slot from Warden+ when the other app *asks* for it; its tunnel comes up a
+     * few seconds later. Look this often, this far apart, before saying "only disconnected".
+     */
+    private const val SETTLE_TRIES = 10
+    private const val SETTLE_STEP_MS = 1_000L
 
     @Volatile private var lastVpnApp: String? = null
     @Volatile private var lastVpnAppAt = 0L
@@ -74,10 +78,14 @@ object VpnTakeover {
 
     /** Called from the VPN's onRevoke (off the main thread). */
     suspend fun onRevoked(context: Context) {
-        delay(SETTLE_MS)
+        var otherVpn = false
+        for (i in 0 until SETTLE_TRIES) {
+            delay(SETTLE_STEP_MS)
+            otherVpn = VpnController.otherVpnActive(context)
+            if (otherVpn) break
+        }
         val c = context.wardenContainer
         val now = System.currentTimeMillis()
-        val otherVpn = VpnController.otherVpnActive(context)
         val config = c.allowStore.current()
         val vpnApps = c.installedApps.vpnPackages()
         val alwaysOn = runCatching { Settings.Secure.getString(context.contentResolver, "always_on_vpn_app") }.getOrNull()

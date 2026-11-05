@@ -70,6 +70,14 @@ class VpnAppsTest {
         assertTrue(VpnApps.suspendTargets(apps, config, emptySet(), enforced = false).isEmpty())
     }
 
+    @Test fun consentDialogNamesTheRequestingApp() {
+        val text = "Connection request\nFakeVPN (Tailscale-Ersatz) wants to set up a VPN connection that allows it to monitor network traffic."
+        val blocked = mapOf("com.qa.fakevpn" to "FakeVPN (Tailscale-Ersatz)", "com.vpn" to "VPN")
+        assertEquals("com.qa.fakevpn", VpnApps.consentRequester(text, blocked))
+        assertNull(VpnApps.consentRequester("Tailscale wants to set up a VPN connection", mapOf("com.qa.fakevpn" to "FakeVPN")))
+        assertNull(VpnApps.consentRequester(text, mapOf("x" to " ")))
+    }
+
     @Test fun takeoverSuspect() {
         val apps = setOf(VpnApps.TAILSCALE)
         // Always-on names it for sure.

@@ -85,8 +85,11 @@ fun VpnGuardSection(modifier: Modifier = Modifier, vm: VpnGuardViewModel = viewM
 
             GuardSwitch(
                 "Block VPN apps",
-                if (vpnApps.isEmpty()) "No VPN app installed. New ones are blocked as soon as they're installed."
-                else "${vpnApps.size - trusted.size} of ${vpnApps.size} installed VPN apps blocked. New ones are blocked too.",
+                when {
+                    !vpnBlocked -> "Off. ${vpnApps.size} VPN app(s) installed — any of them can push the filter out."
+                    vpnApps.isEmpty() -> "No VPN app installed. New ones are blocked as soon as they're installed."
+                    else -> "${vpnApps.size - trusted.size} of ${vpnApps.size} installed VPN apps blocked. New ones are blocked too."
+                },
                 vpnBlocked, vm::setVpnAppsBlocked,
             )
             // Trusted VPN (A): a VPN the user needs, e.g. Tailscale — allowed, Browser mode covers browsers.

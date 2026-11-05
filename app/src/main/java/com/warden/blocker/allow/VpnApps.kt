@@ -36,6 +36,18 @@ object VpnApps {
     fun suspendTargets(vpnApps: Set<String>, config: AllowConfig, protected: Set<String>, enforced: Boolean): Set<String> =
         if (!enforced) emptySet() else vpnApps - trusted(vpnApps, config) - protected
 
+    /** Android's "Connection request" dialog that every VPN app needs once before it may connect. */
+    const val CONSENT_DIALOG_PACKAGE = "com.android.vpndialogs"
+
+    /**
+     * Which of [blockedLabels] (package → app name) the VPN consent dialog is asking for: the
+     * dialog names the app ("FreeVPN wants to set up a VPN connection …"). The longest matching
+     * name wins, so "VPN" doesn't match "VPN Pro". Null when none of them.
+     */
+    fun consentRequester(dialogText: String, blockedLabels: Map<String, String>): String? =
+        blockedLabels.entries.filter { (_, label) -> label.isNotBlank() && dialogText.contains(label, ignoreCase = true) }
+            .maxByOrNull { it.value.length }?.key
+
     /**
      * The app most likely behind a VPN that just took over, or null when Warden+ can't tell
      * (Android doesn't say who owns another app's VPN). Its "Always-on VPN" setting names it for

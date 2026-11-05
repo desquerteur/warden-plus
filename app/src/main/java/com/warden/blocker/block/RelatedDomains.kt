@@ -16,7 +16,7 @@ object RelatedDomains {
     /** One media domain; [sharedWith] names other services that break too when it's blocked. */
     data class Related(val domain: String, val sharedWith: String? = null)
 
-    private val META_CDN = Related("fbcdn.net", sharedWith = "Facebook, Instagram, Threads")
+    private val META_CDN = Related("fbcdn.net", sharedWith = "all Meta apps (Facebook, Instagram, Threads)")
 
     /** Site → its own image / video / short-link domains. */
     val TABLE: Map<String, List<Related>> = mapOf(

@@ -3,9 +3,13 @@ package com.warden.blocker.accessibility
 import android.accessibilityservice.AccessibilityService
 import android.content.ComponentName
 import android.content.Intent
+import android.graphics.Rect
+import android.hardware.display.DisplayManager
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
+import android.util.DisplayMetrics
+import android.view.Display
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityWindowInfo
 import com.warden.blocker.block.AccessDecision
@@ -35,6 +39,8 @@ import kotlinx.coroutines.withContext
  *
  * Only an app the user really opened is blocked: [ForegroundGate] filters out widgets on the
  * home screen, overlays, keyboards and the like, and keeps the block screen from looping.
+ * [WindowShield] keeps it blocked in split screens and pop-up windows: it looks at every visible
+ * app window, not just the focused one (issue #3: a block screen pushed aside in a pop-up).
  *
  * It also performs *in-app feature* blocking: while a supported app is foreground, it scans
  * the visible node tree (throttled) for signals of a blocked feature — e.g. Instagram Reels
@@ -49,6 +55,7 @@ class AppBlockAccessibilityService : AccessibilityService() {
     private val settingsGuard by lazy { SettingsGuardHook(this) }
     private val handler = Handler(Looper.getMainLooper())
     private val gate = ForegroundGate.shared
+    private val shield = WindowShield.shared
     private val activityCache = HashMap<String, Boolean>()
     // Only touched on the main thread (accessibility events, rechecks and the grant timer).
     private var grantRecheck: Job? = null
@@ -72,6 +79,11 @@ class AppBlockAccessibilityService : AccessibilityService() {
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         val type = event?.eventType ?: return
+        if (type == AccessibilityEvent.TYPE_WINDOWS_CHANGED) {
+            // A window appeared, moved, was resized or took focus: split screens and pop-ups.
+            scheduleWindowCheck()
+            return
+        }
         val pkg = event.packageName?.toString() ?: return
         // Settings guard (warn only): before the foreground logic, which never looks at Settings (critical).
         settingsGuard.onEvent(event)
@@ -81,6 +93,7 @@ class AppBlockAccessibilityService : AccessibilityService() {
         if (type == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
             val confirmed = isActivityOf(pkg, event.className?.toString())
             evaluate(pkg, confirmed, attempt = 0)
+            scheduleWindowCheck()
         }
         if (pkg == packageName) return
         if (type == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED ||
@@ -116,17 +129,117 @@ class AppBlockAccessibilityService : AccessibilityService() {
     private fun checkAccess(pkg: String, confirmed: Boolean) {
         scope.launch {
             val decision = wardenContainer.accessController.decideForPackage(pkg)
-            if (decision is AccessDecision.Allow) { recheckWhenGrantEnds(pkg); return@launch }
+            if (decision is AccessDecision.Allow) {
+                shield.allowed(pkg, SystemClock.uptimeMillis())
+                recheckWhenGrantEnds(pkg)
+                return@launch
+            }
             // The lookup took a moment: make sure the user is still in that app, not back Home.
             if (activeAppPackage() != pkg) { gate.forget(pkg); return@launch }
             if (!passLoopGuard(pkg, confirmed)) return@launch
-            when (decision) {
-                is AccessDecision.Allow -> Unit
-                is AccessDecision.Pause -> launchIntercept(InterceptActivity.KIND_PAUSE, decision.item.id, null, null)
-                is AccessDecision.HardBlock -> launchIntercept(InterceptActivity.KIND_BLOCK, decision.item.id, null, null)
-                is AccessDecision.LimitReached -> launchIntercept(InterceptActivity.KIND_LIMIT, decision.item.id, decision.reason, null)
+            showBlockScreen(pkg, decision)
+        }
+    }
+
+    private fun showBlockScreen(pkg: String, decision: AccessDecision) {
+        lastBlockScreenAt = SystemClock.uptimeMillis()
+        when (decision) {
+            is AccessDecision.Allow -> return
+            is AccessDecision.Pause -> launchIntercept(InterceptActivity.KIND_PAUSE, decision.item.id, null, null)
+            is AccessDecision.HardBlock -> launchIntercept(InterceptActivity.KIND_BLOCK, decision.item.id, null, null)
+            is AccessDecision.LimitReached -> launchIntercept(InterceptActivity.KIND_LIMIT, decision.item.id, decision.reason, null)
+        }
+        // From now on, keep an eye on it in every window, not just the focused one.
+        shield.shield(pkg)
+        handler.post { scheduleWindowCheck() }
+    }
+
+    // --- Split screens and pop-up windows ---
+    // Only touched on the main thread.
+    private var windowCheckSince = 0L
+    @Volatile private var lastBlockScreenAt = 0L
+    private val windowCheck = Runnable {
+        windowCheckSince = 0L
+        checkWindows()
+    }
+
+    /** Look at all windows once they have settled (window events come in bursts). */
+    private fun scheduleWindowCheck(delayMs: Long = WINDOW_SETTLE_MS) {
+        val now = SystemClock.uptimeMillis()
+        if (windowCheckSince == 0L) {
+            windowCheckSince = now
+        } else if (now - windowCheckSince >= WINDOW_MAX_WAIT_MS) {
+            return // a pop-up being dragged sends events nonstop: let the pending check run
+        }
+        handler.removeCallbacks(windowCheck)
+        handler.postDelayed(windowCheck, delayMs)
+    }
+
+    private fun checkWindows() {
+        val now = SystemClock.uptimeMillis()
+        when (val step = shield.assess(appWindows(), packageName, ::isCritical, now)) {
+            WindowShield.Step.None -> Unit
+            is WindowShield.Step.Later -> scheduleWindowCheck((step.atMs - now).coerceAtLeast(50L))
+            is WindowShield.Step.CheckSide -> enforce(step.pkg, goHome = false)
+            is WindowShield.Step.ShowBlockScreen -> enforce(step.pkg, goHome = false)
+            is WindowShield.Step.GoHome -> enforce(step.pkg, goHome = true)
+        }
+    }
+
+    /**
+     * [pkg] is visible somewhere without the block screen covering it. Ask again (a grant or the
+     * end of a schedule lets it through), then show the block screen or leave to the home screen.
+     */
+    private fun enforce(pkg: String, goHome: Boolean) {
+        scope.launch {
+            val decision = wardenContainer.accessController.decideForPackage(pkg)
+            withContext(Dispatchers.Main) {
+                if (decision is AccessDecision.Allow) {
+                    shield.allowed(pkg, SystemClock.uptimeMillis())
+                    return@withContext
+                }
+                // Own key: if a window can't be got rid of, this pauses only the window guard.
+                if (!passLoopGuard(WINDOW_KEY_PREFIX + pkg, confirmed = true)) return@withContext
+                if (goHome) {
+                    shield.shield(pkg)
+                    gate.noteWentHome(SystemClock.uptimeMillis())
+                    performGlobalAction(GLOBAL_ACTION_HOME)
+                    scheduleWindowCheck()
+                } else if (SystemClock.uptimeMillis() - lastBlockScreenAt < BLOCK_SCREEN_STARTING_MS) {
+                    // A block screen was just launched and may not be on screen yet: look again.
+                    scheduleWindowCheck(BLOCK_SCREEN_STARTING_MS)
+                } else {
+                    showBlockScreen(pkg, decision)
+                }
             }
         }
+    }
+
+    /** All visible app windows (not keyboards, system bars, overlays). Empty if Android can't say. */
+    private fun appWindows(): List<WindowShield.AppWindow> = runCatching {
+        val (sw, sh) = screenSize()
+        val r = Rect()
+        windows.mapNotNull { w ->
+            if (w.type != AccessibilityWindowInfo.TYPE_APPLICATION) return@mapNotNull null
+            val pkg = w.root?.packageName?.toString() ?: return@mapNotNull null
+            w.getBoundsInScreen(r)
+            WindowShield.AppWindow(
+                pkg = pkg,
+                active = w.isActive || w.isFocused,
+                coversScreen = WindowShield.covers(r.width(), r.height(), sw, sh),
+                area = WindowShield.area(r.width(), r.height(), sw, sh),
+                pip = w.isInPictureInPictureMode,
+            )
+        }
+    }.getOrDefault(emptyList())
+
+    /** Size of the screen in use (the Fold's cover or inner screen), in pixels. */
+    private fun screenSize(): Pair<Int, Int> {
+        val display = getSystemService(DisplayManager::class.java)?.getDisplay(Display.DEFAULT_DISPLAY)
+            ?: return 0 to 0
+        val m = DisplayMetrics()
+        @Suppress("DEPRECATION") display.getRealMetrics(m)
+        return m.widthPixels to m.heightPixels
     }
 
     /**
@@ -243,5 +356,11 @@ class AppBlockAccessibilityService : AccessibilityService() {
 
         /** Wake just after the grant's end, so it has surely expired. */
         const val GRANT_RECHECK_MARGIN_MS = 500L
+
+        /** Quiet time after window changes before all windows are looked at. */
+        const val WINDOW_SETTLE_MS = 450L
+        const val WINDOW_MAX_WAIT_MS = 1_500L
+        const val WINDOW_KEY_PREFIX = "window:"
+        const val BLOCK_SCREEN_STARTING_MS = 1_500L
     }
 }

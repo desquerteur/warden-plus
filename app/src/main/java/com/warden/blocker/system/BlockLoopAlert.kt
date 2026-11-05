@@ -18,7 +18,7 @@ object BlockLoopAlert {
     private const val NOTIF_ID = NotificationIds.BLOCK_LOOP
 
     fun notifyPaused(context: Context, key: String) {
-        val name = if (key.startsWith("feature:")) "this feed" else AppsHelper.labelFor(context, key)
+        val name = if (key.startsWith("feature:")) "this feed" else AppsHelper.labelFor(context, key.removePrefix("window:"))
         val pi = PendingIntent.getActivity(
             context, NOTIF_ID, MainActivity.requestIntent(context),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,

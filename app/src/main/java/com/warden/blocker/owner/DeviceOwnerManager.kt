@@ -58,6 +58,13 @@ object DeviceOwnerManager {
             // A locked clock should also be the right one: network time on (left on afterwards).
             step("Automatic time") { dpm.setAutoTimeEnabled(admin, true) }
         }
+        if (plan.privateDnsAutomatic && Build.VERSION.SDK_INT >= 29) step("Private DNS") {
+            // A named provider (DNS over TLS) goes around the filter; "Automatic" doesn't. Lifting
+            // the rule later leaves it on Automatic, Android's own default.
+            if (dpm.getGlobalPrivateDnsMode(admin) == DevicePolicyManager.PRIVATE_DNS_MODE_PROVIDER_HOSTNAME) {
+                dpm.setGlobalPrivateDnsModeOpportunistic(admin)
+            }
+        }
         step("Always-on VPN") {
             val ours = dpm.getAlwaysOnVpnPackage(admin) == context.packageName
             when (OwnerPolicyPlanner.alwaysOnVpnAction(plan.alwaysOnVpn, ours, prefs.alwaysOnVpnSet)) {

@@ -47,6 +47,7 @@ class AppBlockAccessibilityService : AccessibilityService() {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val settingsGuard by lazy { SettingsGuardHook(this) }
+    private val browserGuard by lazy { BrowserGuard(this) }
     private val handler = Handler(Looper.getMainLooper())
     private val gate = ForegroundGate.shared
     private val activityCache = HashMap<String, Boolean>()
@@ -75,6 +76,7 @@ class AppBlockAccessibilityService : AccessibilityService() {
         val pkg = event.packageName?.toString() ?: return
         // Settings guard (warn only): before the foreground logic, which never looks at Settings (critical).
         settingsGuard.onEvent(event)
+        browserGuard.onEvent(event, pkg) // VPN bypass protection: Browser mode, who took the VPN
 
         // Only a window *state* change can mean "another app came to the front". Content
         // changes fire constantly — also from widgets on the home screen — and never block.
@@ -232,6 +234,7 @@ class AppBlockAccessibilityService : AccessibilityService() {
 
     override fun onDestroy() {
         settingsGuard.stop()
+        browserGuard.stop()
         handler.removeCallbacksAndMessages(null)
         scope.cancel()
         super.onDestroy()

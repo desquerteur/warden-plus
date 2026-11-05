@@ -46,6 +46,7 @@ sealed class ProtectedChange(val kind: Loosening) {
     enum class Setting(val label: String) {
         ALWAYS_ON("Always on"), BLOCK_DOH("Block DNS-over-HTTPS"), BLOCK_NOTIFICATIONS("Block notifications"),
         SETTINGS_GUARD("Settings guard"), GUARD_DATE_TIME("Settings guard: Also Date & time"),
+        BROWSER_MODE("Browser mode"),
     }
 
     /** What happens, for "… at 15:40" in the pending list and in messages. */

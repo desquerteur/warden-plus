@@ -17,6 +17,7 @@ import com.warden.blocker.hosts.DomainMatcher
 import com.warden.blocker.stats.StatsRecorder
 import com.warden.blocker.system.NotificationIds
 import com.warden.blocker.system.ProtectionWatch
+import com.warden.blocker.system.VpnTakeover
 import com.warden.blocker.wardenContainer
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -106,6 +107,7 @@ class WardenVpnService : VpnService() {
             }
 
         VpnController.clearRefused()
+        VpnTakeover.cancel(this) // the filter is back: "Another VPN took over" is out of date
         _running.value = true
         _alwaysOn.value = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) isAlwaysOn else null
         // Reports a gap since the last heartbeat (force-stopped, put to sleep) and starts beating.

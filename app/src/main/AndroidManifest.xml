@@ -32,6 +32,10 @@
             <action android:name="android.intent.action.MAIN" />
             <category android:name="android.intent.category.HOME" />
         </intent>
+        <!-- VPN apps (category "VPN apps", VPN bypass protection): only apps with a VpnService. -->
+        <intent>
+            <action android:name="android.net.VpnService" />
+        </intent>
     </queries>
 
     <application

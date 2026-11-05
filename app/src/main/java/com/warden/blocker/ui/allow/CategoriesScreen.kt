@@ -77,12 +77,20 @@ fun CategoriesScreen(onBack: () -> Unit, vm: AllowViewModel = viewModel()) {
                 val members = list.filter { effective(it) == category }
                 val excluded = list.filter { it.detected == category && config.categoryOverrides[it.packageName] == AppCategories.NONE }
                 val open = category.name in expanded
+                // VPN apps: taking one out of the category is "Trust" (Trusted VPN), see VpnApps.trusted.
+                val vpn = category == AppCategory.VPN
                 Card(Modifier.fillMaxWidth()) {
                     Column(Modifier.fillMaxWidth().padding(CardPadding), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Column(Modifier.weight(1f)) {
-                                Text("Block all ${category.label.lowercase()}", style = MaterialTheme.typography.titleMedium)
+                                Text(if (vpn) "Block VPN apps" else "Block all ${category.label.lowercase()}", style = MaterialTheme.typography.titleMedium)
                                 Hint(if (apps == null) "Looking for apps…" else "${members.size} installed")
+                                if (vpn) {
+                                    Hint(
+                                        "Another VPN pushes Warden's website filter out. Need one (e.g. Tailscale)? " +
+                                            "Tap Trust — Browser mode then still blocks websites in browsers.",
+                                    )
+                                }
                             }
                             Switch(
                                 checked = category in config.blockedCategories,
@@ -101,15 +109,19 @@ fun CategoriesScreen(onBack: () -> Unit, vm: AllowViewModel = viewModel()) {
                                     CategoryAppRow(
                                         app,
                                         status = if (byHand) "Added by you" else "Detected",
-                                        action = if (byHand) "Remove" else "Not a ${category.singular}",
+                                        action = when {
+                                            byHand -> "Remove"
+                                            vpn -> "Trust"
+                                            else -> "Not a ${category.singular}"
+                                        },
                                         onAction = { vm.setOverride(app.packageName, if (byHand) null else AppCategories.NONE) },
                                     )
                                 }
                                 excluded.forEach { app ->
                                     CategoryAppRow(
                                         app,
-                                        status = "You said: not a ${category.singular}",
-                                        action = "Count again",
+                                        status = if (vpn) "Trusted VPN — not blocked" else "You said: not a ${category.singular}",
+                                        action = if (vpn) "Block again" else "Count again",
                                         onAction = { vm.setOverride(app.packageName, null) },
                                     )
                                 }

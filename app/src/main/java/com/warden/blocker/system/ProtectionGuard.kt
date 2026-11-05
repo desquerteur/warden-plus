@@ -164,6 +164,7 @@ class ProtectionGuard(private val context: Context, private val c: AppContainer)
                 ProtectedChange.Setting.BLOCK_NOTIFICATIONS -> s.setBlockNotifications(false)
                 ProtectedChange.Setting.SETTINGS_GUARD -> SettingsGuardStore.get(context).setEnabled(false)
                 ProtectedChange.Setting.GUARD_DATE_TIME -> SettingsGuardStore.get(context).setWatchDateTime(false)
+                ProtectedChange.Setting.BROWSER_MODE -> s.setBrowserMode(false)
             }
             is ProtectedChange.LoosenAllow -> c.allowStore.update(change.edit::applyTo)
             is ProtectedChange.ShortenBlockUntil -> {

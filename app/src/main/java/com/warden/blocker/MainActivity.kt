@@ -95,6 +95,9 @@ class MainActivity : ComponentActivity() {
     /** Set by a [requestIntent] asking for Setup; the scaffold navigates there and clears it. */
     private var openSetupRequested by mutableStateOf(false)
 
+    /** Set by a [requestIntent] from "Another VPN took over": take the VPN slot back (consent dialog). */
+    private var restoreRequested by mutableStateOf(false)
+
     /** Id of the last [requestIntent] acted on, saved so a recreation doesn't repeat it. */
     private var handledRequest = 0L
 
@@ -182,6 +185,14 @@ class MainActivity : ComponentActivity() {
                 // Retry from Home: same consent flow; with the main switch off only the focus session needs it.
                 fun retryVpn() = withVpn(if (vm.masterEnabled.value) AfterConsent.ENABLE_BLOCKING else AfterConsent.START_FOCUS)
 
+                // "Restore" in the VPN-takeover notification: like Try again on Home.
+                LaunchedEffect(restoreRequested) {
+                    if (restoreRequested) {
+                        restoreRequested = false
+                        retryVpn()
+                    }
+                }
+
                 // Stops the VPN too when nothing else needs it (see ProtectionGuard.apply).
                 fun cancelFocus() { vm.cancelFocus() }
 
@@ -210,6 +221,7 @@ class MainActivity : ComponentActivity() {
         handledRequest = id
         if (intent?.getBooleanExtra(EXTRA_ENABLE_BLOCKING, false) == true) enableRequested = true
         if (intent?.getBooleanExtra(EXTRA_OPEN_SETUP, false) == true) openSetupRequested = true
+        if (intent?.getBooleanExtra(EXTRA_RESTORE_FILTER, false) == true) restoreRequested = true
     }
 
     /** The VPN dialog was cancelled or couldn't be shown; Home has the details. */
@@ -231,6 +243,9 @@ class MainActivity : ComponentActivity() {
 
         /** Intent extra: open the Setup screen (e.g. accessibility was switched off by an update). */
         private const val EXTRA_OPEN_SETUP = "com.warden.blocker.OPEN_SETUP"
+
+        /** Intent extra: ask for the VPN slot back after another VPN took over. */
+        private const val EXTRA_RESTORE_FILTER = "com.warden.blocker.RESTORE_FILTER"
         private const val EXTRA_REQUEST_ID = "com.warden.blocker.REQUEST_ID"
         private const val STATE_HANDLED_REQUEST = "handled_request"
 
@@ -238,11 +253,17 @@ class MainActivity : ComponentActivity() {
          * Opens Warden from outside (tile, notification) and asks it to turn blocking on and/or
          * show Setup. An already open Warden gets it via onNewIntent; each request runs once.
          */
-        fun requestIntent(context: Context, enableBlocking: Boolean = false, openSetup: Boolean = false): Intent =
+        fun requestIntent(
+            context: Context,
+            enableBlocking: Boolean = false,
+            openSetup: Boolean = false,
+            restoreFilter: Boolean = false,
+        ): Intent =
             Intent(context, MainActivity::class.java)
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
                 .putExtra(EXTRA_ENABLE_BLOCKING, enableBlocking)
                 .putExtra(EXTRA_OPEN_SETUP, openSetup)
+                .putExtra(EXTRA_RESTORE_FILTER, restoreFilter)
                 .putExtra(EXTRA_REQUEST_ID, System.currentTimeMillis())
     }
 }

@@ -39,6 +39,20 @@ class InstalledAppsInfo(private val context: Context) {
 
     fun detectedCategory(packageName: String): AppCategory? = cached(packageName).category
 
+    @Volatile private var vpnCache: Set<String>? = null
+
+    /**
+     * Installed VPN apps (not Warden+), see [VpnApps]. Visible through the `<queries>` entry for
+     * the VpnService action, also without a launcher icon. Cached until [invalidate].
+     */
+    fun vpnPackages(): Set<String> = vpnCache ?: run {
+        val services = runCatching {
+            context.packageManager.queryIntentServices(Intent(VpnApps.SERVICE_ACTION), PackageManager.MATCH_ALL)
+                .map { ServiceEntry(it.serviceInfo.packageName, it.serviceInfo.permission) }
+        }.getOrDefault(emptyList())
+        VpnApps.detect(services, context.packageName).also { vpnCache = it }
+    }
+
     fun isAlwaysAllowed(packageName: String, config: AllowConfig): Boolean =
         packageName in AlwaysAllowed.PACKAGES ||
             CriticalApps.isCritical(context, packageName) ||
@@ -63,7 +77,7 @@ class InstalledAppsInfo(private val context: Context) {
             .mapNotNull { pkg ->
                 val info = runCatching { pm.getApplicationInfo(pkg, 0) }.getOrNull() ?: return@mapNotNull null
                 val label = pm.getApplicationLabel(info).toString()
-                CategorizedApp(pkg, label, AppCategories.detect(info.category, info.flags))
+                CategorizedApp(pkg, label, AppCategories.detect(info.category, info.flags, pkg in vpnPackages()))
             }
             .sortedBy { it.label.lowercase() }
             .toList()
@@ -72,6 +86,7 @@ class InstalledAppsInfo(private val context: Context) {
     /** Forget what's known about [packageName] (null: everything) after an install or update. */
     fun invalidate(packageName: String?) {
         if (packageName == null) cache.clear() else cache.remove(packageName)
+        vpnCache = null
         defaultsAt = 0L
     }
 
@@ -79,7 +94,7 @@ class InstalledAppsInfo(private val context: Context) {
         val pm = context.packageManager
         val info = runCatching { pm.getApplicationInfo(packageName, 0) }.getOrNull()
         Cached(
-            category = info?.let { AppCategories.detect(it.category, it.flags) },
+            category = info?.let { AppCategories.detect(it.category, it.flags, packageName in vpnPackages()) },
             launchable = info != null && runCatching { pm.getLaunchIntentForPackage(packageName) != null }.getOrDefault(false),
         )
     }

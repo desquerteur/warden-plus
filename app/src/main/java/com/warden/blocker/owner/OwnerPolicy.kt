@@ -25,6 +25,10 @@ enum class OwnerPolicy(
     LOCK_DATE_TIME(UserManager.DISALLOW_CONFIG_DATE_TIME),
     /** No safe mode (it starts the phone without Warden+). */
     BLOCK_SAFE_BOOT(UserManager.DISALLOW_SAFE_BOOT),
+    /** Detected VPN apps (not trusted ones) are suspended while blocking is on: none can push the filter out. */
+    SUSPEND_VPN_APPS,
+    /** Private DNS can't be set to a provider (DNS over TLS would go around the filter); it's set to Automatic. */
+    LOCK_PRIVATE_DNS(UserManager.DISALLOW_CONFIG_PRIVATE_DNS),
     ;
 
     companion object {
@@ -47,4 +51,6 @@ val OwnerPolicy.title: String
         OwnerPolicy.BLOCK_APP_CONTROLS -> "Lock app controls"
         OwnerPolicy.LOCK_DATE_TIME -> "Lock date & time"
         OwnerPolicy.BLOCK_SAFE_BOOT -> "Block safe mode"
+        OwnerPolicy.SUSPEND_VPN_APPS -> "Switch off VPN apps"
+        OwnerPolicy.LOCK_PRIVATE_DNS -> "Lock Private DNS"
     }

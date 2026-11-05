@@ -97,12 +97,18 @@ class InterceptActivity : ComponentActivity() {
                 }
 
                 Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-                    val needsItem = kind != KIND_FEATURE && !AllowBlockNotice.isAllowBlock(itemId)
+                    val needsItem = kind != KIND_FEATURE && kind != KIND_WEBSITE && !AllowBlockNotice.isAllowBlock(itemId)
                     Crossfade(!needsItem || loaded, animationSpec = tween(Motion.MEDIUM), label = "intercept") { ready ->
                         if (!ready) return@Crossfade
                         val current = item
                         when {
                             kind == KIND_FEATURE -> FeatureBlockScreen(featureLabel, ::goHome)
+                            kind == KIND_WEBSITE -> CenteredMessage(
+                                title = "${featureLabel ?: "This website"} is blocked",
+                                body = "Warden+'s website filter isn't running (for example another VPN like Tailscale " +
+                                    "is on), so Browser mode blocks this site in the browser instead.",
+                                onHome = ::goHome,
+                            )
                             // "Allow only" / blocked category: no blocklist entry behind it.
                             AllowBlockNotice.isAllowBlock(itemId) -> CenteredMessage(
                                 title = AllowBlockNotice.title(itemId),
@@ -166,6 +172,8 @@ class InterceptActivity : ComponentActivity() {
         const val KIND_BLOCK = "block"
         const val KIND_LIMIT = "limit"
         const val KIND_FEATURE = "feature"
+        /** Browser mode: a blocked website in a browser's address bar ([EXTRA_FEATURE_LABEL] = host). */
+        const val KIND_WEBSITE = "website"
     }
 }
 

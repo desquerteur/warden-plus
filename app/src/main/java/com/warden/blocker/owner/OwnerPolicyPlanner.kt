@@ -10,6 +10,8 @@ data class OwnerPlan(
     val clearRestrictions: Set<String>,
     val alwaysOnVpn: Boolean,
     val uninstallBlocked: Boolean,
+    /** Set Private DNS to "Automatic" if it names a provider ([OwnerPolicy.LOCK_PRIVATE_DNS]). */
+    val privateDnsAutomatic: Boolean = false,
 )
 
 /**
@@ -33,14 +35,19 @@ object OwnerPolicyPlanner {
      * The changes from today's state to the wanted one. [suspendedByUs] is what Warden+ suspended
      * earlier (it only ever lifts its own suspensions); [wantSuspended] comes from [suspendTargets].
      * Every managed restriction that isn't wanted is cleared, so switching a policy off undoes it.
+     * [vpnApps] are the VPN apps "Switch off VPN apps" stops right now
+     * ([com.warden.blocker.allow.VpnApps.suspendTargets]: not trusted, only while blocking is on).
      */
     fun plan(
         enabled: Set<OwnerPolicy>,
         wantSuspended: Set<String>,
         suspendedByUs: Set<String>,
         protected: Set<String>,
+        vpnApps: Set<String> = emptySet(),
     ): OwnerPlan {
-        val want = if (OwnerPolicy.SUSPEND_BLOCKED_APPS in enabled) wantSuspended - protected else emptySet()
+        val blocked = if (OwnerPolicy.SUSPEND_BLOCKED_APPS in enabled) wantSuspended else emptySet()
+        val vpn = if (OwnerPolicy.SUSPEND_VPN_APPS in enabled) vpnApps else emptySet()
+        val want = blocked + vpn - protected
         val restrictions = enabled.mapNotNull { it.restriction }.toSet()
         return OwnerPlan(
             suspend = want - suspendedByUs,
@@ -50,6 +57,7 @@ object OwnerPolicyPlanner {
             clearRestrictions = OwnerPolicy.MANAGED_RESTRICTIONS - restrictions,
             alwaysOnVpn = OwnerPolicy.ALWAYS_ON_VPN in enabled,
             uninstallBlocked = OwnerPolicy.BLOCK_UNINSTALL in enabled,
+            privateDnsAutomatic = OwnerPolicy.LOCK_PRIVATE_DNS in enabled,
         )
     }
 

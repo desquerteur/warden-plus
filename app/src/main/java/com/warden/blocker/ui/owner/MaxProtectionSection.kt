@@ -201,7 +201,7 @@ private fun EmergencyExitBlock(vm: OwnerViewModel, pinBypassed: Boolean) {
     }
 }
 
-private val OwnerPolicy.explanation: String
+internal val OwnerPolicy.explanation: String
     get() = when (this) {
         OwnerPolicy.SUSPEND_BLOCKED_APPS ->
             "While blocking is on, hard-blocked apps (and apps at their limit) are greyed out by Android — " +
@@ -212,6 +212,9 @@ private val OwnerPolicy.explanation: String
         OwnerPolicy.BLOCK_APP_CONTROLS -> "No Force stop, Clear data or Uninstall for any app in Settings."
         OwnerPolicy.LOCK_DATE_TIME -> "Time is set automatically and can't be changed, so schedules can't be tricked."
         OwnerPolicy.BLOCK_SAFE_BOOT -> "Safe mode would start the phone without Warden+."
+        OwnerPolicy.SUSPEND_VPN_APPS ->
+            "While blocking is on, VPN apps (not the ones you trust) are greyed out, so none can push the filter out."
+        OwnerPolicy.LOCK_PRIVATE_DNS -> "Private DNS stays on Automatic: no encrypted DNS around the filter."
     }
 
 private fun formatDateTime(context: Context, millis: Long): String {

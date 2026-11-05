@@ -186,7 +186,8 @@ class HostsListRepository(
                 DomainHashSet(active.sumOf { it.domainCount }).also { set ->
                     for (s in active) {
                         val f = domainsFile(s.id)
-                        if (f.exists()) f.forEachLine { line -> if (line.isNotEmpty()) set.add(line) }
+                        // Also here, for lists imported before the update hosts were protected.
+                        if (f.exists()) f.forEachLine { line -> if (line.isNotEmpty() && !NeverBlockHosts.wouldBlock(line)) set.add(line) }
                     }
                 }
             }
@@ -237,7 +238,10 @@ class HostsListRepository(
                     tmp.bufferedWriter().use { out ->
                         while (true) {
                             val line = reader.readLine() ?: break
-                            HostsParser.parseLine(line) { d -> if (seen.add(d)) { out.write(d); out.write('\n'.code) } }
+                            HostsParser.parseLine(line) { d ->
+                                // Warden's own updates (GitHub) stay reachable whatever a list says.
+                                if (!NeverBlockHosts.wouldBlock(d) && seen.add(d)) { out.write(d); out.write('\n'.code) }
+                            }
                             if (++lines % 4000 == 0) {
                                 coroutineContext.ensureActive()
                                 _progress.value = ImportProgress(source.name, counted.count, total, seen.size)

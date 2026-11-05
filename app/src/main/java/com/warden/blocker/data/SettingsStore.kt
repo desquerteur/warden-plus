@@ -47,6 +47,8 @@ class SettingsStore(private val context: Context) {
         val PROTECTION_LOCKED_UNTIL = longPreferencesKey("protection_locked_until")
         val PENDING_CHANGES = stringPreferencesKey("pending_changes")
         val PROTECTION_OFF_EVENTS = stringSetPreferencesKey("protection_off_events")
+        val VPN_SWITCH_EVENTS = stringSetPreferencesKey("vpn_switch_events")
+        val BROWSER_MODE = booleanPreferencesKey("browser_mode")
     }
 
     /**
@@ -97,6 +99,26 @@ class SettingsStore(private val context: Context) {
             if (events.any { (it.toLongOrNull() ?: 0L) > at - 10 * 60_000L }) return@edit
             p[Keys.PROTECTION_OFF_EVENTS] = (events + at.toString()).toSet()
         }.let { }
+
+    /** When another app's VPN pushed Warden's filter out (epoch millis, last ~5 weeks). */
+    val vpnSwitchEvents: Flow<List<Long>> = context.dataStore.data.map { p ->
+        p[Keys.VPN_SWITCH_EVENTS].orEmpty().mapNotNull { it.toLongOrNull() }.sorted()
+    }
+
+    /** One takeover can be reported twice (revoke + the check on the next start): a minute apart counts once. */
+    suspend fun recordVpnSwitch(at: Long) =
+        context.dataStore.edit { p ->
+            val keep = at - 35L * 24 * 60 * 60_000L
+            val events = p[Keys.VPN_SWITCH_EVENTS].orEmpty().filter { (it.toLongOrNull() ?: 0L) >= keep }
+            if (events.any { (it.toLongOrNull() ?: 0L) > at - 60_000L }) return@edit
+            p[Keys.VPN_SWITCH_EVENTS] = (events + at.toString()).toSet()
+        }.let { }
+
+    /** Browser mode: while Warden's filter is off (e.g. Tailscale holds the VPN), block in browsers' address bars. */
+    val browserMode: Flow<Boolean> = context.dataStore.data.map { it[Keys.BROWSER_MODE] ?: false }
+
+    suspend fun setBrowserMode(value: Boolean) =
+        context.dataStore.edit { it[Keys.BROWSER_MODE] = value }.let { }
 
     /** Whether Warden's accessibility service has ever been connected — so its later absence
      *  (Android turns it off when the app is updated from an APK file) can be flagged. */

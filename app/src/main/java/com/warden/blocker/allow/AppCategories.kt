@@ -10,6 +10,9 @@ enum class AppCategory(val label: String, val singular: String) {
     AUDIO("Music & audio", "music app"),
     NEWS("News & magazines", "news app"),
     IMAGE("Photos & images", "photo app"),
+    /** Apps that bring their own VPN (Tailscale, free VPNs …): switching one on pushes Warden's
+     *  website filter out, since Android allows one VPN at a time. Detected by [VpnApps]. */
+    VPN("VPN apps", "VPN app"),
 }
 
 /**
@@ -23,8 +26,12 @@ object AppCategories {
     /** Override value: "don't treat this app as any category". */
     const val NONE = "NONE"
 
-    /** [category] is `ApplicationInfo.category`, [flags] is `ApplicationInfo.flags`. */
-    fun detect(category: Int, flags: Int): AppCategory? {
+    /**
+     * [category] is `ApplicationInfo.category`, [flags] is `ApplicationInfo.flags`. [isVpn]: the
+     * app has a VPN service ([VpnApps]) — that wins, the VPN slot is what matters for blocking.
+     */
+    fun detect(category: Int, flags: Int, isVpn: Boolean = false): AppCategory? {
+        if (isVpn) return AppCategory.VPN
         @Suppress("DEPRECATION")
         if (category == ApplicationInfo.CATEGORY_GAME || flags and ApplicationInfo.FLAG_IS_GAME != 0) {
             return AppCategory.GAME

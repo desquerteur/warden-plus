@@ -33,6 +33,15 @@ data class HostsTemplate(val name: String, val description: String, val url: Str
 object HostsTemplates {
     private const val BASE = "https://raw.githubusercontent.com/StevenBlack/hosts/master/"
 
+    /**
+     * hagezi's "Encrypted DNS/VPN/Tor/Proxy Bypass" list (GPL-3.0, github.com/hagezi/dns-blocklists),
+     * plain domains. The old `hosts/` folder is gone; this is the "Wildcard Domains" variant.
+     * GitHub's update hosts are never taken from it ([NeverBlockHosts]).
+     */
+    const val VPN_BYPASS_URL =
+        "https://raw.githubusercontent.com/hagezi/dns-blocklists/main/wildcard/doh-vpn-proxy-bypass-onlydomains.txt"
+    const val VPN_BYPASS_NAME = "VPN, proxy & DoH bypass"
+
     /** "Unified" is the base list; the others are add-ons (the `-only` variants), so
      *  combining them never downloads the base list twice. */
     val ALL = listOf(
@@ -41,5 +50,10 @@ object HostsTemplates {
         HostsTemplate("Gambling", "StevenBlack add-on", BASE + "alternates/gambling-only/hosts"),
         HostsTemplate("Adult content", "StevenBlack add-on", BASE + "alternates/porn-only/hosts"),
         HostsTemplate("Social media", "StevenBlack add-on", BASE + "alternates/social-only/hosts"),
+        HostsTemplate(
+            VPN_BYPASS_NAME,
+            "VPN, proxy & encrypted-DNS sites (~17k) · hagezi, GPL-3.0",
+            VPN_BYPASS_URL,
+        ),
     )
 }

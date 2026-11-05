@@ -16,6 +16,10 @@ object NotificationIds {
     const val BLOCK_LOOP = 1004
     /** A schedule started but Android didn't let the filter start in the background. */
     const val FILTER_PAUSED = 1005
+    /** "Another VPN took over – website blocking is off" (VPN bypass protection). */
+    const val VPN_TAKEOVER = 1006
+    /** Request code of that notification's "VPN settings" action (not a notification). */
+    const val VPN_TAKEOVER_SETTINGS = 1007
     /** "Settings guard is on – managed by Warden+" (ongoing while the guard is on). */
     const val SETTINGS_GUARD = 1010
     /** The clock or time zone was changed by hand (Settings guard). */
@@ -27,7 +31,10 @@ object NotificationIds {
     const val NEW_APP_RANGE = 0x10000
 
     /** The fixed ids, for the uniqueness test. */
-    val fixed = listOf(VPN, ACCESSIBILITY, PROTECTION_WATCH, BLOCK_LOOP, FILTER_PAUSED, SETTINGS_GUARD, CLOCK_CHANGED, UPDATE)
+    val fixed = listOf(
+        VPN, ACCESSIBILITY, PROTECTION_WATCH, BLOCK_LOOP, FILTER_PAUSED, VPN_TAKEOVER, VPN_TAKEOVER_SETTINGS,
+        SETTINGS_GUARD, CLOCK_CHANGED, UPDATE,
+    )
 
     fun newApp(label: String): Int = NEW_APP_BASE + (label.hashCode() and (NEW_APP_RANGE - 1))
 }

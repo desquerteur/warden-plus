@@ -9,6 +9,7 @@ import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import com.warden.blocker.AppContainer
+import com.warden.blocker.allow.VpnApps
 import com.warden.blocker.block.AccessDecision
 import com.warden.blocker.block.BlockStateClock
 import com.warden.blocker.block.TimeWindows
@@ -75,10 +76,14 @@ object OwnerSync {
         val enabled = prefs.policies.value
         val decisions: Map<String, AccessDecision> =
             if (OwnerPolicy.SUSPEND_BLOCKED_APPS in enabled) decisions(c) else emptyMap()
+        val vpnApps = if (OwnerPolicy.SUSPEND_VPN_APPS in enabled) c.installedApps.vpnPackages() else emptySet()
         val suspendedByUs = prefs.suspendedByUs
-        val protected = ProtectedPackages.collect(context, decisions.keys + suspendedByUs)
+        val protected = ProtectedPackages.collect(context, decisions.keys + suspendedByUs + vpnApps)
         val want = OwnerPolicyPlanner.suspendTargets(decisions, protected)
-        DeviceOwnerManager.apply(context, OwnerPolicyPlanner.plan(enabled, want, suspendedByUs, protected))
+        val vpnTargets = if (vpnApps.isEmpty()) emptySet() else {
+            VpnApps.suspendTargets(vpnApps, c.allowStore.current(), protected, c.blockEngine.isBlockingActiveNow())
+        }
+        DeviceOwnerManager.apply(context, OwnerPolicyPlanner.plan(enabled, want, suspendedByUs, protected, vpnTargets))
     }
 
     /**

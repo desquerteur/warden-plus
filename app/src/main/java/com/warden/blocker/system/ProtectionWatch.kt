@@ -91,10 +91,8 @@ object ProtectionWatch {
     suspend fun onVpnRevoked(context: Context) {
         markCleanStop(context)
         context.wardenContainer.settings.recordProtectionOff(System.currentTimeMillis())
-        notify(
-            context, "Website blocking was turned off",
-            "Warden+'s VPN was disconnected in Android settings or another VPN app took over. Tap to turn it back on.",
-        )
+        // Its own loud notice with "Restore" / "VPN settings", naming the VPN app when known.
+        VpnTakeover.onRevoked(context)
     }
 
     private fun notify(context: Context, title: String, text: String) {

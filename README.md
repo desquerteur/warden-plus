@@ -16,11 +16,11 @@ Kotlin · Jetpack Compose · on-device DNS filter · Accessibility app blocking 
 
 **[⬇ Download the latest APK](https://github.com/desquerteur/warden-plus/releases/latest)** · **[Explore the gallery](#screenshot-gallery)** · **[Install guide](#install)** · **[What's new](https://github.com/desquerteur/warden-plus/releases)**
 
-### ▶ Watch the intro · 0:48
+### ▶ Watch the intro · 0:51
 
 [![Warden+ intro preview: click to watch the full video](docs/images/warden-plus-intro-preview.gif)](docs/videos/warden-plus-intro.mp4)
 
-**[▶ Watch the full video (MP4)](docs/videos/warden-plus-intro.mp4)** · A 48-second tour built in code from real app captures (no sound); [video source](docs/videos/source/README.md).
+**[▶ Watch the full video (MP4)](docs/videos/warden-plus-intro.mp4)** · A 51-second tour built in code from real app captures (no sound, 60 fps); [video source](docs/videos/source/README.md).
 
 ## Contents
 

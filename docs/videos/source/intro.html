@@ -4,45 +4,51 @@
 <meta charset="utf-8">
 <title>Warden+ intro</title>
 <!--
-  Intro video scene. Every frame is drawn by window.seek(t) (t in seconds), so the
-  video can be captured frame by frame (see build.mjs). Phone screens are real
-  emulator captures: frame sequences in frames/<segment>/0001.jpg … and still
-  screenshots in img/*.jpg. manifest.js (written by build.mjs) lists the frame counts.
-  Colours: the app's own theme (ui/theme/Theme.kt) – indigo #4F5BD5, coral #E86A5C.
+  Intro video scene (60 fps). Every frame is drawn by window.seek(t) (t in seconds), so the
+  video can be captured frame by frame (see build.mjs). Phone screens are real emulator
+  captures: frame sequences in frames/<segment>/0001.jpg … and stills in img/*.jpg.
+  manifest.js (written by build.mjs) lists frame counts, clip offsets and the taps seen in
+  each recording. Colours: the app's own theme (ui/theme/Theme.kt) – indigo #4F5BD5,
+  dark indigo #3A44A8, coral #E86A5C.
 -->
 <style>
-  :root {
-    --indigo: #4F5BD5;
-    --indigo-dark: #3A44A8;
-    --coral: #E86A5C;
-    --ink: #1B1B21;
-    --muted: #55566A;
-    --bg: #F7F6FC;
-  }
+  :root { --indigo: #4F5BD5; --indigo-dark: #3A44A8; --coral: #E86A5C; --ink: #1B1B21; --muted: #55566A; --bg: #F7F6FC; }
   html, body { margin: 0; width: 1920px; height: 1080px; overflow: hidden; background: var(--bg); }
   body { font-family: "Segoe UI Variable Display", "Segoe UI", Roboto, Arial, sans-serif; color: var(--ink); }
-  #stage { position: absolute; inset: 0; overflow: hidden;
-    background:
-      radial-gradient(1100px 700px at 88% 8%, rgba(79,91,213,0.10), transparent 70%),
-      radial-gradient(900px 600px at 6% 96%, rgba(232,106,92,0.07), transparent 70%),
-      var(--bg); }
-  .scene { position: absolute; inset: 0; opacity: 0; }
-  .text { position: absolute; left: 150px; top: 0; bottom: 0; width: 760px;
-    display: flex; flex-direction: column; justify-content: center; }
+  #bg { position: absolute; inset: 0; overflow: hidden; background: linear-gradient(180deg, #F8F7FD 0%, #F3F2FB 100%); }
+  .blob { position: absolute; border-radius: 50%; will-change: transform; }
+  #b1 { width: 1500px; height: 1100px; left: 900px; top: -560px; background: radial-gradient(closest-side, rgba(79,91,213,0.16), rgba(79,91,213,0)); }
+  #b2 { width: 1300px; height: 1000px; left: -520px; top: 460px; background: radial-gradient(closest-side, rgba(232,106,92,0.11), rgba(232,106,92,0)); }
+  #b3 { width: 1100px; height: 900px; left: 520px; top: 380px; background: radial-gradient(closest-side, rgba(58,68,168,0.07), rgba(58,68,168,0)); }
+  .scene { position: absolute; inset: 0; display: none; }
+  .text { position: absolute; left: 150px; top: 0; bottom: 0; width: 770px; display: flex; flex-direction: column; justify-content: center; }
   .chap { font-size: 26px; font-weight: 600; letter-spacing: 3px; color: var(--coral); margin-bottom: 22px; }
   .chap span { color: #A2A3B5; font-weight: 500; }
   h1 { font-size: 70px; line-height: 1.08; margin: 0 0 26px; font-weight: 700; letter-spacing: -1px; }
   p.sub { font-size: 32px; line-height: 1.45; margin: 0; color: var(--muted); max-width: 720px; }
-  .phones { position: absolute; top: 0; bottom: 0; left: 960px; right: 60px;
-    display: flex; align-items: center; justify-content: center; gap: 56px; }
-  .phone { position: relative; width: 344px; height: 880px; padding: 12px;
-    background: #1D1C22; border-radius: 52px;
-    box-shadow: 0 30px 70px rgba(40,44,110,0.22), 0 6px 18px rgba(0,0,0,0.12); }
+  .w { display: inline-block; white-space: pre; will-change: transform, opacity, filter; }
+  .chip { align-self: flex-start; margin-top: 40px; display: inline-flex; align-items: center; gap: 16px;
+    padding: 14px 28px 14px 18px; border-radius: 999px; background: #FFFFFF; color: var(--ink);
+    font-size: 27px; font-weight: 600; box-shadow: 0 10px 30px rgba(58,68,168,0.14), 0 2px 6px rgba(0,0,0,0.05); opacity: 0; }
+  .chip .ck { width: 40px; height: 40px; border-radius: 50%; background: var(--indigo); display: flex; align-items: center; justify-content: center; }
+  .chip .ck svg { width: 26px; height: 26px; }
+  .chip .ck path { fill: none; stroke: #fff; stroke-width: 3.2; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 24; }
+  .chip .num { font-variant-numeric: tabular-nums; color: var(--indigo-dark); }
+  .phones { position: absolute; top: 0; bottom: 0; left: 960px; right: 60px; display: flex; align-items: center; justify-content: center; gap: 56px; perspective: 1800px; }
+  .pw { position: relative; will-change: transform, opacity, filter; }
+  .shadow { position: absolute; left: 30px; right: 30px; bottom: -34px; height: 60px; border-radius: 50%;
+    background: radial-gradient(closest-side, rgba(40,44,110,0.30), rgba(40,44,110,0)); filter: blur(6px); }
+  .phone { position: relative; width: 344px; height: 880px; padding: 12px; background: #1D1C22; border-radius: 52px;
+    box-shadow: 0 34px 70px rgba(40,44,110,0.20), 0 8px 20px rgba(0,0,0,0.10), inset 0 0 0 1.5px rgba(255,255,255,0.06); }
   .screen { position: relative; width: 344px; height: 880px; border-radius: 40px; overflow: hidden; background: #fff; }
-  .screen img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0; }
-  .icon { width: 132px; height: 132px; border-radius: 34px; background: var(--indigo);
-    display: flex; align-items: center; justify-content: center; margin-bottom: 34px;
-    box-shadow: 0 16px 40px rgba(79,91,213,0.30); }
+  .screen img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0; transform-origin: 50% 40%; }
+  .glare { position: absolute; inset: 0; border-radius: 40px; pointer-events: none;
+    background: linear-gradient(115deg, rgba(255,255,255,0) 35%, rgba(255,255,255,0.10) 48%, rgba(255,255,255,0) 62%); }
+  .tap { position: absolute; width: 56px; height: 56px; margin: -28px 0 0 -28px; border-radius: 50%; opacity: 0;
+    background: radial-gradient(circle, rgba(79,91,213,0.45) 0%, rgba(79,91,213,0.28) 55%, rgba(79,91,213,0) 72%);
+    box-shadow: 0 0 0 2px rgba(255,255,255,0.85); }
+  .icon { width: 132px; height: 132px; border-radius: 34px; background: var(--indigo); display: flex; align-items: center; justify-content: center;
+    margin-bottom: 34px; box-shadow: 0 16px 40px rgba(79,91,213,0.30); }
   .icon svg { width: 132px; height: 132px; }
   .brand { font-size: 104px; font-weight: 700; letter-spacing: -2px; margin: 0 0 18px; line-height: 1; }
   .outro { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
@@ -51,140 +57,235 @@
   .outro .tags { display: flex; gap: 18px; margin-top: 30px; }
   .tag { font-size: 26px; padding: 10px 26px; border-radius: 999px; background: #E6E7FA; color: var(--indigo-dark); font-weight: 600; }
   #bar { position: absolute; left: 150px; right: 150px; bottom: 44px; height: 4px; display: flex; gap: 10px; opacity: 0; }
-  #bar div { flex: 1; background: #E2E2EE; border-radius: 2px; overflow: hidden; }
-  #bar div i { display: block; height: 100%; width: 0; background: var(--indigo); }
+  #bar div { flex: 1; background: rgba(79,91,213,0.13); border-radius: 2px; overflow: hidden; }
+  #bar div i { display: block; height: 100%; width: 0; background: var(--indigo); border-radius: 2px; }
 </style>
 </head>
 <body>
+<div id="bg"><div class="blob" id="b1"></div><div class="blob" id="b2"></div><div class="blob" id="b3"></div></div>
 <div id="stage"></div>
 <div id="bar"></div>
 <script src="manifest.js"></script>
 <script>
 const SHIELD = `<svg viewBox="18 18 72 72"><path fill="#fff" d="M54,30 L72,37 L72,54 C72,66 64,74 54,78 C44,74 36,66 36,54 L36,37 Z"/><path fill="#4F5BD5" d="M49,54 l4,4 l8,-9 l3,3 l-11,12 l-7,-7 z"/></svg>`;
+const CHECK = `<svg viewBox="0 0 24 24"><path d="M5 12.5 l4.5 4.5 L19 7.5"/></svg>`;
+const OVERLAP = 0.8;   // seconds two scenes share (cross-fade + slide)
 
 // Phone content: a list of items; each item is a frame sequence ("seg") or a still ("img"),
 // shown from `at` seconds after the scene starts (cross-fades into the next item).
+// chip: small accent under the caption, from `at` seconds; {count:[from,to]} counts up.
 const SCENES = [
-  { start: 0.0, end: 5.4, kind: 'intro',
-    phones: [[{ seg: 'home-on', at: 0.4 }]] },
-  { start: 5.0, end: 11.4, n: 1, title: 'Block apps and websites',
+  { dur: 5.8, kind: 'intro',
+    phones: [[{ seg: 'home-on', at: 0.3 }]],
+    chip: { at: 3.1, html: 'Blocking is ON' } },
+  { dur: 6.8, n: 1, title: 'Block apps and websites',
     sub: 'Add a site or an app in one tap. A blocked app can open with a calm breathing pause first.',
-    phones: [[{ seg: 'web-add', at: 0.2 }], [{ seg: 'pause', at: 0.5 }]] },
-  { start: 11.0, end: 16.6, n: 2, title: 'Hosts lists like StevenBlack',
+    phones: [[{ seg: 'web-add', at: 0.25 }], [{ seg: 'pause', at: 0.6 }]],
+    chip: { at: 5.2, html: 'reddit.com blocked' } },
+  { dur: 6.2, n: 2, title: 'Hosts lists like StevenBlack',
     sub: 'One-tap ready-made lists or your own hosts file: tens of thousands of domains, filtered on the phone.',
-    phones: [[{ seg: 'hosts', at: 0.2 }, { img: 'hosts-lists.jpg', at: 4.4 }]] },
-  { start: 16.2, end: 23.0, n: 3, title: 'Schedules, focus and “Block until”',
+    phones: [[{ seg: 'hosts', at: 0.25 }, { img: 'hosts-lists.jpg', at: 4.5 }]],
+    chip: { at: 2.9, html: '<span class="num">{n}</span> domains blocked', count: [77758, 84481] } },
+  { dur: 7.2, n: 3, title: 'Schedules, focus and “Block until”',
     sub: 'Weekly windows like Mon–Fri 9–17, focus sessions, or blocking until a time you pick.',
-    phones: [[{ seg: 'schedule', at: 0.2 }], [{ seg: 'block-until', at: 0.5 }]] },
-  { start: 22.6, end: 28.2, n: 4, title: 'Allow only & block categories (e.g. games)',
+    phones: [[{ seg: 'schedule', at: 0.25 }], [{ seg: 'block-until', at: 0.55 }]],
+    chip: { at: 3.4, html: 'Work · Mon–Fri 09:00–17:00' } },
+  { dur: 6.2, n: 4, title: 'Allow only & block categories (e.g. games)',
     sub: 'Block everything except what you allow — or every app of a kind, even ones installed later.',
-    phones: [[{ img: 'allow-only.jpg', at: 0 }], [{ img: 'categories.jpg', at: 0 }]] },
-  { start: 27.8, end: 33.4, n: 5, title: 'Block protection: PIN, delay or locked',
+    phones: [[{ img: 'allow-only.jpg', at: 0 }], [{ img: 'categories.jpg', at: 0 }]],
+    chip: { at: 1.8, html: 'Block all games' } },
+  { dur: 6.6, n: 5, title: 'Block protection: PIN, delay or locked',
     sub: 'Loosening the rules takes a PIN, a waiting time or a date. Tightening always works at once.',
-    phones: [[{ seg: 'protection', at: 0.2 }], [{ img: 'protection.jpg', at: 0 }]] },
-  { start: 33.0, end: 38.6, n: 6, title: 'Beautiful usage stats',
+    phones: [[{ seg: 'protection', at: 0.25 }], [{ img: 'protection.jpg', at: 0 }]],
+    chip: { at: 3.0, html: 'PIN – weakening asks for your PIN' } },
+  { dur: 6.2, n: 6, title: 'Beautiful usage stats',
     sub: 'Screen time, top apps, unlocks and your focus streak — today, this week or this month.',
-    phones: [[{ seg: 'usage', at: 0.2 }], [{ img: 'usage-dark.jpg', at: 0 }]] },
-  { start: 38.2, end: 43.8, n: 7, title: 'Guided setup & spotlight guides',
+    phones: [[{ seg: 'usage', at: 0.25 }], [{ img: 'usage-dark.jpg', at: 0 }]],
+    chip: { at: 1.4, html: '<span class="num">{n}</span>m screen time today', count: [0, 12] } },
+  { dur: 6.4, n: 7, title: 'Guided setup & spotlight guides',
     sub: 'A step-by-step setup wizard, and guides that point at the right button for you.',
-    phones: [[{ seg: 'wizard-done', at: 0.2 }], [{ seg: 'guide', at: 0.4 }]] },
-  { start: 43.4, end: 48.0, kind: 'outro', last: true },
+    phones: [[{ seg: 'wizard-done', at: 0.25 }], [{ seg: 'guide', at: 0.5 }]],
+    chip: { at: 3.0, html: '<span class="num">{n}</span> of 7 steps done', count: [0, 7] } },
+  { dur: 5.6, kind: 'outro', last: true },
 ];
-const DURATION = 48.0;
+let acc = 0;
+SCENES.forEach((s, i) => { s.start = acc; s.end = acc + s.dur; acc = s.end - OVERLAP; s.first = i === 0; });
+const DURATION = SCENES[SCENES.length - 1].end;
 const CHAPTERS = SCENES.filter(s => s.n).length;
 
-const ease = x => 1 - Math.pow(1 - Math.min(Math.max(x, 0), 1), 3);
 const clamp01 = x => Math.min(Math.max(x, 0), 1);
+const easeOut = x => 1 - Math.pow(1 - clamp01(x), 3);
+const easeInOut = x => { x = clamp01(x); return x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2; };
+const TAU = Math.PI * 2;
 
 const stage = document.getElementById('stage');
 const bar = document.getElementById('bar');
 for (let i = 0; i < CHAPTERS; i++) bar.appendChild(Object.assign(document.createElement('div'), { innerHTML: '<i></i>' }));
 
+const words = (txt, cls = '') => txt.split(/(\s+)/).filter(x => x.length)
+  .map(w => /^\s+$/.test(w) ? w : `<span class="w ${cls}">${w.replace(/&/g, '&amp;')}</span>`).join('');
+
 function phoneHTML(items) {
-  return `<div class="phone"><div class="screen">${items.map(() => '<img alt="">').join('')}</div></div>`;
+  return `<div class="pw"><div class="shadow"></div><div class="phone"><div class="screen">${items.map(() => '<img alt="">').join('')}<div class="glare"></div></div></div></div>`;
 }
 
 for (const s of SCENES) {
   const el = document.createElement('div');
   el.className = 'scene';
+  const chip = s.chip ? `<div class="chip"><span class="ck">${CHECK}</span><span class="ct"></span></div>` : '';
   if (s.kind === 'intro') {
-    el.innerHTML = `<div class="text"><div class="icon">${SHIELD}</div>
-      <div class="brand">Warden+</div>
-      <p class="sub" style="font-size:38px;max-width:700px">a free, open-source app &amp; website blocker for Android</p></div>
+    el.innerHTML = `<div class="text"><div class="icon w">${SHIELD}</div>
+      <div class="brand"><span class="w">Warden+</span></div>
+      <p class="sub" style="font-size:38px;max-width:700px">${words('a free, open-source app & website blocker for Android')}</p>${chip}</div>
       <div class="phones">${s.phones.map(phoneHTML).join('')}</div>`;
   } else if (s.kind === 'outro') {
-    el.innerHTML = `<div class="outro"><div class="icon">${SHIELD}</div>
-      <div class="brand">Warden+</div>
-      <div class="line">Unofficial fork of ChristopherLaughlin/warden</div>
-      <div class="tags"><span class="tag">Free</span><span class="tag">Open source</span><span class="tag">GPL-3.0</span></div>
-      <div class="url">github.com/desquerteur/warden-plus</div></div>`;
+    el.innerHTML = `<div class="outro"><div class="icon w">${SHIELD}</div>
+      <div class="brand"><span class="w">Warden+</span></div>
+      <div class="line">${words('Unofficial fork of ChristopherLaughlin/warden')}</div>
+      <div class="tags"><span class="tag w">Free</span><span class="tag w">Open source</span><span class="tag w">GPL-3.0</span></div>
+      <div class="url"><span class="w">github.com/desquerteur/warden-plus</span></div></div>`;
   } else {
-    el.innerHTML = `<div class="text"><div class="chap">${String(s.n).padStart(2, '0')} <span>/ ${String(CHAPTERS).padStart(2, '0')}</span></div>
-      <h1>${s.title.replace(/&(?!amp;)/g, '&amp;')}</h1><p class="sub">${s.sub}</p></div>
+    el.innerHTML = `<div class="text"><div class="chap"><span class="w" style="color:var(--coral)">${String(s.n).padStart(2, '0')}</span> <span class="w">/ ${String(CHAPTERS).padStart(2, '0')}</span></div>
+      <h1>${words(s.title)}</h1><p class="sub">${words(s.sub)}</p>${chip}</div>
       <div class="phones">${s.phones.map(phoneHTML).join('')}</div>`;
   }
   stage.appendChild(el);
   s.el = el;
-  s.textEls = [...el.querySelectorAll('.chap, h1, p.sub, .icon, .brand, .line, .tags, .url')];
-  s.phoneEls = [...el.querySelectorAll('.phone')];
-  s.imgEls = s.phoneEls.map(p => [...p.querySelectorAll('img')]);
+  s.wordEls = [...el.querySelectorAll('.w')];
+  s.chipEl = el.querySelector('.chip');
+  s.pwEls = [...el.querySelectorAll('.pw')];
+  s.imgEls = s.pwEls.map(p => [...p.querySelectorAll('img')]);
+  // One tap circle per tap/swipe recorded in the segment.
+  s.tapEls = (s.phones || []).map((items, pi) => items.map(it => {
+    const seg = it.seg && MANIFEST.segments[it.seg];
+    return (seg ? seg.taps : []).map(tp => {
+      const d = document.createElement('div');
+      d.className = 'tap';
+      s.pwEls[pi].querySelector('.screen').appendChild(d);
+      return { el: d, tp, seg };
+    });
+  }));
 }
 
 function frameSrc(seg, local) {
-  const count = MANIFEST.frames[seg];
-  if (!count) throw new Error('missing segment ' + seg);
-  const i = Math.min(Math.max(Math.floor(local * MANIFEST.fps), 0), count - 1);
-  return `frames/${seg}/${String(i + 1).padStart(4, '0')}.jpg`;
+  const m = MANIFEST.segments[seg];
+  const i = Math.min(Math.max(Math.floor(local * MANIFEST.fps + 1e-6), 0), m.frames - 1);
+  return `frames/${seg}/${String(i + 1).padStart(5, '0')}.jpg`;
+}
+
+function drawBackground(t) {
+  const b1 = document.getElementById('b1'), b2 = document.getElementById('b2'), b3 = document.getElementById('b3');
+  b1.style.transform = `translate(${Math.sin(TAU * t / 23) * 90}px, ${Math.cos(TAU * t / 29) * 60}px) scale(${1 + Math.sin(TAU * t / 31) * 0.05})`;
+  b2.style.transform = `translate(${Math.cos(TAU * t / 27) * 110}px, ${Math.sin(TAU * t / 21) * 50}px)`;
+  b3.style.transform = `translate(${Math.sin(TAU * t / 33 + 1) * 160}px, ${Math.cos(TAU * t / 25 + 2) * 70}px)`;
 }
 
 window.seek = async function (t) {
+  drawBackground(t);
   const loads = [];
   for (const s of SCENES) {
-    const local = t - s.start;
-    const fadeIn = s.start === 0 ? 1 : ease(local / 0.6);
-    const fadeOut = s.last ? 1 : 1 - ease((t - (s.end - 0.5)) / 0.5);
-    const vis = (t >= s.start && t <= s.end) ? Math.min(fadeIn, fadeOut) : 0;
-    s.el.style.opacity = vis;
-    s.el.style.display = vis > 0 ? 'block' : 'none';
-    if (vis <= 0) continue;
-    // Text: rises gently, one line after the other.
-    s.textEls.forEach((e, i) => {
-      const k = s.start === 0 ? 1 : ease((local - 0.1 - i * 0.12) / 0.7);
-      e.style.opacity = k;
-      e.style.transform = `translateY(${(1 - k) * 22}px)`;
+    const local = t - s.start, rem = s.end - t;
+    if (t < s.start || t > s.end) { s.el.style.display = 'none'; continue; }
+    s.el.style.display = 'block';
+    const out = s.last ? 0 : easeInOut((OVERLAP - rem) / OVERLAP);   // 0 → 1 while leaving
+
+    // Words: rise out of a soft blur one after the other, leave upwards.
+    s.wordEls.forEach((e, j) => {
+      const kin = s.first ? easeOut((local + 0.9 - j * 0.09) / 0.8) : easeOut((local - 0.3 - j * 0.045) / 0.75);
+      const kout = s.last ? 0 : easeInOut((OVERLAP - rem - j * 0.012) / (OVERLAP * 0.8));
+      const o = kin * (1 - kout);
+      e.style.opacity = o.toFixed(3);
+      e.style.transform = `translateY(${((1 - kin) * 26 - kout * 16).toFixed(2)}px)`;
+      const blur = (1 - kin) * 9 + kout * 7;
+      e.style.filter = blur > 0.05 ? `blur(${blur.toFixed(2)}px)` : 'none';
     });
-    // Phones: fade and rise, the second one a little later.
-    s.phoneEls.forEach((p, i) => {
-      const k = s.start === 0 ? ease((local + 0.6) / 0.9) : ease((local - 0.15 - i * 0.18) / 0.8);
-      p.style.opacity = k;
-      p.style.transform = `translateY(${(1 - k) * 36}px) scale(${0.97 + 0.03 * k})`;
+
+    // Accent chip with a drawn tick and an optional count-up.
+    if (s.chipEl) {
+      const c = s.chip, k = easeOut((local - c.at) / 0.6);
+      const o = k * (1 - out);
+      s.chipEl.style.opacity = o.toFixed(3);
+      s.chipEl.style.transform = `translateY(${((1 - k) * 16 - out * 10).toFixed(2)}px) scale(${(0.94 + 0.06 * k).toFixed(4)})`;
+      s.chipEl.style.filter = (1 - k) * 6 + out * 5 > 0.05 ? `blur(${((1 - k) * 6 + out * 5).toFixed(2)}px)` : 'none';
+      s.chipEl.querySelector('path').style.strokeDashoffset = (24 * (1 - easeInOut((local - c.at - 0.15) / 0.5))).toFixed(2);
+      let html = c.html;
+      if (c.count) {
+        const v = Math.round(c.count[0] + (c.count[1] - c.count[0]) * easeInOut((local - c.at - 0.1) / 1.3));
+        html = html.replace('{n}', v.toLocaleString('en-US'));
+      }
+      const ct = s.chipEl.querySelector('.ct');
+      if (ct.innerHTML !== html) ct.innerHTML = html;
+    }
+
+    // Phones: glide in from the right, float and tilt gently, glide out to the left.
+    s.pwEls.forEach((p, i) => {
+      const kin = s.first ? easeInOut((local + 0.55) / 1.4) : easeInOut((local - 0.05 - i * 0.14) / 1.15);
+      const kout = out;
+      const ph = i * 1.7 + (s.n || 0) * 0.9;
+      const fy = Math.sin(TAU * t / 6.5 + ph) * 7;
+      const ry = Math.sin(TAU * t / 9 + ph) * 2.2 + (1 - kin) * -9 + kout * 7;
+      const rx = Math.cos(TAU * t / 11 + ph) * 1.1;
+      const rz = Math.sin(TAU * t / 13 + ph) * 0.35;
+      const tx = (1 - kin) * 90 - kout * 80;
+      const sc = 1 + (1 - kin) * 0.04 - kout * 0.035;
+      p.style.opacity = (kin * (1 - kout)).toFixed(3);
+      p.style.transform = `translate3d(${tx.toFixed(2)}px, ${fy.toFixed(2)}px, 0) rotateY(${ry.toFixed(3)}deg) rotateX(${rx.toFixed(3)}deg) rotateZ(${rz.toFixed(3)}deg) scale(${sc.toFixed(4)})`;
+      const blur = (1 - kin) * 7 + kout * 6;
+      p.style.filter = blur > 0.05 ? `blur(${blur.toFixed(2)}px)` : 'none';
+      const sh = p.querySelector('.shadow');
+      sh.style.transform = `translateY(${(-fy * 0.6).toFixed(2)}px) scaleX(${(1 - fy / 120).toFixed(4)})`;
+      sh.style.opacity = (0.85 - fy / 40).toFixed(3);
+      p.querySelector('.glare').style.transform = `translateX(${(Math.sin(TAU * t / 9 + ph) * 30).toFixed(2)}px)`;
     });
+
     // Screen content.
     (s.phones || []).forEach((items, pi) => {
       items.forEach((it, ii) => {
         const img = s.imgEls[pi][ii];
         const next = items[ii + 1];
-        const a = ii === 0 ? 1 : ease((local - it.at) / 0.45);
-        const b = next ? 1 - ease((local - next.at) / 0.45) : 1;
+        const a = ii === 0 ? 1 : easeInOut((local - it.at) / 0.6);
+        const b = next ? 1 - easeInOut((local - next.at) / 0.6) : 1;
         const o = Math.min(a, b);
-        img.style.opacity = o;
+        img.style.opacity = o.toFixed(3);
+        if (it.img) {   // stills: a slow Ken Burns drift
+          const kb = clamp01((local - it.at) / (s.dur - it.at));
+          img.style.transform = `scale(${(1.005 + 0.025 * kb).toFixed(4)}) translateY(${(-6 * kb).toFixed(2)}px)`;
+        }
         if (o <= 0 && ii !== 0) return;
         const src = it.seg ? frameSrc(it.seg, local - it.at) : 'img/' + it.img;
         if (img.getAttribute('src') !== src) {
           img.setAttribute('src', src);
           loads.push(img.decode().catch(() => {}));
         }
+        // Soft tap circles where the recording was tapped.
+        for (const { el, tp, seg } of s.tapEls[pi][ii]) {
+          const t0 = (tp.t - seg.ss) / seg.speed + it.at - (tp.to ? 0.1 : 0.14);
+          const dur = tp.to ? Math.max(tp.d / seg.speed, 0.35) + 0.5 : 0.66;
+          const p = (local - t0) / dur;
+          if (p < 0 || p > 1 || o <= 0) { el.style.opacity = 0; continue; }
+          let x = tp.x, y = tp.y, scale, op;
+          if (tp.to) {   // swipe: press, glide, lift
+            const m = easeInOut((p - 0.2) / 0.6);
+            x = tp.x + (tp.to[0] - tp.x) * m; y = tp.y + (tp.to[1] - tp.y) * m;
+            scale = 0.9; op = Math.min(easeOut(p / 0.2), 1 - easeOut((p - 0.8) / 0.2)) * 0.9;
+          } else {
+            scale = 0.55 + 0.75 * easeOut(p);
+            op = Math.sin(Math.PI * Math.min(p * 1.15, 1)) * 0.95;
+          }
+          el.style.left = (x / 904 * 100).toFixed(3) + '%';
+          el.style.top = (y / 2316 * 100).toFixed(3) + '%';
+          el.style.opacity = (op * o).toFixed(3);
+          el.style.transform = `scale(${scale.toFixed(3)})`;
+        }
       });
     });
   }
-  // Chapter progress bar (only during the chapters).
+  // Chapter progress bar.
   const chapters = SCENES.filter(s => s.n);
   const first = chapters[0], lastC = chapters[chapters.length - 1];
-  const barVis = Math.min(ease((t - first.start) / 0.6), 1 - ease((t - (lastC.end - 0.5)) / 0.5));
-  bar.style.opacity = t < first.start ? 0 : barVis;
+  bar.style.opacity = Math.min(easeInOut((t - first.start - 0.2) / 0.8), 1 - easeInOut((t - (lastC.end - OVERLAP)) / OVERLAP)).toFixed(3);
   chapters.forEach((s, i) => {
-    const span = (s.end - 0.4) - s.start;
-    bar.children[i].firstChild.style.width = (clamp01((t - s.start) / span) * 100) + '%';
+    bar.children[i].firstChild.style.width = (easeInOut((t - s.start) / (s.dur - OVERLAP * 0.5)) * 100).toFixed(2) + '%';
   });
   await Promise.all(loads);
 };

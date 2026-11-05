@@ -121,6 +121,14 @@ fun VpnGuardSection(modifier: Modifier = Modifier, vm: VpnGuardViewModel = viewM
                 },
                 list?.enabled == true, vm::setBypassList,
             )
+            // Right under the switch it belongs to — at the bottom of this long card nobody saw it.
+            message?.let {
+                Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+                FlowRow {
+                    TextButton(onClick = { vm.clearMessage(); vm.setBypassList(true) }) { Text("Try again") }
+                    TextButton(onClick = vm::clearMessage) { Text("OK") }
+                }
+            }
 
             GuardSwitch(
                 "Browser mode",
@@ -168,10 +176,6 @@ fun VpnGuardSection(modifier: Modifier = Modifier, vm: VpnGuardViewModel = viewM
                         "protection (device owner, below) Android itself switches VPN apps off and locks VPN and " +
                         "Private DNS settings.",
                 )
-            }
-            message?.let {
-                Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
-                FlowRow { TextButton(onClick = vm::clearMessage) { Text("OK") } }
             }
         }
     }

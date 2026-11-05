@@ -3,6 +3,7 @@ package com.warden.blocker.ui.intercept
 import android.content.Intent
 import android.os.Bundle
 import android.os.SystemClock
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.animation.AnimatedContent
@@ -68,11 +69,18 @@ import kotlinx.coroutines.launch
 /**
  * Shown over a blocked app. Renders one of three experiences depending on the decision:
  * a hard block, a limit-reached notice, or the mindful pause that can grant timed access.
+ *
+ * Only ever full screen: in a pop-up, split-screen half or picture-in-picture window it could be
+ * pushed aside with the blocked app usable next to it (issue #3), so then it leaves for Home.
  */
 class InterceptActivity : ComponentActivity() {
 
+    private var leaving = false
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        addOnMultiWindowModeChangedListener { if (it.isInMultiWindowMode) leaveWindowedMode() }
+        addOnPictureInPictureModeChangedListener { if (it.isInPictureInPictureMode) leaveWindowedMode() }
         // Anti-tapjacking: a malicious overlay must not be able to trick taps on "Continue"
         // (which grants access) or dismiss the block.
         window.decorView.filterTouchesWhenObscured = true
@@ -144,14 +152,40 @@ class InterceptActivity : ComponentActivity() {
         }
     }
 
-    private fun goHome() {
+    override fun onResume() {
+        super.onResume()
+        // Samsung's "pop-up view" and split screen ignore resizeableActivity on big screens.
+        if (isInMultiWindowMode || isInPictureInPictureMode) leaveWindowedMode()
+    }
+
+    /**
+     * The block screen ended up in a pop-up, split-screen or picture-in-picture window, where
+     * it could be moved off the blocked app. Android doesn't let an app make itself full screen
+     * again, so leave for the home screen, which hides the blocked app; opening it again shows
+     * the block screen again (and the accessibility service keeps watching all windows).
+     */
+    private fun leaveWindowedMode() {
+        if (leaving) return
+        leaving = true
+        Toast.makeText(
+            applicationContext,
+            "Still blocked by Warden+. The block screen can't be moved or made smaller.",
+            Toast.LENGTH_LONG,
+        ).show()
+        goHome(removeTask = true)
+    }
+
+    private fun goHome() = goHome(removeTask = false)
+
+    private fun goHome(removeTask: Boolean) {
         // Widgets of blocked apps live on the home screen; give it a moment before judging again.
         ForegroundGate.shared.noteWentHome(SystemClock.uptimeMillis())
         startActivity(
             Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME)
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
         )
-        finish()
+        // A pop-up / split task would otherwise linger as an empty window.
+        if (removeTask) finishAndRemoveTask() else finish()
     }
 
     @Deprecated("Back should return home, never silently enter the app")

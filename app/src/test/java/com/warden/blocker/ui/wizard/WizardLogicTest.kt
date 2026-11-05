@@ -90,7 +90,8 @@ class WizardLogicTest {
     @Test fun requiredPagesAndAndroidGuides() {
         assertEquals(setOf(APP_BLOCKING, WEBSITE_BLOCKING), WizardStep.entries.filter { it.task && !it.optional }.toSet())
         // Every Android-settings walk-through is used by the wizard or the Protection guide.
-        val used = WizardStep.entries.flatMap { it.guides } + Tours.protection.steps.mapNotNull { it.guide }
+        val used = WizardStep.entries.flatMap { it.guides } + Tours.protection.steps.mapNotNull { it.guide } +
+            SettingsGuide.GRAYSCALE // Settings › Gray mode, when the ADB permission is missing
         assertEquals(SettingsGuide.entries.toSet(), used.toSet())
     }
 }

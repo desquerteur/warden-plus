@@ -31,6 +31,8 @@ enum class Loosening {
     OWNER_POLICY_OFF,
     /** The device-owner emergency exit: its wait follows Block protection, capped at 24 h. */
     REMOVE_DEVICE_OWNER,
+    /** Gray mode switched off or made to cover less time (see GrayModeLogic.loosens). */
+    WEAKEN_GRAY_MODE,
 }
 
 /**

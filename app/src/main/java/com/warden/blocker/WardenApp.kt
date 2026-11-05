@@ -13,6 +13,7 @@ import com.warden.blocker.system.ProtectionGuard
 import com.warden.blocker.data.BlockRepository
 import com.warden.blocker.data.SettingsStore
 import com.warden.blocker.data.WardenDatabase
+import com.warden.blocker.gray.GrayMode
 import com.warden.blocker.hosts.HostsListRepository
 import com.warden.blocker.owner.OwnerSync
 import com.warden.blocker.system.FilterKeeper
@@ -38,6 +39,7 @@ class WardenApp : Application() {
         UpdateCheckWorker.sync(this)
         OwnerSync.start(this) // device-owner rules follow the blocking state
         FilterKeeper.start(this) // re-arms the website filter when a schedule starts
+        GrayMode.start(this) // gray screen follows its setting and the blocking state
     }
 
     private fun createNotificationChannel() {

@@ -67,6 +67,8 @@ powershell -ExecutionPolicy Bypass -File scripts\set-device-owner.ps1
 
 Nur prüfen, ohne etwas zu setzen: `... set-device-owner.ps1 -CheckOnly`.
 Findet es adb nicht: `... set-device-owner.ps1 -AdbPath C:\platform-tools\adb.exe`.
+Das Skript schaltet nebenbei auch **Gray mode** frei (Erlaubnis `WRITE_SECURE_SETTINGS`, siehe
+[GRAY_MODE.md](GRAY_MODE.md)).
 
 **Oder von Hand** (im Ordner `C:\platform-tools`):
 

@@ -9,6 +9,8 @@ import android.content.ComponentName
 import android.content.ContentResolver
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
+import androidx.core.content.ContextCompat
 import android.content.pm.PackageManager
 import android.os.Build
 import android.provider.Settings
@@ -23,6 +25,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -92,8 +95,22 @@ object GrayMode {
         started = true
         val c = app.wardenContainer
         val prefs = GrayModePrefs.get(app)
+        // A sleeping phone runs no clock and delivers inexact alarms late; the screen must be
+        // right the moment it comes on again, so screen-on and unlock check too.
+        val wakeups = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+        val wakeReceiver = object : BroadcastReceiver() {
+            override fun onReceive(context: Context, intent: Intent) { wakeups.tryEmit(Unit) }
+        }
+        runCatching {
+            ContextCompat.registerReceiver(
+                app, wakeReceiver,
+                IntentFilter().apply { addAction(Intent.ACTION_SCREEN_ON); addAction(Intent.ACTION_USER_PRESENT) },
+                ContextCompat.RECEIVER_NOT_EXPORTED,
+            )
+        }.onFailure { Log.e(TAG, "Couldn't listen for screen-on", it) }
         CoroutineScope(SupervisorJob() + Dispatchers.Default).launch {
             merge(
+                wakeups,
                 prefs.config.unit(),
                 c.settings.masterEnabled.unit(),
                 c.settings.alwaysOn.unit(),

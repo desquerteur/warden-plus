@@ -142,7 +142,7 @@ class WardenVpnService : VpnService() {
         val inputs = listOf<Flow<Any?>>(
             c.repository.items, c.repository.schedules, c.hostsLists.activeKey,
             c.settings.blockDoh, c.settings.masterEnabled, c.settings.alwaysOn, c.settings.focusEndsAt,
-            c.allowStore.config,
+            c.allowStore.config, c.settings.relatedOff,
         ).map { it.distinctUntilChanged() } // settings flows re-emit on every unrelated pref write
         combine(inputs) { }
             .drop(1) // the initial values are covered by the refresh before the packet loop

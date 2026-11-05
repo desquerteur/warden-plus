@@ -49,6 +49,7 @@ class SettingsStore(private val context: Context) {
         val PROTECTION_OFF_EVENTS = stringSetPreferencesKey("protection_off_events")
         val VPN_SWITCH_EVENTS = stringSetPreferencesKey("vpn_switch_events")
         val BROWSER_MODE = booleanPreferencesKey("browser_mode")
+        val RELATED_OFF = stringSetPreferencesKey("related_domains_off")
     }
 
     /**
@@ -119,6 +120,15 @@ class SettingsStore(private val context: Context) {
 
     suspend fun setBrowserMode(value: Boolean) =
         context.dataStore.edit { it[Keys.BROWSER_MODE] = value }.let { }
+
+    /** Website entries (by domain) that block only the site itself, not its image / video domains (RelatedDomains). */
+    val relatedOff: Flow<Set<String>> = context.dataStore.data.map { it[Keys.RELATED_OFF] ?: emptySet() }
+
+    suspend fun setRelatedOff(domain: String, off: Boolean) =
+        context.dataStore.edit { p ->
+            val now = p[Keys.RELATED_OFF] ?: emptySet()
+            p[Keys.RELATED_OFF] = if (off) now + domain else now - domain
+        }.let { }
 
     /** Whether Warden's accessibility service has ever been connected — so its later absence
      *  (Android turns it off when the app is updated from an APK file) can be flagged. */

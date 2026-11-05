@@ -185,6 +185,7 @@ class ProtectionGuard(private val context: Context, private val c: AppContainer)
                 prefs.setPolicies(prefs.policies.value - change.policy)
                 OwnerSync.syncNow(context)
             }
+            is ProtectedChange.RelatedOff -> s.setRelatedOff(change.domain, true)
             ProtectedChange.ConfirmOwnerExit -> OwnerPrefs.get(context).setExitReadyAt(System.currentTimeMillis())
             is ProtectedChange.SetProtection -> s.setProtection(change.settings)
             ProtectedChange.DisableUninstallProtection -> AdminManager.disable(context)

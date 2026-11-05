@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.warden.blocker.block.BlockProtection
 import com.warden.blocker.block.PendingChange
 import com.warden.blocker.block.ProtectedChange
+import com.warden.blocker.block.RelatedDomains
 import com.warden.blocker.block.ProtectionSettings
 import com.warden.blocker.data.BlockType
 import com.warden.blocker.data.BlockedItem
@@ -185,6 +186,17 @@ class WardenViewModel(app: Application) : AndroidViewModel(app) {
                 interceptMode = InterceptMode.PAUSE,
             ),
         )
+    }
+
+    /** Website entries whose image / video domains are not blocked ([RelatedDomains]). */
+    val relatedOff: StateFlow<Set<String>> =
+        container.settings.relatedOff.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptySet())
+
+    /** Blocking the related domains again is immediate; leaving them out is a loosening. */
+    fun setRelatedBlocked(item: BlockedItem, blocked: Boolean) = viewModelScope.launch {
+        val domain = RelatedDomains.normalize(item.value)
+        if (blocked) container.settings.setRelatedOff(domain, false)
+        else protectionGuard.request(ProtectedChange.RelatedOff(domain, item.label))
     }
 
     fun toggleItem(item: BlockedItem) = saveItem(item.copy(enabled = !item.enabled))

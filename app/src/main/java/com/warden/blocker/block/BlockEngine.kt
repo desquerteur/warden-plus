@@ -74,7 +74,8 @@ class BlockEngine(
     }
 
     private suspend fun manualAndDohDomains(now: Long = System.currentTimeMillis()): List<String> {
-        val domains = repo.enabledDomains(now).toMutableList()
+        // Blocked sites bring their image / video domains along (issue #4), unless switched off per entry.
+        val domains = RelatedDomains.expand(repo.enabledDomains(now), settings.relatedOff.first()).toMutableList()
         if (settings.blockDoh.first()) domains += DohHosts.ALL
         return domains
     }

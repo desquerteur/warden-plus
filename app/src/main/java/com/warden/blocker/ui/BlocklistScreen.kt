@@ -190,9 +190,12 @@ fun BlocklistScreen(
         }
     }
 
+    val relatedOff by vm.relatedOff.collectAsStateWithLifecycle()
     editing?.let { current ->
         ItemEditorSheet(
             item = current,
+            relatedBlocked = com.warden.blocker.block.RelatedDomains.normalize(current.value) !in relatedOff,
+            onRelatedChange = { vm.setRelatedBlocked(current, it) },
             // A shorter "until …" or a later "from …" asks Block protection first (in saveItem).
             onSave = { vm.saveItem(it) },
             onDismiss = { editing = null },

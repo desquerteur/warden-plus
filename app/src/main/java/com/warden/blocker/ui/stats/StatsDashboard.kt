@@ -246,6 +246,14 @@ private fun Tiles(state: StatsUiState) {
                 color = MaterialTheme.colorScheme.error,
             )
         }
+        if (state.vpnSwitchesThisWeek > 0) {
+            // Another VPN app took the VPN slot (VPN bypass protection).
+            Text(
+                "VPN switched ${state.vpnSwitchesThisWeek}× this week",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.error,
+            )
+        }
     }
 }
 

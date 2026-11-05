@@ -70,6 +70,7 @@ import com.warden.blocker.system.Hardening
 import com.warden.blocker.owner.DeviceOwnerManager
 import com.warden.blocker.ui.protectionSummary
 import com.warden.blocker.ui.AnimatedCheck
+import com.warden.blocker.ui.InfoNote
 import com.warden.blocker.ui.LocalMotion
 import com.warden.blocker.ui.Motion
 import com.warden.blocker.ui.SubScreenTopBar
@@ -379,6 +380,11 @@ private fun WebsiteBlockingPage(done: Boolean) {
             primary = false,
         ) { openSettingsGuide(context, SettingsGuide.OTHER_VPN) }
     }
+    // VPN bypass protection, in short: the details live on the Protection page.
+    InfoNote(
+        "Another VPN app (a free VPN, Tailscale …) would push this filter out. Protection › VPN bypass " +
+            "protection blocks VPN apps, warns at once if one takes over, and has Browser mode for a VPN you trust.",
+    )
 }
 
 @Composable

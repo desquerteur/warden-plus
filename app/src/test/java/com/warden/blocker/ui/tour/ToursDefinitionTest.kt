@@ -104,7 +104,7 @@ class ToursDefinitionTest {
 
     @Test fun protectionDetailsLiveOnTheProtectionPage() {
         val byTarget = Tours.protection.steps.associateBy { it.target }
-        listOf(TourIds.SETTINGS_PIN, TourIds.SETTINGS_GUARD_SYSTEM, TourIds.SETTINGS_DEVICE_OWNER).forEach {
+        listOf(TourIds.SETTINGS_PIN, TourIds.SETTINGS_GUARD_SYSTEM, TourIds.PROTECTION_VPN_GUARD, TourIds.SETTINGS_DEVICE_OWNER).forEach {
             assertEquals(it, TourRoutes.PROTECTION, byTarget.getValue(it).route)
         }
         // Settings › Protection: the way there taps the Protection card.

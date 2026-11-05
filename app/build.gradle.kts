@@ -1,4 +1,4 @@
-import java.util.Properties
+﻿import java.util.Properties
 
 plugins {
     alias(libs.plugins.android.application)
@@ -44,8 +44,8 @@ android {
         targetSdk = 34
         // CI overrides both from the git tag: v1.2.3 -> versionName 1.2.3, versionCode 10203
         // (major*10000 + minor*100 + patch). The defaults follow the same scheme.
-        versionCode = providers.gradleProperty("versionCode").orNull?.toInt() ?: 306
-        versionName = providers.gradleProperty("versionName").orNull ?: "0.3.6"
+        versionCode = providers.gradleProperty("versionCode").orNull?.toInt() ?: 308
+        versionName = providers.gradleProperty("versionName").orNull ?: "0.3.8"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         // GitHub repository ("owner/name") the in-app updater checks for new releases.
         val updateRepo = providers.gradleProperty("updateRepo").orNull ?: "desquerteur/warden-plus"
@@ -108,7 +108,7 @@ val verifyReleaseSigning by tasks.registering {
 }
 tasks.matching { it.name == "preReleaseBuild" }.configureEach { dependsOn(verifyReleaseSigning) }
 
-// The device-owner guide is read inside the app (Settings › Protection › Maximum protection ›
+// The device-owner guide is read inside the app (Settings â€º Protection â€º Maximum protection â€º
 // Step-by-step guide), not on GitHub in a browser that may well be blocked. docs/DEVICE_OWNER.md
 // is copied into the APK's assets at build time, so app and docs never drift apart.
 abstract class DeviceOwnerGuideAsset : DefaultTask() {

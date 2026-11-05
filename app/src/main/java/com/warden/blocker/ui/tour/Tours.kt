@@ -40,6 +40,7 @@ object TourIds {
     const val PROTECTION_MODES = "protection.modes"
     const val SETTINGS_GUARD_SYSTEM = "settings.guard_system_settings"
     const val SETTINGS_DEVICE_OWNER = "settings.device_owner"
+    const val PROTECTION_VPN_GUARD = "protection.vpn_guard"
 
     /** The "Settings are locked" screen (PIN): guides don't walk past it. */
     const val SETTINGS_LOCKED = "settings.locked"
@@ -76,6 +77,7 @@ object Tours {
             step(T.SETTINGS_PROTECTION_CHECKLIST, PROTECTION_SCREEN, "Protection checklist", "Uninstall protection, battery, Always-on VPN, Accessibility. All ticked = hard to switch off."),
             step(T.SETTINGS_UNINSTALL, PROTECTION_SCREEN, "Uninstall protection", "Device admin: Warden+ can't be uninstalled on impulse and “Force stop” is greyed out.", SettingsGuide.DEVICE_ADMIN),
             step(T.SETTINGS_GUARD_SYSTEM, PROTECTION_SCREEN, "Settings guard", "Warns you when an Android page that could switch Warden+ off opens, like Force stop or VPN. The page stays usable."),
+            step(T.PROTECTION_VPN_GUARD, PROTECTION_SCREEN, "VPN bypass protection", "Another VPN app would push the website filter out. Block VPN apps, trust one you need (e.g. Tailscale) and turn on Browser mode."),
             step(T.SETTINGS_DEVICE_OWNER, PROTECTION_SCREEN, "Maximum protection", "Expert mode, set up once with a computer. Android itself then enforces the blocks."),
             step(T.HOME_FOCUS, HOME, "Strict focus", "Tick Strict before you start a focus session — then it can't be ended early, not even with the PIN."),
             step(T.HOME_BLOCK_UNTIL, HOME, "Block until …", "Block until a time you pick — tonight, tomorrow morning or a date. Strict: no way out early."),

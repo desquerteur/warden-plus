@@ -64,6 +64,11 @@ import com.warden.blocker.ui.wizard.WizardStep
 import com.warden.blocker.ui.wizard.rememberOpenWizardAt
 import com.warden.blocker.ui.tour.tourTarget
 import com.warden.blocker.system.Hardening
+import com.warden.blocker.system.PrivateDns
+import com.warden.blocker.allow.AppCategory
+import com.warden.blocker.ui.vpnguard.VpnGuardSection
+import com.warden.blocker.ui.vpnguard.VpnGuardViewModel
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.warden.blocker.util.PermissionsHelper
 import com.warden.blocker.vpn.VpnController
 import com.warden.blocker.vpn.WardenVpnService
@@ -121,6 +126,10 @@ fun ProtectionScreen(vm: WardenViewModel, onBack: () -> Unit, onOpenSetup: () ->
     val isOwner = remember(resumes) { DeviceOwnerManager.isDeviceOwner(context) }
     val openWizardAt = rememberOpenWizardAt(onOpenSetup)
     val ownerPolicies by OwnerPrefs.get(context).policies.collectAsStateWithLifecycle()
+    val vpnGuard: VpnGuardViewModel = viewModel()
+    val allowConfig by vpnGuard.config.collectAsStateWithLifecycle()
+    val vpnAppsBlocked = AppCategory.VPN in allowConfig.blockedCategories
+    val privateDnsBypass = remember(resumes) { PrivateDns.currentBypass(context) }
 
     // Delay / Locked show their choices first; the mode switches once one is picked.
     var expanded by remember { mutableStateOf<ProtectionMode?>(null) }
@@ -274,8 +283,28 @@ fun ProtectionScreen(vm: WardenViewModel, onBack: () -> Unit, onOpenSetup: () ->
                 action = "Open setup",
                 onAction = { openWizardAt(WizardStep.APP_BLOCKING) },
             )
+            // VPN bypass protection: VPN apps blocked and no Private DNS around the filter (card below).
+            val vpnGuardOk = vpnAppsBlocked && privateDnsBypass == null
+            CheckRow(
+                ok = vpnGuardOk,
+                title = "VPN bypass protection",
+                text = when {
+                    !vpnAppsBlocked -> "Block VPN apps, so another VPN can't push the website filter out."
+                    privateDnsBypass != null -> "Private DNS is set to $privateDnsBypass and goes around the filter."
+                    else -> "VPN apps are blocked and Private DNS is fine. More options in the card below."
+                },
+                action = when {
+                    !vpnAppsBlocked -> "Turn on"
+                    privateDnsBypass != null -> "Open settings"
+                    else -> null
+                },
+            ) {
+                if (!vpnAppsBlocked) vpnGuard.setVpnAppsBlocked(true)
+                else runCatching { context.startActivity(PrivateDns.settingsIntent()) }
+            }
 
             SettingsGuardSection(Modifier.tourTarget(TourIds.SETTINGS_GUARD_SYSTEM))
+            VpnGuardSection(Modifier.tourTarget(TourIds.PROTECTION_VPN_GUARD), vm = vpnGuard)
             MaxProtectionSection(Modifier.tourTarget(TourIds.SETTINGS_DEVICE_OWNER))
 
             val offCount = offCountSince(offEvents, now)

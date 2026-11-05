@@ -73,9 +73,11 @@ data class StatsUiState(
     val focusSessions: Int = 0,
     /** Times protection was found switched off from outside in the last 7 days (see ProtectionWatch). */
     val protectionOffThisWeek: Int = 0,
+    /** Times another app's VPN pushed Warden's filter out in the last 7 days (VpnTakeover). */
+    val vpnSwitchesThisWeek: Int = 0,
 )
 
-private data class FocusStats(val streak: Int, val longest: Int, val sessions: Int, val offThisWeek: Int)
+private data class FocusStats(val streak: Int, val longest: Int, val sessions: Int, val offThisWeek: Int, val vpnSwitches: Int = 0)
 
 /** Loads the stats dashboard off the main thread; keeps the last result per period while refreshing. */
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -102,13 +104,14 @@ class StatsViewModel(app: Application) : AndroidViewModel(app) {
     }.flowOn(Dispatchers.Default)
 
     private val focus = app.wardenContainer.settings.let { s ->
-        combine(s.currentStreak, s.longestStreak, s.focusSessionsDone, s.protectionOffEvents) { streak, longest, sessions, off ->
-            FocusStats(streak, longest, sessions, offCountSince(off, System.currentTimeMillis()))
+        combine(s.currentStreak, s.longestStreak, s.focusSessionsDone, s.protectionOffEvents, s.vpnSwitchEvents) { streak, longest, sessions, off, vpn ->
+            val now = System.currentTimeMillis()
+            FocusStats(streak, longest, sessions, offCountSince(off, now), offCountSince(vpn, now))
         }
     }
 
     val state: StateFlow<StatsUiState> = combine(period, usage, blocks, focus) { p, u, b, f ->
-        StatsUiState(p, u, b, shownFocusStreak(f.streak, f.sessions), shownFocusStreak(f.longest, f.sessions), f.sessions, f.offThisWeek)
+        StatsUiState(p, u, b, shownFocusStreak(f.streak, f.sessions), shownFocusStreak(f.longest, f.sessions), f.sessions, f.offThisWeek, f.vpnSwitches)
     }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), StatsUiState())
 

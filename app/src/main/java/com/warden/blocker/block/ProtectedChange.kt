@@ -40,6 +40,8 @@ sealed class ProtectedChange(val kind: Loosening) {
     data class SetListSpan(val listId: String, val name: String, val from: Long?, val until: Long?) :
         ProtectedChange(Loosening.SHORTEN_TIMES)
     data class OwnerPolicyOff(val policy: OwnerPolicy) : ProtectedChange(Loosening.OWNER_POLICY_OFF)
+    /** A website entry stops blocking its image / video domains ([RelatedDomains]). */
+    data class RelatedOff(val domain: String, val label: String) : ProtectedChange(Loosening.WEAKEN_ITEM)
     /** PIN given for the device-owner emergency exit: it becomes ready (removal is then one tap). */
     data object ConfirmOwnerExit : ProtectedChange(Loosening.REMOVE_DEVICE_OWNER)
 
@@ -69,6 +71,7 @@ sealed class ProtectedChange(val kind: Loosening) {
         is ShortenBlockUntil -> "The block will end sooner"
         is SetListSpan -> "List “$name” will be blocked for less time"
         is OwnerPolicyOff -> "“${policy.title}” will be switched off"
+        is RelatedOff -> "$label will no longer block its pictures and videos"
         ConfirmOwnerExit -> "Device owner mode can then be removed"
     }
 
@@ -92,6 +95,7 @@ sealed class ProtectedChange(val kind: Loosening) {
         is ShortenBlockUntil -> "ShortenBlockUntil"
         is SetListSpan -> "SetListSpan"
         is OwnerPolicyOff -> "OwnerPolicyOff"
+        is RelatedOff -> "RelatedOff"
         ConfirmOwnerExit -> "ConfirmOwnerExit"
     }
 
@@ -113,6 +117,7 @@ sealed class ProtectedChange(val kind: Loosening) {
             is ShortenBlockUntil -> o.put("endsAt", endsAt)
             is SetListSpan -> o.put("id", listId).put("name", name).putOpt("from", from).putOpt("until", until)
             is OwnerPolicyOff -> o.put("policy", policy.name)
+            is RelatedOff -> o.put("domain", domain).put("label", label)
         }
     }
 
@@ -141,6 +146,7 @@ sealed class ProtectedChange(val kind: Loosening) {
                 "ShortenBlockUntil" -> ShortenBlockUntil(o.getLong("endsAt"))
                 "SetListSpan" -> SetListSpan(o.getString("id"), o.getString("name"), o.optLongOrNull("from"), o.optLongOrNull("until"))
                 "OwnerPolicyOff" -> OwnerPolicyOff(OwnerPolicy.valueOf(o.getString("policy")))
+                "RelatedOff" -> RelatedOff(o.getString("domain"), o.getString("label"))
                 else -> null
             }
         }.getOrNull()

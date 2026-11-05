@@ -20,6 +20,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
@@ -31,6 +32,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.warden.blocker.block.RelatedDomains
 import com.warden.blocker.data.BlockType
 import com.warden.blocker.data.BlockedItem
 import com.warden.blocker.data.InterceptMode
@@ -43,7 +45,13 @@ import com.warden.blocker.ui.times.spanValid
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ItemEditorSheet(item: BlockedItem, onSave: (BlockedItem) -> Unit, onDismiss: () -> Unit) {
+fun ItemEditorSheet(
+    item: BlockedItem,
+    onSave: (BlockedItem) -> Unit,
+    onDismiss: () -> Unit,
+    relatedBlocked: Boolean = true,
+    onRelatedChange: (Boolean) -> Unit = {},
+) {
     var mode by remember { mutableStateOf(item.interceptMode) }
     var pauseSeconds by remember { mutableStateOf(item.pauseSeconds) }
     var prompt by remember { mutableStateOf(item.customPrompt ?: "") }
@@ -91,6 +99,7 @@ fun ItemEditorSheet(item: BlockedItem, onSave: (BlockedItem) -> Unit, onDismiss:
                 AnimatedVisibility(mode == InterceptMode.PAUSE && item.type != BlockType.APP) {
                     SupportingText("Mindful pause applies to apps. Websites are hard-blocked at the network layer.")
                 }
+                if (item.type == BlockType.WEBSITE) RelatedDomainsSection(item.value, relatedBlocked, onRelatedChange)
 
                 SpanSection(activeFrom, activeUntil) { f, u -> activeFrom = f; activeUntil = u }
                 Spacer(Modifier.height(4.dp))
@@ -133,5 +142,34 @@ private fun Stepper(label: String, value: Int, step: Int, min: Int, max: Int, on
         Text("$value", style = MaterialTheme.typography.titleMedium, modifier = Modifier.width(40.dp))
         Spacer(Modifier.width(8.dp))
         FilledTonalIconButton(onClick = { onChange((value + step).coerceAtMost(max)) }) { Text("+") }
+    }
+}
+
+/**
+ * Pictures and videos of big sites come from other domains (issue #4): what blocking this site
+ * also blocks, a switch to leave them out (a loosening: applied in Block protection), and the
+ * cases no DNS filter can catch.
+ */
+@Composable
+private fun RelatedDomainsSection(domain: String, blocked: Boolean, onChange: (Boolean) -> Unit) {
+    val related = remember(domain) { RelatedDomains.relatedTo(domain) }
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text("Pictures & videos", style = MaterialTheme.typography.labelLarge)
+        if (related.isNotEmpty()) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f).padding(end = 8.dp)) {
+                    Text("Also block its image & video servers", style = MaterialTheme.typography.bodyLarge)
+                    SupportingText("Also blocks: " + related.joinToString(", ") { it.domain })
+                    related.mapNotNull { r -> r.sharedWith?.let { "${r.domain} is shared with $it." } }.distinct().forEach { SupportingText(it) }
+                }
+                Switch(checked = blocked, onCheckedChange = onChange)
+            }
+        }
+        InfoNote(
+            "Still seeing pictures? A page that was open before the block can stay in the browser's " +
+                "cache — close the tab or reload. Google image search thumbnails come from Google itself " +
+                "(gstatic.com) and can't be blocked without breaking Google. Chrome's \"Secure DNS\" goes " +
+                "around the filter: turn on Block DNS-over-HTTPS in Settings.",
+        )
     }
 }

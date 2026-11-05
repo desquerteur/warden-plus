@@ -67,6 +67,7 @@ import com.warden.blocker.ui.wizard.WizardStep
 import com.warden.blocker.ui.wizard.rememberOpenWizardAt
 import com.warden.blocker.util.PermissionsHelper
 import com.warden.blocker.vpn.VpnController
+import com.warden.blocker.system.PrivateDns
 import com.warden.blocker.vpn.WardenVpnService
 import kotlinx.coroutines.delay
 import java.util.Calendar
@@ -183,6 +184,17 @@ fun HomeScreen(
                     if (needsSetup) "" else " App blocking still works.",
             ) {
                 OutlinedButton(onClick = onRetryVpn) { Text("Try again") }
+            }
+        }
+        // Private DNS with a provider (DNS over TLS) goes past the filter: websites aren't blocked.
+        val privateDns = remember(resumes) { PrivateDns.currentBypass(context) }
+        AnimatedVisibility(protecting && privateDns != null) {
+            WarningCard(
+                title = "Private DNS goes around the filter",
+                text = "Android's Private DNS is set to ${privateDns.orEmpty()}, so websites aren't blocked. Set it to " +
+                    "Automatic: Network & internet → Private DNS (Samsung: Connections → More connection settings).",
+            ) {
+                OutlinedButton(onClick = { runCatching { context.startActivity(PrivateDns.settingsIntent()) } }) { Text("Open settings") }
             }
         }
         // Blocking is on but the filter isn't running (OS killed it). Never leave the user

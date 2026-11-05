@@ -167,11 +167,14 @@ class InterceptActivity : ComponentActivity() {
     private fun leaveWindowedMode() {
         if (leaving) return
         leaving = true
-        Toast.makeText(
+        // Moving into a pop-up can recreate the screen: say it once, not twice.
+        val now = SystemClock.uptimeMillis()
+        if (now - lastLeftWindowedAt > 3_000L) Toast.makeText(
             applicationContext,
             "Still blocked by Warden+. The block screen can't be moved or made smaller.",
             Toast.LENGTH_LONG,
         ).show()
+        lastLeftWindowedAt = now
         goHome(removeTask = true)
     }
 
@@ -200,6 +203,8 @@ class InterceptActivity : ComponentActivity() {
         const val KIND_BLOCK = "block"
         const val KIND_LIMIT = "limit"
         const val KIND_FEATURE = "feature"
+
+        private var lastLeftWindowedAt = 0L
     }
 }
 

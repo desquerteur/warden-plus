@@ -142,6 +142,7 @@ class AppBlockAccessibilityService : AccessibilityService() {
     }
 
     private fun showBlockScreen(pkg: String, decision: AccessDecision) {
+        lastBlockScreenAt = SystemClock.uptimeMillis()
         when (decision) {
             is AccessDecision.Allow -> return
             is AccessDecision.Pause -> launchIntercept(InterceptActivity.KIND_PAUSE, decision.item.id, null, null)
@@ -156,6 +157,7 @@ class AppBlockAccessibilityService : AccessibilityService() {
     // --- Split screens and pop-up windows ---
     // Only touched on the main thread.
     private var windowCheckSince = 0L
+    @Volatile private var lastBlockScreenAt = 0L
     private val windowCheck = Runnable {
         windowCheckSince = 0L
         checkWindows()
@@ -203,6 +205,9 @@ class AppBlockAccessibilityService : AccessibilityService() {
                     gate.noteWentHome(SystemClock.uptimeMillis())
                     performGlobalAction(GLOBAL_ACTION_HOME)
                     scheduleWindowCheck()
+                } else if (SystemClock.uptimeMillis() - lastBlockScreenAt < BLOCK_SCREEN_STARTING_MS) {
+                    // A block screen was just launched and may not be on screen yet: look again.
+                    scheduleWindowCheck(BLOCK_SCREEN_STARTING_MS)
                 } else {
                     showBlockScreen(pkg, decision)
                 }
@@ -356,5 +361,6 @@ class AppBlockAccessibilityService : AccessibilityService() {
         const val WINDOW_SETTLE_MS = 450L
         const val WINDOW_MAX_WAIT_MS = 1_500L
         const val WINDOW_KEY_PREFIX = "window:"
+        const val BLOCK_SCREEN_STARTING_MS = 1_500L
     }
 }

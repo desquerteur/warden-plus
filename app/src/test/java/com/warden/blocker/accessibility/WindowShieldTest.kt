@@ -52,13 +52,35 @@ class WindowShieldTest {
         assertEquals(untis, shield.shielded)
     }
 
-    @Test fun leavingForHomeEndsTheShield() {
-        val shield = WindowShield()
+    @Test fun leavingForHomeEndsTheShieldAfterAWhile() {
+        val shield = WindowShield(lingerMs = 60_000)
+        shield.shield(untis)
+        // Back on the home screen with widgets: nothing happens.
+        assertEquals(Step.None, shield.at(1_000, full(launcher, active = true)))
+        assertEquals(Step.None, shield.at(30_000, full(launcher, active = true)))
+        assertEquals(untis, shield.shielded)
+        assertEquals(Step.None, shield.at(61_000, full(launcher, active = true)))
+        assertNull(shield.shielded)
+    }
+
+    @Test fun reopenedSoonWithoutBlockScreenShowsItAgain() {
+        val shield = WindowShield(lingerMs = 60_000)
         shield.shield(untis)
         assertEquals(Step.None, shield.at(1_000, full(launcher, active = true)))
+        // Untis back full screen and no block screen (the open event got lost, the app hung...).
+        assertEquals(Step.ShowBlockScreen(untis), shield.at(5_000, full(untis, active = true)))
+    }
+
+    @Test fun lingerClockStartsOverWhileTheBlockScreenIsUp() {
+        val shield = WindowShield(lingerMs = 10_000)
+        shield.shield(untis)
+        assertEquals(Step.None, shield.at(1_000, full(launcher, active = true)))
+        assertEquals(Step.None, shield.at(5_000, full(warden, active = true)))
+        assertEquals(Step.None, shield.at(9_000, full(launcher, active = true)))
+        assertEquals(Step.None, shield.at(15_000, full(launcher, active = true)))
+        assertEquals(untis, shield.shielded)
+        assertEquals(Step.None, shield.at(19_000, full(launcher, active = true)))
         assertNull(shield.shielded)
-        // Back on the home screen with widgets: nothing happens.
-        assertEquals(Step.None, shield.at(2_000, full(launcher, active = true)))
     }
 
     @Test fun grantOrEndOfBlockEndsTheShield() {

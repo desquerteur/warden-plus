@@ -16,6 +16,9 @@ package com.warden.blocker.accessibility
  *     covering it: go Home if the block screen is up next to it, else show the block screen again.
  *     After [maxQuietAttempts] tries it only acts again when the user reaches for the app (its
  *     window becomes active) — so a window that cannot be closed never makes the screen flicker.
+ *     Once the app and the block screen are both gone (user went Home), it stays shielded for
+ *     [lingerMs]: if it shows up again in that time without a block screen — an event the
+ *     [ForegroundGate] never got, a hanging app — the block screen comes back.
  *  2. Another app is visible in a split / pop-up arrangement without being the focused window →
  *     ask whether it is blocked ([Step.CheckSide]), once it has been visible for [sideSettleMs].
  *
@@ -31,6 +34,7 @@ class WindowShield(
     private val sideSettleMs: Long = SIDE_SETTLE_MS,
     private val sideRecheckMs: Long = SIDE_RECHECK_MS,
     private val maxQuietAttempts: Int = MAX_QUIET_ATTEMPTS,
+    private val lingerMs: Long = LINGER_MS,
 ) {
 
     /** One visible application window, as the accessibility service sees it. */
@@ -61,6 +65,7 @@ class WindowShield(
     var shielded: String? = null
         private set
     private var attempts = 0
+    private var hiddenSince = 0L
     private val firstSeen = HashMap<String, Long>()
     private val allowedAt = HashMap<String, Long>()
 
@@ -71,6 +76,7 @@ class WindowShield(
             shielded = pkg
             attempts = 0
         }
+        hiddenSince = 0L
     }
 
     /** [pkg] may be used right now (no block, a grant, schedule over): stop guarding it. */
@@ -93,7 +99,7 @@ class WindowShield(
         allowedAt.keys.retainAll(visible)
         for (pkg in visible) firstSeen.putIfAbsent(pkg, now)
 
-        shieldStep(shown, visible, ownPkg, isCritical)?.let { return it }
+        shieldStep(shown, visible, ownPkg, isCritical, now)?.let { return it }
         return sideStep(shown, ownPkg, isCritical, now)
     }
 
@@ -102,6 +108,7 @@ class WindowShield(
         visible: Set<String>,
         ownPkg: String,
         isCritical: (String) -> Boolean,
+        now: Long,
     ): Step? {
         val pkg = shielded ?: return null
         if (isCritical(pkg)) {
@@ -109,12 +116,18 @@ class WindowShield(
             return null
         }
         if (pkg !in visible) {
-            // Hidden behind the block screen: as it should be. Gone with the block screen gone
-            // too: the user has moved on.
-            if (ownPkg !in visible) shielded = null
             attempts = 0
+            if (ownPkg in visible) {
+                hiddenSince = 0L // hidden behind the block screen: as it should be
+            } else if (hiddenSince == 0L) {
+                hiddenSince = now // both gone: the user moved on, most likely
+            } else if (now - hiddenSince >= lingerMs) {
+                shielded = null
+                hiddenSince = 0L
+            }
             return null
         }
+        hiddenSince = 0L
         val reachedFor = shown.any { it.pkg == pkg && it.active }
         if (attempts >= maxQuietAttempts && !reachedFor) return Step.None
         attempts++
@@ -149,6 +162,7 @@ class WindowShield(
         const val SIDE_SETTLE_MS = 700L
         const val SIDE_RECHECK_MS = 5_000L
         const val MAX_QUIET_ATTEMPTS = 2
+        const val LINGER_MS = 60_000L
 
         /** Windows smaller than this share of the screen are toasts and menus, not an app in use. */
         const val MIN_AREA = 0.08f

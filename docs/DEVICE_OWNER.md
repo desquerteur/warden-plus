@@ -95,6 +95,8 @@ Warden+ öffnen → **Settings → Maximum protection**. Jede Regel hat einen ei
 | Lock app controls | „Beenden erzwingen“, „Daten löschen“, „Deinstallieren“ sind für alle Apps gesperrt. |
 | Lock date & time | Uhrzeit kommt automatisch aus dem Netz und lässt sich nicht verstellen – Zeitpläne können nicht ausgetrickst werden. |
 | Block safe mode | Der abgesicherte Modus (startet ohne Warden+) ist gesperrt. |
+| Switch off VPN apps | Während die Sperre läuft, legt Android erkannte VPN-Apps still (außer denen, die du als „Trusted VPN“ erlaubt hast) – kein anderes VPN kann den Website-Filter verdrängen. |
+| Lock Private DNS | „Privates DNS“ steht auf Automatisch und lässt sich nicht auf einen Anbieter (z. B. dns.google) stellen – verschlüsseltes DNS am Filter vorbei geht nicht. |
 
 Bewusst **nicht** dabei: Werksreset sperren und USB-Debugging sperren – sonst gäbe es keinen
 Rückweg mehr außerhalb der App.

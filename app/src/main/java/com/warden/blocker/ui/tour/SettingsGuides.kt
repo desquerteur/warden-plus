@@ -99,6 +99,18 @@ enum class SettingsGuide(
         note = "Turn it off again under Settings › Protection when you want to uninstall.",
         openLabel = "Turn on now",
     ),
+    /** Gray mode by hand, without the ADB permission (Settings › Gray mode). */
+    GRAYSCALE(
+        listOf(
+            MiniFrame("Settings", listOf("Connections", "Display", "Battery", "Apps", "Accessibility"), tap = 4),
+            MiniFrame("Accessibility", listOf("Vision enhancements", "Hearing enhancements", "Interaction", "Installed apps"), tap = 0),
+            MiniFrame("Vision enhancements", listOf("High contrast theme", "Color correction", "Color filter", "Magnification"), tap = 1),
+            MiniFrame("Color correction", listOf("On", "Grayscale"), tap = 0, toggle = 0),
+            MiniFrame("Color correction", listOf("On", "Deuteranomaly", "Protanomaly", "Tritanomaly", "Grayscale"), tap = 4),
+        ),
+        note = "Pixel: Accessibility › Color and motion › Color correction · Samsung also: Digital Wellbeing › Bedtime mode › Grayscale",
+        openLabel = "Open Accessibility",
+    ),
     ;
 
     /** "Settings › Accessibility › …", the short form of the way. */
@@ -131,6 +143,11 @@ fun openSettingsGuide(context: Context, guide: SettingsGuide): Boolean {
         )
         SettingsGuide.DEVICE_ADMIN -> listOf(AdminManager.enableIntent(context))
         SettingsGuide.VPN_CONSENT -> emptyList()
+        // Straight to colour correction where the phone has it, else the accessibility page.
+        SettingsGuide.GRAYSCALE -> listOf(
+            Intent("com.android.settings.ACCESSIBILITY_COLOR_SPACE_SETTINGS"),
+            Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS),
+        )
     }
     return candidates.any { intent -> runCatching { context.startActivity(intent) }.isSuccess }
 }

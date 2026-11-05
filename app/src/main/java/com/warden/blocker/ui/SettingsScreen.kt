@@ -32,6 +32,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.warden.blocker.ui.gray.GrayModeCard
 import com.warden.blocker.ui.owner.OwnerLockedExit
 import com.warden.blocker.ui.tour.RestartGuideCard
 import com.warden.blocker.ui.tour.TourIds
@@ -126,6 +127,8 @@ fun SettingsScreen(vm: WardenViewModel, onOpenSetup: () -> Unit, onOpenProtectio
                 }
             }
         }
+
+        GrayModeCard()
 
         SectionHeader("Help")
         RestartGuideCard()

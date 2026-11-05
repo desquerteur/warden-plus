@@ -5,6 +5,7 @@ import com.warden.blocker.data.BlockType
 import com.warden.blocker.data.BlockedItem
 import com.warden.blocker.data.InterceptMode
 import com.warden.blocker.data.Schedule
+import com.warden.blocker.gray.GrayModeConfig
 import com.warden.blocker.owner.OwnerPolicy
 import com.warden.blocker.owner.title
 import org.json.JSONArray
@@ -42,6 +43,8 @@ sealed class ProtectedChange(val kind: Loosening) {
     data class OwnerPolicyOff(val policy: OwnerPolicy) : ProtectedChange(Loosening.OWNER_POLICY_OFF)
     /** PIN given for the device-owner emergency exit: it becomes ready (removal is then one tap). */
     data object ConfirmOwnerExit : ProtectedChange(Loosening.REMOVE_DEVICE_OWNER)
+    /** Gray mode set to [config], which switches it off or covers less time. */
+    data class SetGrayMode(val config: GrayModeConfig) : ProtectedChange(Loosening.WEAKEN_GRAY_MODE)
 
     enum class Setting(val label: String) {
         ALWAYS_ON("Always on"), BLOCK_DOH("Block DNS-over-HTTPS"), BLOCK_NOTIFICATIONS("Block notifications"),
@@ -69,6 +72,7 @@ sealed class ProtectedChange(val kind: Loosening) {
         is SetListSpan -> "List “$name” will be blocked for less time"
         is OwnerPolicyOff -> "“${policy.title}” will be switched off"
         ConfirmOwnerExit -> "Device owner mode can then be removed"
+        is SetGrayMode -> if (config.enabled) "Gray mode will cover less time" else "Gray mode will be switched off"
     }
 
     /** Stable names (not class names, which a minified build would rename). */
@@ -92,6 +96,7 @@ sealed class ProtectedChange(val kind: Loosening) {
         is SetListSpan -> "SetListSpan"
         is OwnerPolicyOff -> "OwnerPolicyOff"
         ConfirmOwnerExit -> "ConfirmOwnerExit"
+        is SetGrayMode -> "SetGrayMode"
     }
 
     fun toJson(): JSONObject = JSONObject().put("type", typeName()).also { o ->
@@ -112,6 +117,7 @@ sealed class ProtectedChange(val kind: Loosening) {
             is ShortenBlockUntil -> o.put("endsAt", endsAt)
             is SetListSpan -> o.put("id", listId).put("name", name).putOpt("from", from).putOpt("until", until)
             is OwnerPolicyOff -> o.put("policy", policy.name)
+            is SetGrayMode -> o.put("gray", config.toJson())
         }
     }
 
@@ -140,6 +146,7 @@ sealed class ProtectedChange(val kind: Loosening) {
                 "ShortenBlockUntil" -> ShortenBlockUntil(o.getLong("endsAt"))
                 "SetListSpan" -> SetListSpan(o.getString("id"), o.getString("name"), o.optLongOrNull("from"), o.optLongOrNull("until"))
                 "OwnerPolicyOff" -> OwnerPolicyOff(OwnerPolicy.valueOf(o.getString("policy")))
+                "SetGrayMode" -> SetGrayMode(GrayModeConfig.fromJson(o.getJSONObject("gray")))
                 else -> null
             }
         }.getOrNull()

@@ -13,6 +13,8 @@ import com.warden.blocker.block.ProtectionSettings
 import com.warden.blocker.block.ProtectionState
 import com.warden.blocker.block.Verdict
 import com.warden.blocker.data.Schedule
+import com.warden.blocker.gray.GrayMode
+import com.warden.blocker.gray.GrayModePrefs
 import com.warden.blocker.guard.SettingsGuardStore
 import com.warden.blocker.owner.OwnerPrefs
 import com.warden.blocker.owner.OwnerSync
@@ -185,6 +187,10 @@ class ProtectionGuard(private val context: Context, private val c: AppContainer)
                 OwnerSync.syncNow(context)
             }
             ProtectedChange.ConfirmOwnerExit -> OwnerPrefs.get(context).setExitReadyAt(System.currentTimeMillis())
+            is ProtectedChange.SetGrayMode -> {
+                GrayModePrefs.get(context).setConfig(change.config)
+                GrayMode.syncAndPlan(context)
+            }
             is ProtectedChange.SetProtection -> s.setProtection(change.settings)
             ProtectedChange.DisableUninstallProtection -> AdminManager.disable(context)
             is ProtectedChange.ChangePin -> s.setPin(change.hash, change.salt)

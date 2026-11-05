@@ -3,6 +3,7 @@ package com.warden.blocker.system
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import com.warden.blocker.gray.GrayMode
 import com.warden.blocker.util.PermissionsHelper
 import com.warden.blocker.wardenContainer
 import kotlinx.coroutines.CoroutineScope
@@ -28,6 +29,7 @@ class BootReceiver : BroadcastReceiver() {
                 // Consent must have been granted previously.
                 FilterKeeper.ensureRunning(context, notifyOnFailure = true)
                 FilterKeeper.scheduleNext(context)
+                GrayMode.syncAndPlan(context) // alarms don't survive a reboot
                 if (action == Intent.ACTION_MY_PACKAGE_REPLACED) {
                     val warn = AccessibilityAlert.shouldWarn(
                         accessibilityOn = PermissionsHelper.isAccessibilityEnabled(context),

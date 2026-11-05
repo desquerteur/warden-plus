@@ -20,6 +20,10 @@
     <uses-permission android:name="android.permission.HIDE_OVERLAY_WINDOWS" />
     <!-- Block protection: ask Android (with the user's OK) not to put Warden+ to sleep. -->
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+    <!-- Gray mode: switch Android's colour correction to grayscale. Granted once over ADB
+         (adb shell pm grant com.warden.blocker android.permission.WRITE_SECURE_SETTINGS), see docs/GRAY_MODE.md. -->
+    <uses-permission android:name="android.permission.WRITE_SECURE_SETTINGS"
+        tools:ignore="ProtectedPermissions" />
 
     <!-- Least privilege: see only launchable apps (for the picker) and the launcher (to keep
          it un-blockable) instead of requesting QUERY_ALL_PACKAGES. -->
@@ -131,6 +135,23 @@
                 <action android:name="android.service.quicksettings.action.QS_TILE" />
             </intent-filter>
         </service>
+
+        <!-- Quick Settings tile: gray mode on / off (off follows Block protection). -->
+        <service
+            android:name=".gray.GrayModeTileService"
+            android:exported="true"
+            android:icon="@drawable/ic_gray_tile"
+            android:label="Gray mode"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
+
+        <!-- Gray mode: the next change (schedule window, blocking starts or ends). -->
+        <receiver
+            android:name=".gray.GrayAlarmReceiver"
+            android:exported="false" />
 
         <!-- Device admin: uninstall protection only (no enforcement policies declared). -->
         <receiver

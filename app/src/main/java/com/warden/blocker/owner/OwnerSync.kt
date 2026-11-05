@@ -102,7 +102,8 @@ object OwnerSync {
 
     private fun <T> Flow<T>.unit(): Flow<Unit> = map { }
 
-    private fun minuteTicks(context: Context): Flow<Unit> = flow {
+    /** Ticks at every minute boundary (and a focus end); also drives gray mode, see GrayMode. */
+    internal fun minuteTicks(context: Context): Flow<Unit> = flow {
         while (true) {
             emit(Unit)
             val focusEndsAt = context.wardenContainer.settings.focusEndsAt.first()

@@ -96,6 +96,17 @@ function Invoke-Adb([string[]]$adbArgs) {
     return ($out -join "`n")
 }
 
+# Gray mode needs a one-time permission that only ADB can grant; give it here too (docs/GRAY_MODE.md).
+function Grant-GrayMode {
+    Invoke-Adb @('shell', 'pm', 'grant', $package, 'android.permission.WRITE_SECURE_SETTINGS') | Out-Null
+    $grant = Invoke-Adb @('shell', 'dumpsys', 'package', $package)
+    if ($grant -match 'android\.permission\.WRITE_SECURE_SETTINGS: granted=true') {
+        Write-Ok 'Gray mode freigeschaltet (Warden+ darf den Bildschirm grau schalten).'
+    } else {
+        Write-Info 'Hinweis: Gray mode konnte nicht freigeschaltet werden (siehe docs/GRAY_MODE.md).'
+    }
+}
+
 # --- 2. Geraet pruefen -----------------------------------------------------------------------
 & $adb start-server 2>&1 | Out-Null
 $deviceLines = (& $adb devices 2>&1 | ForEach-Object { "$_" }) |
@@ -168,6 +179,7 @@ if ($ownerMatch.Success) {
     $owner = $ownerMatch.Groups[1].Value
     if ($owner -eq $package) {
         Write-Ok 'Warden+ ist bereits Device Owner. Nichts zu tun.'
+        if (-not $CheckOnly) { Grant-GrayMode }
         Write-Info 'In der App: Einstellungen -> Maximum protection -> Regeln einschalten.'
         exit 0
     }
@@ -230,6 +242,7 @@ Write-Info $result.Trim()
 if ($result -match 'Success') {
     Write-Host ''
     Write-Host '  Fertig! Warden+ ist jetzt Device Owner.' -ForegroundColor Green
+    Grant-GrayMode
     Write-Info 'Jetzt:'
     Write-Info '  1. Konten wieder anmelden (Google, Samsung).'
     Write-Info '  2. Warden+ oeffnen -> Settings -> "Maximum protection" -> Regeln einschalten.'

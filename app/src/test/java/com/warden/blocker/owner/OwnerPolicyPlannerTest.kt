@@ -66,7 +66,7 @@ class OwnerPolicyPlannerTest {
     @Test fun eachRestrictionIsSwitchedOnItsOwn() {
         val plan = OwnerPolicyPlanner.plan(setOf(OwnerPolicy.LOCK_DATE_TIME), emptySet(), emptySet(), emptySet())
         assertEquals(setOf("no_config_date_time"), plan.addRestrictions)
-        assertEquals(setOf("no_config_vpn", "no_control_apps", "no_safe_boot"), plan.clearRestrictions)
+        assertEquals(setOf("no_config_vpn", "no_control_apps", "no_safe_boot", "disallow_config_private_dns"), plan.clearRestrictions)
         assertFalse(plan.alwaysOnVpn)
         assertFalse(plan.uninstallBlocked)
     }
@@ -93,6 +93,34 @@ class OwnerPolicyPlannerTest {
         // Factory reset and USB debugging must stay available (the way back without the app).
         assertFalse("no_factory_reset" in OwnerPolicy.MANAGED_RESTRICTIONS)
         assertFalse("no_debugging_features" in OwnerPolicy.MANAGED_RESTRICTIONS)
+    }
+
+    @Test fun vpnAppsAreSuspendedOnlyWithTheirRule() {
+        val vpn = setOf("com.free.vpn")
+        val off = OwnerPolicyPlanner.plan(setOf(OwnerPolicy.SUSPEND_BLOCKED_APPS), setOf("com.hard"), emptySet(), emptySet(), vpn)
+        assertEquals(setOf("com.hard"), off.suspend)
+        val on = OwnerPolicyPlanner.plan(setOf(OwnerPolicy.SUSPEND_VPN_APPS), setOf("com.hard"), emptySet(), emptySet(), vpn)
+        assertEquals(vpn, on.suspend)
+        val both = OwnerPolicyPlanner.plan(
+            setOf(OwnerPolicy.SUSPEND_BLOCKED_APPS, OwnerPolicy.SUSPEND_VPN_APPS), setOf("com.hard"), emptySet(), setOf("com.free.vpn"), vpn,
+        )
+        assertEquals("protected apps never", setOf("com.hard"), both.suspend)
+    }
+
+    @Test fun vpnRuleOffReleasesThem() {
+        val plan = OwnerPolicyPlanner.plan(emptySet(), emptySet(), suspendedByUs = setOf("com.free.vpn"), protected = emptySet(), vpnApps = setOf("com.free.vpn"))
+        assertEquals(setOf("com.free.vpn"), plan.unsuspend)
+    }
+
+    @Test fun privateDnsLock() {
+        val on = OwnerPolicyPlanner.plan(setOf(OwnerPolicy.LOCK_PRIVATE_DNS), emptySet(), emptySet(), emptySet())
+        assertTrue(on.privateDnsAutomatic)
+        assertEquals(setOf(android.os.UserManager.DISALLOW_CONFIG_PRIVATE_DNS), on.addRestrictions)
+        // Emergency exit: the restriction is lifted, nothing is set any more.
+        val release = OwnerPolicyPlanner.releaseAll(emptySet())
+        assertFalse(release.privateDnsAutomatic)
+        assertTrue(android.os.UserManager.DISALLOW_CONFIG_PRIVATE_DNS in release.clearRestrictions)
+        assertTrue(android.os.UserManager.DISALLOW_CONFIG_VPN in release.clearRestrictions)
     }
 
     @Test fun parseIgnoresUnknownNames() {

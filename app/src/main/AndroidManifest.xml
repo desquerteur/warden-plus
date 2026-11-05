@@ -61,12 +61,17 @@
         </activity>
 
         <!-- Full-screen intercept shown when a blocked app is opened: hard block,
-             limit-reached notice, or the mindful pause. -->
+             limit-reached notice, or the mindful pause. Never a pop-up, split half or
+             picture-in-picture window (issue #3: a pop-up block screen could be pushed aside).
+             Android ignores resizeableActivity on large screens and with "multi window for
+             all apps", so InterceptActivity also leaves for Home if it lands in one. -->
         <activity
             android:name=".ui.intercept.InterceptActivity"
             android:excludeFromRecents="true"
             android:exported="false"
             android:launchMode="singleTask"
+            android:resizeableActivity="false"
+            android:supportsPictureInPicture="false"
             android:taskAffinity=""
             android:theme="@style/Theme.Warden" />
 

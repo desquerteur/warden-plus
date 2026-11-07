@@ -43,12 +43,12 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.warden.blocker.time.TrustedClock
 import com.warden.blocker.ui.CardPadding
 import com.warden.blocker.ui.CheckboxRow
 import com.warden.blocker.ui.Motion
 import com.warden.blocker.ui.SupportingText
 import kotlinx.coroutines.delay
-import java.time.LocalDate
 import java.time.ZoneId
 
 /**
@@ -66,8 +66,8 @@ fun BlockUntilCard(
 ) {
     val is24Hour = DateFormat.is24HourFormat(LocalContext.current)
     val zone = ZoneId.systemDefault()
-    var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
-    LaunchedEffect(Unit) { while (true) { delay(15_000); now = System.currentTimeMillis() } }
+    var now by remember { mutableLongStateOf(TrustedClock.now()) }
+    LaunchedEffect(Unit) { while (true) { delay(15_000); now = TrustedClock.now() } }
     val running = focusEndsAt > now
     var strict by remember { mutableStateOf(false) }
     var picking by remember { mutableStateOf(false) }
@@ -120,7 +120,7 @@ private fun defaultUntil(now: Long): Long = ((now + 2 * 3_600_000L) / 3_600_000L
 @Composable
 private fun BlockUntilDialog(initial: Long, onConfirm: (Long) -> Unit, onDismiss: () -> Unit) {
     var at by remember { mutableLongStateOf(initial) }
-    val now = System.currentTimeMillis()
+    val now = TrustedClock.now()
     val is24Hour = DateFormat.is24HourFormat(LocalContext.current)
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -133,7 +133,7 @@ private fun BlockUntilDialog(initial: Long, onConfirm: (Long) -> Unit, onDismiss
         title = { Text("Block until") },
         text = {
             Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                DateTimeRow("Blocking ends", at, { at = it }, minDate = LocalDate.now())
+                DateTimeRow("Blocking ends", at, { at = it }, minDate = TrustedClock.today())
                 Text(
                     if (at > now) "Blocked until ${dateTimeLabel(at, now, ZoneId.systemDefault(), is24Hour)}"
                     else "Pick a time in the future",

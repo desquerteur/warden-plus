@@ -4,6 +4,7 @@ import com.warden.blocker.data.BlockRepository
 import com.warden.blocker.data.SettingsStore
 import com.warden.blocker.hosts.DomainHashSet
 import com.warden.blocker.hosts.DomainMatcher
+import com.warden.blocker.time.TrustedClock
 import kotlinx.coroutines.flow.first
 import java.util.Calendar
 
@@ -23,7 +24,7 @@ class BlockEngine(
      * True when blocking is enforced right now. A focus session forces it on for its
      * duration; otherwise it's the master switch AND (always-on OR an active schedule).
      */
-    suspend fun isBlockingActiveNow(now: Calendar = Calendar.getInstance()): Boolean {
+    suspend fun isBlockingActiveNow(now: Calendar = TrustedClock.calendar()): Boolean {
         if (settings.focusEndsAt.first() > now.timeInMillis) return true
         if (!settings.masterEnabled.first()) return false
         if (settings.alwaysOn.first()) return true
@@ -31,7 +32,7 @@ class BlockEngine(
     }
 
     /** See [BlockStateClock.filterShouldRun]. */
-    suspend fun filterShouldRun(now: Long = System.currentTimeMillis()): Boolean =
+    suspend fun filterShouldRun(now: Long = TrustedClock.now()): Boolean =
         BlockStateClock.filterShouldRun(settings.masterEnabled.first(), settings.focusEndsAt.first(), now)
 
     suspend fun blockedDomains(): List<String> {
@@ -52,7 +53,7 @@ class BlockEngine(
             builtTimed = null // "Allow only" ignores the blocklist, so its time spans don't matter
             return it
         }
-        val now = System.currentTimeMillis()
+        val now = TrustedClock.now()
         val lists = listDomains()
         builtTimed = BuiltTimed(repo.timedItemsInEffect(now), lists)
         return DomainMatcher(manualAndDohDomains(now), lists)
@@ -68,12 +69,12 @@ class BlockEngine(
      * blocking since the last [blocklist] — the VPN's clock then rebuilds, like it does when a
      * schedule starts or ends. A new list set object means the active lists changed.
      */
-    suspend fun timedContentChanged(now: Long = System.currentTimeMillis()): Boolean {
+    suspend fun timedContentChanged(now: Long = TrustedClock.now()): Boolean {
         val built = builtTimed ?: return false
         return built.itemIds != repo.timedItemsInEffect(now) || built.lists !== listDomains()
     }
 
-    private suspend fun manualAndDohDomains(now: Long = System.currentTimeMillis()): List<String> {
+    private suspend fun manualAndDohDomains(now: Long = TrustedClock.now()): List<String> {
         // Blocked sites bring their image / video domains along (issue #4), unless switched off per entry.
         val domains = RelatedDomains.expand(repo.enabledDomains(now), settings.relatedOff.first()).toMutableList()
         if (settings.blockDoh.first()) domains += DohHosts.ALL

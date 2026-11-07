@@ -14,6 +14,7 @@ import com.warden.blocker.MainActivity
 import com.warden.blocker.WardenApp
 import com.warden.blocker.block.BlockStateClock
 import com.warden.blocker.block.ScheduleEvaluator
+import com.warden.blocker.time.TrustedClock
 import com.warden.blocker.vpn.VpnController
 import com.warden.blocker.vpn.WardenVpnService
 import com.warden.blocker.wardenContainer
@@ -25,7 +26,6 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.launch
-import java.util.Calendar
 
 /**
  * Keeps the website filter (VPN) running whenever it should ([BlockStateClock.filterShouldRun]).
@@ -74,7 +74,7 @@ object FilterKeeper {
     /** Sets (or clears) the alarm for the next schedule start. */
     suspend fun scheduleNext(context: Context) {
         val c = context.wardenContainer
-        val now = Calendar.getInstance()
+        val now = TrustedClock.calendar()
         val nextStart = ScheduleEvaluator.nextStart(c.repository.enabledSchedules(), now)?.timeInMillis
         val at = BlockStateClock.nextFilterCheck(
             c.settings.masterEnabled.first(), c.settings.alwaysOn.first(), nextStart, now.timeInMillis,
@@ -82,7 +82,7 @@ object FilterKeeper {
         val am = context.getSystemService(AlarmManager::class.java) ?: return
         val pi = alarmIntent(context)
         if (at == null) { am.cancel(pi); return }
-        val wakeAt = at + ALARM_MARGIN_MS
+        val wakeAt = TrustedClock.toSystemTime(at + ALARM_MARGIN_MS) // alarms run on the phone's clock
         // Exact when allowed (Android 12+: "Alarms & reminders"); otherwise Android may run it a
         // few minutes late in Doze — the VPN, if running, has switched on by itself already.
         val exact = Build.VERSION.SDK_INT < Build.VERSION_CODES.S || am.canScheduleExactAlarms()

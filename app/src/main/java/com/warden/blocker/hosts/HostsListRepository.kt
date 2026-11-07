@@ -4,6 +4,7 @@ import android.content.Context
 import android.net.Uri
 import android.provider.OpenableColumns
 import com.warden.blocker.block.TimeWindows
+import com.warden.blocker.time.TrustedClock
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -173,7 +174,7 @@ class HostsListRepository(
      * if none). Built from the files on first use and cached until that set of lists changes,
      * so repeated VPN refreshes are free — and a new set object means the lists changed.
      */
-    suspend fun activeDomainSet(now: Long = System.currentTimeMillis()): DomainHashSet? {
+    suspend fun activeDomainSet(now: Long = TrustedClock.now()): DomainHashSet? {
         ensureLoaded()
         return cacheLock.withLock {
             val active = _sources.value.filter {

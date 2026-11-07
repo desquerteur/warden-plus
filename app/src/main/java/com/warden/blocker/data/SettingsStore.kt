@@ -12,10 +12,10 @@ import com.warden.blocker.block.DEFAULT_DELAY_MINUTES
 import com.warden.blocker.block.PendingChange
 import com.warden.blocker.block.ProtectionMode
 import com.warden.blocker.block.ProtectionSettings
+import com.warden.blocker.time.TrustedClock
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
-import java.time.LocalDate
 
 private val Context.dataStore by preferencesDataStore(name = "warden_settings")
 
@@ -179,7 +179,7 @@ class SettingsStore(private val context: Context) {
      * while blocking is enabled. A gap of more than a day resets the streak to 1.
      */
     suspend fun recordActiveDay() {
-        val today = LocalDate.now().toEpochDay()
+        val today = TrustedClock.today().toEpochDay()
         context.dataStore.edit { p ->
             val last = p[Keys.LAST_ACTIVE_DAY] ?: -1L
             if (last == today) return@edit
@@ -227,7 +227,7 @@ class SettingsStore(private val context: Context) {
             if (fails >= 5) {
                 val step = (fails - 5).coerceAtMost(7) // 0..7
                 val seconds = (30L shl step).coerceAtMost(3600L)
-                lockUntil = System.currentTimeMillis() + seconds * 1000
+                lockUntil = TrustedClock.now() + seconds * 1000
                 p[Keys.PIN_LOCK_UNTIL] = lockUntil
             }
         }

@@ -20,6 +20,7 @@ import com.warden.blocker.block.ProtectedChange
 import com.warden.blocker.block.ScheduleEvaluator
 import com.warden.blocker.block.Verdict
 import com.warden.blocker.owner.OwnerSync
+import com.warden.blocker.time.TrustedClock
 import com.warden.blocker.wardenContainer
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -36,7 +37,6 @@ import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import java.time.ZoneId
 import java.util.Calendar
 
 /** What the card and the tile show. */
@@ -149,7 +149,7 @@ object GrayMode {
     suspend fun wanted(context: Context, config: GrayModeConfig = GrayModePrefs.get(context).config.value): Boolean {
         if (!config.enabled) return false
         val blocking = config.whenMode == GrayWhen.WHILE_BLOCKING && context.wardenContainer.blockEngine.isBlockingActiveNow()
-        val now = Calendar.getInstance()
+        val now = TrustedClock.calendar()
         return GrayModeLogic.shouldBeGray(config, blocking, now.get(Calendar.HOUR_OF_DAY) * 60 + now.get(Calendar.MINUTE))
     }
 
@@ -175,16 +175,16 @@ object GrayMode {
     }
 
     /** When the wanted state may change next while the app isn't running (null = never by itself). */
-    suspend fun nextChange(context: Context, now: Long = System.currentTimeMillis()): Long? {
+    suspend fun nextChange(context: Context, now: Long = TrustedClock.now()): Long? {
         val config = GrayModePrefs.get(context).config.value
         if (!config.enabled) return null
         return when (config.whenMode) {
             GrayWhen.ALWAYS -> null
-            GrayWhen.SCHEDULE -> GrayModeLogic.nextWindowEdge(now, ZoneId.systemDefault(), config.startMinute, config.endMinute)
+            GrayWhen.SCHEDULE -> GrayModeLogic.nextWindowEdge(now, TrustedClock.zone(), config.startMinute, config.endMinute)
             GrayWhen.WHILE_BLOCKING -> {
                 val c = context.wardenContainer
                 val schedules = c.repository.enabledSchedules()
-                val cal = Calendar.getInstance().apply { timeInMillis = now }
+                val cal = TrustedClock.calendar().apply { timeInMillis = now }
                 GrayModeLogic.earliestAfter(
                     now,
                     listOf(
@@ -198,7 +198,8 @@ object GrayMode {
     }
 
     private suspend fun planNext(context: Context) {
-        val at = nextChange(context)?.plus(ALARM_MARGIN_MS)
+        // Alarms run on the phone's clock (whole seconds, so the same plan isn't set again and again).
+        val at = nextChange(context)?.plus(ALARM_MARGIN_MS)?.let { TrustedClock.toSystemTime(it) / 1000 * 1000 }
         if (at == plannedAt) return
         val am = context.getSystemService(AlarmManager::class.java) ?: return
         val pi = PendingIntent.getBroadcast(

@@ -54,13 +54,14 @@ object GuardAlerts {
         val zones = if (change.fromZone != null && change.toZone != null) " (${change.fromZone} → ${change.toZone})" else ""
         val notification = NotificationCompat.Builder(context, WardenApp.ALERTS_CHANNEL_ID)
             .setSmallIcon(android.R.drawable.stat_sys_warning)
-            .setContentTitle("$what by hand")
-            .setContentText("Schedules follow the clock. Warden+ noticed the change.")
+            .setContentTitle("The clock was changed")
+            .setContentText("Your blocks keep running on the real time.")
             .setStyle(
                 NotificationCompat.BigTextStyle().bigText(
-                    "$what$zones, with automatic time switched off. Schedules and time limits follow " +
-                        "the phone's clock, so changing it is a way around them. Warden+ counts it in " +
-                        "Settings → Protection → Settings guard.",
+                    "The clock was changed – your blocks keep running on the real time. " +
+                        "$what$zones by hand. Focus sessions, \"Block until\", schedules, waits and " +
+                        "locks don't end any sooner. Turn on automatic date & time to set the clock right " +
+                        "again. Warden+ counts it in Settings → Protection → Settings guard.",
                 ),
             )
             .setPriority(NotificationCompat.PRIORITY_HIGH)

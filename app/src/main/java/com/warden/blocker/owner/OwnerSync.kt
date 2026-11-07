@@ -15,6 +15,7 @@ import com.warden.blocker.block.BlockStateClock
 import com.warden.blocker.block.TimeWindows
 import com.warden.blocker.data.BlockType
 import com.warden.blocker.data.BlockedItem
+import com.warden.blocker.time.TrustedClock
 import com.warden.blocker.wardenContainer
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -92,7 +93,7 @@ object OwnerSync {
      * "Allow only" or blocked categories, every launchable app.
      */
     private suspend fun decisions(c: AppContainer): Map<String, AccessDecision> {
-        val now = System.currentTimeMillis()
+        val now = TrustedClock.now()
         val items = c.repository.enabledApps().filter { TimeWindows.inEffect(it, now) }.associateBy { it.value }
         val byAllow = if (c.blockEngine.isBlockingActiveNow()) {
             val candidates = if (c.allowStore.current().affectsApps) c.installedApps.launchablePackages() + items.keys else items.keys
@@ -112,7 +113,7 @@ object OwnerSync {
         while (true) {
             emit(Unit)
             val focusEndsAt = context.wardenContainer.settings.focusEndsAt.first()
-            delay(BlockStateClock.delayUntilNextCheck(System.currentTimeMillis(), focusEndsAt))
+            delay(BlockStateClock.delayUntilNextCheck(TrustedClock.now(), focusEndsAt))
         }
     }
 }

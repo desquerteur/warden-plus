@@ -71,6 +71,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.warden.blocker.time.TrustedClock
 import kotlinx.coroutines.delay
 
 // --- Layout tokens (docs/STYLE.md) ---
@@ -400,11 +401,11 @@ fun StatusIcon(ok: Boolean, modifier: Modifier = Modifier) {
 
 @Composable
 internal fun FocusCard(focusEndsAt: Long, strict: Boolean, onStart: (Int, Boolean) -> Unit, onCancel: () -> Unit) {
-    var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
+    var now by remember { mutableLongStateOf(TrustedClock.now()) }
     // Ticks only while a session runs, not all the time Home is open.
     LaunchedEffect(focusEndsAt) {
-        now = System.currentTimeMillis()
-        while (now < focusEndsAt) { delay(1000); now = System.currentTimeMillis() }
+        now = TrustedClock.now()
+        while (now < focusEndsAt) { delay(1000); now = TrustedClock.now() }
     }
     val active = focusEndsAt > now
 

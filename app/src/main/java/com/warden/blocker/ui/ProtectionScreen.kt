@@ -55,10 +55,12 @@ import com.warden.blocker.system.AdminManager
 import com.warden.blocker.owner.DeviceOwnerManager
 import com.warden.blocker.owner.OwnerPolicy
 import com.warden.blocker.owner.OwnerPrefs
+import com.warden.blocker.time.TrustedClock
 import com.warden.blocker.ui.guard.SettingsGuardSection
 import com.warden.blocker.ui.owner.MaxProtectionSection
 import com.warden.blocker.ui.times.PickDateDialog
 import com.warden.blocker.ui.times.PickTimeDialog
+import com.warden.blocker.ui.time.AutoTimeCard
 import com.warden.blocker.ui.tour.TourIds
 import com.warden.blocker.ui.wizard.WizardStep
 import com.warden.blocker.ui.wizard.rememberOpenWizardAt
@@ -107,7 +109,7 @@ fun ProtectionScreen(vm: WardenViewModel, onBack: () -> Unit, onOpenSetup: () ->
     val focusStrict by vm.focusStrict.collectAsStateWithLifecycle()
     val offEvents by vm.protectionOffEvents.collectAsStateWithLifecycle()
     val alwaysOnVpn by WardenVpnService.alwaysOnState.collectAsStateWithLifecycle()
-    val now = System.currentTimeMillis()
+    val now = TrustedClock.now()
     val mode = BlockProtection.effectiveMode(protection, now)
 
     // Re-check the Android settings when coming back from them.
@@ -216,6 +218,7 @@ fun ProtectionScreen(vm: WardenViewModel, onBack: () -> Unit, onOpenSetup: () ->
                 }
             }
 
+            AutoTimeCard()
             PendingChangesCard(vm)
 
             // PIN
@@ -356,7 +359,7 @@ fun ProtectionScreen(vm: WardenViewModel, onBack: () -> Unit, onOpenSetup: () ->
         )
     }
     if (pickDate) {
-        val today = LocalDate.now(ZoneId.systemDefault())
+        val today = TrustedClock.today()
         PickDateDialog(
             initial = today.plusDays(1),
             minDate = today,
@@ -373,7 +376,7 @@ fun ProtectionScreen(vm: WardenViewModel, onBack: () -> Unit, onOpenSetup: () ->
             is24Hour = DateFormat.is24HourFormat(context),
             onPick = { t ->
                 val until = date.atTime(t).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
-                if (until > System.currentTimeMillis()) {
+                if (until > TrustedClock.now()) {
                     choose(ProtectionSettings(ProtectionMode.LOCKED, protection.delayMinutes, until))
                 }
             },

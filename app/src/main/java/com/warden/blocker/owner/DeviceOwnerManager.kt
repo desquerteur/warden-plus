@@ -54,9 +54,22 @@ object DeviceOwnerManager {
         }
         plan.clearRestrictions.forEach { r -> step("Lifting $r") { dpm.clearUserRestriction(admin, r) } }
         plan.addRestrictions.forEach { r -> step("Setting $r") { dpm.addUserRestriction(admin, r) } }
-        if (OwnerPolicy.LOCK_DATE_TIME.restriction in plan.addRestrictions && Build.VERSION.SDK_INT >= 30) {
-            // A locked clock should also be the right one: network time on (left on afterwards).
-            step("Automatic time") { dpm.setAutoTimeEnabled(admin, true) }
+        if (OwnerPolicy.LOCK_DATE_TIME.restriction in plan.addRestrictions) {
+            // A locked clock should also be the right one: network time and time zone on (on
+            // Android 11+ they are left on afterwards, Android's own default; the user may switch
+            // them off again once the rule is lifted).
+            if (Build.VERSION.SDK_INT >= 30) {
+                step("Automatic time") { dpm.setAutoTimeEnabled(admin, true) }
+                step("Automatic time zone") { dpm.setAutoTimeZoneEnabled(admin, true) }
+            } else {
+                @Suppress("DEPRECATION")
+                step("Automatic time") { dpm.setAutoTimeRequired(admin, true) }
+            }
+        }
+        if (OwnerPolicy.LOCK_DATE_TIME.restriction in plan.clearRestrictions && Build.VERSION.SDK_INT < 30) {
+            // Android 8–10: "automatic time required" is a rule of its own — the exit lifts it too.
+            @Suppress("DEPRECATION")
+            step("Automatic time") { dpm.setAutoTimeRequired(admin, false) }
         }
         if (plan.privateDnsAutomatic && Build.VERSION.SDK_INT >= 29) step("Private DNS") {
             // A named provider (DNS over TLS) goes around the filter; "Automatic" doesn't. Lifting

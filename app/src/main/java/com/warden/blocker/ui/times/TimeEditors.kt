@@ -32,6 +32,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogProperties
 import com.warden.blocker.data.Schedule
 import com.warden.blocker.hosts.HostsSource
+import com.warden.blocker.time.TrustedClock
 import java.time.LocalDate
 import java.time.ZoneId
 
@@ -46,7 +47,7 @@ private fun nextHour(now: Long) = (now / HOUR + 1) * HOUR
  */
 @Composable
 fun OnceBlockDialog(initial: Schedule?, onSave: (Schedule) -> Unit, onDismiss: () -> Unit) {
-    val now = remember { System.currentTimeMillis() }
+    val now = remember { TrustedClock.now() }
     var name by remember { mutableStateOf(initial?.name ?: "") }
     var start by remember { mutableLongStateOf(initial?.onceStartAt ?: nextHour(now)) }
     var end by remember { mutableLongStateOf(initial?.onceEndAt ?: (nextHour(now) + 2 * HOUR)) }
@@ -54,7 +55,7 @@ fun OnceBlockDialog(initial: Schedule?, onSave: (Schedule) -> Unit, onDismiss: (
     val zone = ZoneId.systemDefault()
     val problem = when {
         end <= start -> "The end must be after the start"
-        end <= System.currentTimeMillis() -> "The end is in the past"
+        end <= TrustedClock.now() -> "The end is in the past"
         else -> null
     }
 
@@ -90,10 +91,10 @@ fun OnceBlockDialog(initial: Schedule?, onSave: (Schedule) -> Unit, onDismiss: (
                     end = new + (end - start).coerceAtLeast(HOUR)
                     start = new
                 })
-                DateTimeRow("Ends", end, { end = it }, minDate = LocalDate.now(zone))
+                DateTimeRow("Ends", end, { end = it }, minDate = TrustedClock.today())
                 Text(
-                    problem ?: "Blocks from ${dateTimeLabel(start, System.currentTimeMillis(), zone, is24Hour)} " +
-                        "to ${dateTimeLabel(end, System.currentTimeMillis(), zone, is24Hour)}",
+                    problem ?: "Blocks from ${dateTimeLabel(start, TrustedClock.now(), zone, is24Hour)} " +
+                        "to ${dateTimeLabel(end, TrustedClock.now(), zone, is24Hour)}",
                     style = MaterialTheme.typography.bodySmall,
                     color = if (problem != null) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -108,7 +109,7 @@ fun OnceBlockDialog(initial: Schedule?, onSave: (Schedule) -> Unit, onDismiss: (
  */
 @Composable
 fun DateRangeSection(fromDay: Long?, untilDay: Long?, onChange: (Long?, Long?) -> Unit) {
-    val today = LocalDate.now()
+    val today = TrustedClock.today()
     val on = fromDay != null || untilDay != null
     Row(
         Modifier.fillMaxWidth().toggleable(value = on, role = Role.Checkbox, onValueChange = { checked ->
@@ -135,7 +136,7 @@ fun dateRangeValid(fromDay: Long?, untilDay: Long?): Boolean =
 @Composable
 private fun DateBound(label: String, day: Long?, onSet: (Long) -> Unit, onClear: () -> Unit) {
     var picking by remember { mutableStateOf(false) }
-    val today = LocalDate.now()
+    val today = TrustedClock.today()
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Text(label, style = MaterialTheme.typography.labelLarge)
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -159,7 +160,7 @@ private fun DateBound(label: String, day: Long?, onSet: (Long) -> Unit, onClear:
 fun SpanSection(from: Long?, until: Long?, onChange: (Long?, Long?) -> Unit) {
     val is24Hour = DateFormat.is24HourFormat(LocalContext.current)
     val zone = ZoneId.systemDefault()
-    val now = System.currentTimeMillis()
+    val now = TrustedClock.now()
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text("Time limit", style = MaterialTheme.typography.labelLarge)
         Text(
@@ -168,7 +169,7 @@ fun SpanSection(from: Long?, until: Long?, onChange: (Long?, Long?) -> Unit) {
             color = if (until != null && until <= now) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
         )
         if (until != null) {
-            DateTimeRow("Block until", until, { onChange(from, it) }, minDate = LocalDate.now(zone))
+            DateTimeRow("Block until", until, { onChange(from, it) }, minDate = TrustedClock.today())
             TextButton(onClick = { onChange(from, null) }) { Text("No end date") }
         } else {
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -194,7 +195,7 @@ fun SpanSection(from: Long?, until: Long?, onChange: (Long?, Long?) -> Unit) {
 @Composable
 fun SpanLabel(from: Long?, until: Long?) {
     val is24Hour = DateFormat.is24HourFormat(LocalContext.current)
-    val now = System.currentTimeMillis()
+    val now = TrustedClock.now()
     val text = spanLabel(from, until, now, ZoneId.systemDefault(), is24Hour) ?: return
     val over = until != null && until <= now
     Text(

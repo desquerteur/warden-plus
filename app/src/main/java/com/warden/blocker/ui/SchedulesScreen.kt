@@ -40,11 +40,11 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.warden.blocker.block.TimeWindows
 import com.warden.blocker.data.Schedule
+import com.warden.blocker.time.TrustedClock
 import com.warden.blocker.ui.times.OnceBlockDialog
 import com.warden.blocker.ui.times.scheduleLine
 import com.warden.blocker.ui.tour.TourIds
 import com.warden.blocker.ui.tour.tourTarget
-import java.time.ZoneId
 
 @Composable
 fun SchedulesScreen(vm: WardenViewModel) {
@@ -54,8 +54,8 @@ fun SchedulesScreen(vm: WardenViewModel) {
     var creatingOnce by remember { mutableStateOf(false) }
     val listState = rememberLazyListState()
     val is24Hour = DateFormat.is24HourFormat(LocalContext.current)
-    val zone = ZoneId.systemDefault()
-    val now = System.currentTimeMillis()
+    val zone = TrustedClock.zone()
+    val now = TrustedClock.now()
     ScrollToTopOnReselect(listState)
     val gutter = pageGutter()
 

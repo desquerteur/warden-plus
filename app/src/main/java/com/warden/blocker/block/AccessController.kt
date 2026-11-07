@@ -3,6 +3,7 @@ package com.warden.blocker.block
 import com.warden.blocker.data.BlockRepository
 import com.warden.blocker.data.BlockedItem
 import com.warden.blocker.data.InterceptMode
+import com.warden.blocker.time.TrustedClock
 
 enum class LimitReason { OPENS, TIME, COOLDOWN }
 
@@ -38,7 +39,7 @@ class AccessController(
         allowGate(packageName, found)?.let { return it }
         val item = found ?: return AccessDecision.Allow
 
-        val now = System.currentTimeMillis()
+        val now = TrustedClock.now()
         // Fetch only what each check needs (usage stats especially aren't free).
         val hasGrant = repo.activeGrant(item.id, now) != null
         val used = if (item.dailyLimitMinutes > 0) usageMinutesToday(packageName) else 0L

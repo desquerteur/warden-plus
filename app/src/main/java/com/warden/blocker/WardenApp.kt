@@ -17,6 +17,7 @@ import com.warden.blocker.gray.GrayMode
 import com.warden.blocker.hosts.HostsListRepository
 import com.warden.blocker.owner.OwnerSync
 import com.warden.blocker.system.FilterKeeper
+import com.warden.blocker.time.TrustedClock
 import com.warden.blocker.update.UpdateCheckWorker
 import com.warden.blocker.usage.AppsHelper
 import com.warden.blocker.usage.UsageStatsHelper
@@ -33,6 +34,7 @@ class WardenApp : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        TrustedClock.start(this) // first: every blocking decision reads the time from it
         container = AppContainer(this)
         container.newAppWatcher.start()
         createNotificationChannel()

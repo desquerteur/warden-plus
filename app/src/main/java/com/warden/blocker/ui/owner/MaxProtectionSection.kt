@@ -4,6 +4,7 @@ import android.content.Context
 import android.text.format.DateFormat
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.tween
+import com.warden.blocker.time.TrustedClock
 import com.warden.blocker.ui.CardPadding
 import com.warden.blocker.ui.Motion
 import androidx.compose.foundation.layout.Arrangement
@@ -140,10 +141,10 @@ private fun PolicyRow(policy: OwnerPolicy, checked: Boolean, onChange: (Boolean)
 private fun EmergencyExitBlock(vm: OwnerViewModel, pinBypassed: Boolean) {
     val context = LocalContext.current
     val readyAt by vm.exitReadyAt.collectAsStateWithLifecycle()
-    var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
+    var now by remember { mutableLongStateOf(TrustedClock.now()) }
     var confirm by remember { mutableStateOf(false) }
     LaunchedEffect(readyAt) {
-        while (true) { now = System.currentTimeMillis(); delay(1000) }
+        while (true) { now = TrustedClock.now(); delay(1000) }
     }
 
     Text("Emergency exit", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)

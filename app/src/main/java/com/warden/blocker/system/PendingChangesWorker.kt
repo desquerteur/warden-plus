@@ -6,6 +6,7 @@ import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
+import com.warden.blocker.time.TrustedClock
 import com.warden.blocker.wardenContainer
 import java.util.concurrent.TimeUnit
 
@@ -24,7 +25,7 @@ class PendingChangesWorker(context: Context, params: WorkerParameters) : Corouti
 
         fun schedule(context: Context, at: Long) {
             val request = OneTimeWorkRequestBuilder<PendingChangesWorker>()
-                .setInitialDelay((at - System.currentTimeMillis()).coerceAtLeast(0), TimeUnit.MILLISECONDS)
+                .setInitialDelay((at - TrustedClock.now()).coerceAtLeast(0), TimeUnit.MILLISECONDS)
                 .build()
             WorkManager.getInstance(context).enqueueUniqueWork(UNIQUE, ExistingWorkPolicy.REPLACE, request)
         }

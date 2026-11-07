@@ -18,6 +18,7 @@ import com.warden.blocker.gray.GrayModePrefs
 import com.warden.blocker.guard.SettingsGuardStore
 import com.warden.blocker.owner.OwnerPrefs
 import com.warden.blocker.owner.OwnerSync
+import com.warden.blocker.time.TrustedClock
 import com.warden.blocker.ui.whenLabel
 import com.warden.blocker.vpn.VpnController
 import kotlinx.coroutines.Dispatchers
@@ -28,7 +29,6 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
-import java.util.Calendar
 
 /**
  * The one gate every weakening goes through ([request]): it asks [BlockProtection] and then
@@ -53,14 +53,14 @@ class ProtectionGuard(private val context: Context, private val c: AppContainer)
         focusStrict = c.settings.focusStrict.first(),
     )
 
-    suspend fun verdict(kind: Loosening): Verdict = BlockProtection.check(kind, state(), System.currentTimeMillis())
+    suspend fun verdict(kind: Loosening): Verdict = BlockProtection.check(kind, state(), TrustedClock.now())
 
     /**
      * Applies [change] if Block protection allows it now. With [canAskPin] false (the Quick
      * Settings tile) a PIN verdict is only returned, so the caller can open the app instead.
      */
     suspend fun request(change: ProtectedChange, canAskPin: Boolean = true): Verdict {
-        val now = System.currentTimeMillis()
+        val now = TrustedClock.now()
         val verdict = BlockProtection.check(change.kind, state(), now)
         when (verdict) {
             Verdict.Allow -> apply(change)
@@ -79,7 +79,7 @@ class ProtectionGuard(private val context: Context, private val c: AppContainer)
     }
 
     /** Call after any correct PIN entry (unlocking Settings counts too). */
-    fun pinVerified() { pinGraceUntil = System.currentTimeMillis() + PIN_GRACE_MS }
+    fun pinVerified() { pinGraceUntil = TrustedClock.now() + PIN_GRACE_MS }
 
     /** The PIN dialog for [pinRequest] was answered correctly. */
     suspend fun confirmPinRequest() {
@@ -97,7 +97,7 @@ class ProtectionGuard(private val context: Context, private val c: AppContainer)
 
     /** "15:40" today, otherwise "Fri 18:00" (12/24 h as set on the phone). */
     fun whenText(at: Long): String = whenLabel(
-        Calendar.getInstance().apply { timeInMillis = at }, Calendar.getInstance(), DateFormat.is24HourFormat(context),
+        TrustedClock.calendar().apply { timeInMillis = at }, TrustedClock.calendar(), DateFormat.is24HourFormat(context),
     )
 
     // --- "Delay" queue ---
@@ -123,7 +123,7 @@ class ProtectionGuard(private val context: Context, private val c: AppContainer)
      * that a lock now forbids waits until the lock ends.
      */
     suspend fun processDue() = pendingLock.withLock {
-        val now = System.currentTimeMillis()
+        val now = TrustedClock.now()
         val state = state()
         val ready = mutableListOf<ProtectedChange>()
         val list = c.settings.updatePendingChanges { list ->
@@ -170,7 +170,7 @@ class ProtectionGuard(private val context: Context, private val c: AppContainer)
             }
             is ProtectedChange.LoosenAllow -> c.allowStore.update(change.edit::applyTo)
             is ProtectedChange.ShortenBlockUntil -> {
-                val now = System.currentTimeMillis()
+                val now = TrustedClock.now()
                 // Only while that block still runs; queued in "Delay", it may have ended (or been replaced) by now.
                 val endsAt = s.focusEndsAt.first()
                 if (endsAt > now && change.endsAt < endsAt) {
@@ -188,7 +188,7 @@ class ProtectionGuard(private val context: Context, private val c: AppContainer)
                 OwnerSync.syncNow(context)
             }
             is ProtectedChange.RelatedOff -> s.setRelatedOff(change.domain, true)
-            ProtectedChange.ConfirmOwnerExit -> OwnerPrefs.get(context).setExitReadyAt(System.currentTimeMillis())
+            ProtectedChange.ConfirmOwnerExit -> OwnerPrefs.get(context).setExitReadyAt(TrustedClock.now())
             is ProtectedChange.SetGrayMode -> {
                 GrayModePrefs.get(context).setConfig(change.config)
                 GrayMode.syncAndPlan(context)

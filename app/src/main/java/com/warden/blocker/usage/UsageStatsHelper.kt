@@ -4,7 +4,7 @@ import android.app.AppOpsManager
 import android.app.usage.UsageStatsManager
 import android.content.Context
 import android.os.Process
-import java.util.Calendar
+import com.warden.blocker.time.TrustedClock
 
 data class AppUsage(val packageName: String, val totalMillis: Long)
 
@@ -31,11 +31,13 @@ object UsageStatsHelper {
     /** Per-app foreground time since midnight today, most-used first. */
     fun todayUsage(context: Context): List<AppUsage> {
         val usm = context.getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
-        val start = Calendar.getInstance().apply {
-            set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0)
-            set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0)
-        }.timeInMillis
-        val end = System.currentTimeMillis()
+        // "Today" on the trusted clock (see TrustedClock). Usage events carry the phone clock's
+        // times: when it was set back, look back by as much more (rather count too much than too
+        // little); when set forward, reach as far ahead.
+        val phoneNow = System.currentTimeMillis()
+        val trustedNow = TrustedClock.now()
+        val start = TrustedClock.startOfToday() + minOf(0L, phoneNow - trustedNow)
+        val end = maxOf(phoneNow, trustedNow)
         return usm.queryUsageStats(UsageStatsManager.INTERVAL_DAILY, start, end)
             .filter { it.totalTimeInForeground > 0 }
             .groupBy { it.packageName }

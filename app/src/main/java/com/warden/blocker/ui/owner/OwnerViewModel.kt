@@ -12,6 +12,7 @@ import com.warden.blocker.owner.OwnerPolicy
 import com.warden.blocker.owner.OwnerPrefs
 import com.warden.blocker.owner.OwnerSync
 import com.warden.blocker.owner.OwnerSyncWorker
+import com.warden.blocker.time.TrustedClock
 import com.warden.blocker.wardenContainer
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -39,7 +40,7 @@ class OwnerViewModel(app: Application) : AndroidViewModel(app) {
         val app = getApplication<Application>()
         _isOwner.value = DeviceOwnerManager.isDeviceOwner(app)
         OwnerSyncWorker.sync(app)
-        val now = System.currentTimeMillis()
+        val now = TrustedClock.now()
         val readyAt = prefs.exitReadyAt.value
         EmergencyExit.normalizedReadyAt(readyAt, now).let { if (it != readyAt) prefs.setExitReadyAt(it) }
         if (_isOwner.value) sync()
@@ -73,7 +74,7 @@ class OwnerViewModel(app: Application) : AndroidViewModel(app) {
      * at most). [pinBypassed]: asked from the locked Settings — always the full 24 h.
      */
     fun requestExit(pinBypassed: Boolean) = viewModelScope.launch {
-        val now = System.currentTimeMillis()
+        val now = TrustedClock.now()
         val wait = EmergencyExit.waitMillis(protection.verdict(Loosening.REMOVE_DEVICE_OWNER), now, pinBypassed)
         if (wait == null) {
             protection.request(ProtectedChange.ConfirmOwnerExit) // PIN dialog; afterwards "Remove device owner now"
@@ -88,7 +89,7 @@ class OwnerViewModel(app: Application) : AndroidViewModel(app) {
     /** "Remove device owner now": only once a request is ready (its wait is over, or the PIN was given). */
     fun removeNow() {
         val readyAt = prefs.exitReadyAt.value
-        if (readyAt == 0L || readyAt > System.currentTimeMillis()) return
+        if (readyAt == 0L || readyAt > TrustedClock.now()) return
         remove()
     }
 

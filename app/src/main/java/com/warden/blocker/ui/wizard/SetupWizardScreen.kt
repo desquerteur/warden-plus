@@ -68,7 +68,10 @@ import com.warden.blocker.hosts.HostsTemplates
 import com.warden.blocker.system.AdminManager
 import com.warden.blocker.system.Hardening
 import com.warden.blocker.owner.DeviceOwnerManager
+import com.warden.blocker.time.TrustedClock
 import com.warden.blocker.ui.protectionSummary
+import com.warden.blocker.ui.time.openDateSettings
+import com.warden.blocker.ui.time.rememberAutoTimeOn
 import com.warden.blocker.ui.AnimatedCheck
 import com.warden.blocker.ui.InfoNote
 import com.warden.blocker.ui.LocalMotion
@@ -433,7 +436,7 @@ private fun ProtectionPage(vm: WardenViewModel, done: Boolean, onChosen: () -> U
     val protection by vm.protection.collectAsStateWithLifecycle()
     PageTitle("Protection", "How hard should it be to loosen blocking on impulse? Adding or tightening always works right away.")
     Text(
-        protectionSummary(protection, System.currentTimeMillis(), vm::whenText),
+        protectionSummary(protection, TrustedClock.now(), vm::whenText),
         style = MaterialTheme.typography.titleMedium,
         fontWeight = FontWeight.Bold,
     )
@@ -443,6 +446,16 @@ private fun ProtectionPage(vm: WardenViewModel, done: Boolean, onChosen: () -> U
     )
     Button(onClick = onOpenProtection, modifier = Modifier.fillMaxWidth()) { Text("Choose block protection") }
     if (!done) TextButton(onClick = onChosen) { Text("Keep it off") }
+
+    val autoTime = rememberAutoTimeOn()
+    GuideBlock(
+        "Automatic date & time",
+        (if (autoTime) "On. " else "Off — please turn it on. ") +
+            "Changing the date or time doesn't end blocks: Warden+ keeps them running on the real time. " +
+            "With automatic date & time on, the phone's clock stays right too.",
+        button = if (autoTime) null else "Date & time settings",
+        primary = false,
+    ) { openDateSettings(context) }
 
     var adminChecks by remember { mutableIntStateOf(0) }
     val adminActive = remember(adminChecks) { AdminManager.isActive(context) }

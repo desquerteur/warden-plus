@@ -8,8 +8,8 @@ import com.warden.blocker.data.BlockedItem
 import com.warden.blocker.data.InterceptMode
 import com.warden.blocker.data.SettingsStore
 import com.warden.blocker.hosts.DomainMatcher
+import com.warden.blocker.time.TrustedClock
 import kotlinx.coroutines.flow.first
-import java.util.Calendar
 
 /**
  * Feeds [AllowPolicy] the live state. Called only while blocking is enforced:
@@ -78,9 +78,9 @@ class AllowGate(
     private suspend fun allowOnlyNow(mode: ListMode, scope: AllowScope): Boolean {
         if (mode != ListMode.ALLOW_ONLY) return false
         val focusActive = scope != AllowScope.WHENEVER_BLOCKING &&
-            settings.focusEndsAt.first() > System.currentTimeMillis()
+            settings.focusEndsAt.first() > TrustedClock.now()
         val scheduleActive = scope == AllowScope.SCHEDULES_AND_FOCUS && !focusActive &&
-            ScheduleEvaluator.anyActive(repo.enabledSchedules(), Calendar.getInstance())
+            ScheduleEvaluator.anyActive(repo.enabledSchedules(), TrustedClock.calendar())
         return AllowPolicy.allowOnlyNow(mode, scope, focusActive, scheduleActive)
     }
 

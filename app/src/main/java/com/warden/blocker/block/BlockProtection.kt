@@ -3,6 +3,7 @@ package com.warden.blocker.block
 import com.warden.blocker.data.BlockedItem
 import com.warden.blocker.data.InterceptMode
 import com.warden.blocker.data.Schedule
+import com.warden.blocker.time.TrustedClock
 
 /** Changes that make blocking weaker. Adding things (or making them stricter) is never one. */
 enum class Loosening {
@@ -132,7 +133,7 @@ object BlockProtection {
      * moved, a one-time block shortened or a date range narrowed (see [TimeWindows.scheduleTimesLoosen]).
      * Renaming, adding days or extending is fine.
      */
-    fun scheduleEditLoosens(old: Schedule, updated: Schedule, now: Long = System.currentTimeMillis()): Boolean {
+    fun scheduleEditLoosens(old: Schedule, updated: Schedule, now: Long = TrustedClock.now()): Boolean {
         if (old.enabled && !updated.enabled) return true
         if (TimeWindows.scheduleTimesLoosen(old, updated, now)) return true
         // A one-time block only has its start and end; its weekday/clock fields mean nothing.

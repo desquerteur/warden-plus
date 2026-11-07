@@ -58,8 +58,10 @@ import com.warden.blocker.R
 import com.warden.blocker.data.BlockType
 import com.warden.blocker.data.Schedule
 import com.warden.blocker.system.AccessibilityAlert
+import com.warden.blocker.time.TrustedClock
 import com.warden.blocker.ui.stats.shownFocusStreak
 import com.warden.blocker.ui.times.BlockUntilCard
+import com.warden.blocker.ui.time.AutoTimeCard
 import com.warden.blocker.ui.tour.TourIds
 import com.warden.blocker.ui.tour.tourTarget
 import com.warden.blocker.ui.wizard.SetupProgressCard
@@ -70,7 +72,6 @@ import com.warden.blocker.vpn.VpnController
 import com.warden.blocker.system.PrivateDns
 import com.warden.blocker.vpn.WardenVpnService
 import kotlinx.coroutines.delay
-import java.util.Calendar
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -108,7 +109,7 @@ fun HomeScreen(
     // recomposition (e.g. "paused" right after switching on, before the VPN was up).
     val vpnRunning by WardenVpnService.runningState.collectAsStateWithLifecycle()
     // A focus session forces blocking on even while the main switch is off.
-    val focusActive = focusEndsAt > System.currentTimeMillis()
+    val focusActive = focusEndsAt > TrustedClock.now()
     val protecting = enabled || focusActive
     var showPaused by remember { mutableStateOf(false) }
     LaunchedEffect(protecting, vpnRunning) {
@@ -197,6 +198,8 @@ fun HomeScreen(
                 OutlinedButton(onClick = { runCatching { context.startActivity(PrivateDns.settingsIntent()) } }) { Text("Open settings") }
             }
         }
+        // Automatic time off or the clock set by hand: blocks are safe (TrustedClock), but say it.
+        AutoTimeCard()
         // Blocking is on but the filter isn't running (OS killed it). Never leave the user
         // silently unprotected — surface it and offer a one-tap re-arm.
         AnimatedVisibility(problem == FilterProblem.PAUSED) {
@@ -289,13 +292,13 @@ internal fun PendingChangesCard(vm: WardenViewModel) {
 private fun BlockingHeadline(enabled: Boolean, alwaysOn: Boolean, focusEndsAt: Long, schedules: List<Schedule>) {
     val context = LocalContext.current
     val is24Hour = DateFormat.is24HourFormat(context)
-    var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
+    var now by remember { mutableLongStateOf(TrustedClock.now()) }
     LaunchedEffect(Unit) {
-        while (true) { delay(5_000); now = System.currentTimeMillis() }
+        while (true) { delay(5_000); now = TrustedClock.now() }
     }
     val text = blockingHeadline(
         enabled, alwaysOn, focusEndsAt, schedules,
-        Calendar.getInstance().apply { timeInMillis = now }, is24Hour,
+        TrustedClock.calendar(now), is24Hour,
     )
     AnimatedContent(
         text,

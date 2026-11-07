@@ -18,6 +18,7 @@ import com.warden.blocker.stats.StatsRecorder
 import com.warden.blocker.system.NotificationIds
 import com.warden.blocker.system.ProtectionWatch
 import com.warden.blocker.system.VpnTakeover
+import com.warden.blocker.time.TrustedClock
 import com.warden.blocker.wardenContainer
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -156,7 +157,7 @@ class WardenVpnService : VpnService() {
         val c = wardenContainer
         while (true) {
             val focusEndsAt = runCatching { c.settings.focusEndsAt.first() }.getOrDefault(0L)
-            delay(BlockStateClock.delayUntilNextCheck(System.currentTimeMillis(), focusEndsAt))
+            delay(BlockStateClock.delayUntilNextCheck(TrustedClock.now(), focusEndsAt))
             // An entry or hosts list with a "from … / until …" span started or stopped blocking.
             if (runCatching { c.blockEngine.timedContentChanged() }.getOrDefault(false)) refreshBlocklist()
             val active = runCatching { c.blockEngine.isBlockingActiveNow() }.getOrNull() ?: continue

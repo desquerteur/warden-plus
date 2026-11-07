@@ -20,6 +20,7 @@ import com.warden.blocker.feature.FeatureDetector
 import com.warden.blocker.guard.SettingsGuardHook
 import com.warden.blocker.system.AccessibilityAlert
 import com.warden.blocker.system.BlockLoopAlert
+import com.warden.blocker.time.TrustedClock
 import com.warden.blocker.ui.intercept.InterceptActivity
 import com.warden.blocker.util.CriticalApps
 import com.warden.blocker.wardenContainer
@@ -252,12 +253,12 @@ class AppBlockAccessibilityService : AccessibilityService() {
     private suspend fun recheckWhenGrantEnds(pkg: String) {
         val repo = wardenContainer.repository
         val item = repo.appItem(pkg) ?: return
-        val endsAt = repo.activeGrant(item.id, System.currentTimeMillis())?.expiresAt ?: return
+        val endsAt = repo.activeGrant(item.id, TrustedClock.now())?.expiresAt ?: return
         withContext(Dispatchers.Main) {
             if (gate.foreground != pkg) return@withContext
             grantRecheck?.cancel()
             grantRecheck = scope.launch(Dispatchers.Main) {
-                delay(endsAt - System.currentTimeMillis() + GRANT_RECHECK_MARGIN_MS)
+                delay(endsAt - TrustedClock.now() + GRANT_RECHECK_MARGIN_MS)
                 if (gate.foreground != pkg) return@launch
                 // Still in the app: let the gate treat it as freshly opened, with all its checks.
                 gate.forget(pkg)

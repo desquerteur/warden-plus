@@ -18,6 +18,7 @@ import com.warden.blocker.hosts.HostsSource
 import com.warden.blocker.security.PinHasher
 import com.warden.blocker.security.PinResult
 import com.warden.blocker.system.FocusEndWorker
+import com.warden.blocker.time.TrustedClock
 import com.warden.blocker.wardenContainer
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -111,7 +112,7 @@ class WardenViewModel(app: Application) : AndroidViewModel(app) {
     fun setProtection(new: ProtectionSettings) = viewModelScope.launch { changeProtection(new) }
 
     private suspend fun changeProtection(new: ProtectionSettings) {
-        val now = System.currentTimeMillis()
+        val now = TrustedClock.now()
         val capped = new.copy(lockedUntil = new.lockedUntil.coerceAtMost(BlockProtection.maxLockedUntil(now)))
         if (BlockProtection.protectionChangeLoosens(container.settings.protection.first(), capped, now)) {
             protectionGuard.request(ProtectedChange.SetProtection(capped))
@@ -129,7 +130,7 @@ class WardenViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Begin a focus session that forces blocking on for [minutes]. */
     fun startFocus(minutes: Int, strict: Boolean) = viewModelScope.launch {
-        val endsAt = System.currentTimeMillis() + minutes * 60_000L
+        val endsAt = TrustedClock.now() + minutes * 60_000L
         container.settings.startFocus(endsAt, strict)
         FocusEndWorker.schedule(getApplication(), minutes * 60_000L)
     }
@@ -168,7 +169,7 @@ class WardenViewModel(app: Application) : AndroidViewModel(app) {
             // adding a second copy.
             _justAdded.value = container.repository.websiteItem(clean)?.id
                 ?: container.repository.addItem(
-                    BlockedItem(type = BlockType.WEBSITE, value = clean, label = clean, createdAt = System.currentTimeMillis()),
+                    BlockedItem(type = BlockType.WEBSITE, value = clean, label = clean, createdAt = TrustedClock.now()),
                 )
         }
         return true
@@ -182,7 +183,7 @@ class WardenViewModel(app: Application) : AndroidViewModel(app) {
                 type = BlockType.APP,
                 value = packageName,
                 label = label,
-                createdAt = System.currentTimeMillis(),
+                createdAt = TrustedClock.now(),
                 interceptMode = InterceptMode.PAUSE,
             ),
         )
@@ -249,7 +250,7 @@ class WardenViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Verifies [pin], enforcing a compounding lockout after repeated failures. */
     suspend fun verifyPin(pin: String): PinResult {
-        val now = System.currentTimeMillis()
+        val now = TrustedClock.now()
         val lockUntil = container.settings.pinLockUntil()
         if (lockUntil > now) return PinResult.Locked(((lockUntil - now) / 1000).toInt() + 1)
 

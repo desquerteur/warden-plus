@@ -7,6 +7,7 @@ import com.warden.blocker.block.ProtectedChange
 import com.warden.blocker.block.TimeWindows
 import com.warden.blocker.hosts.HostsSource
 import com.warden.blocker.system.FocusEndWorker
+import com.warden.blocker.time.TrustedClock
 import com.warden.blocker.wardenContainer
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -26,7 +27,7 @@ class TimesViewModel(app: Application) : AndroidViewModel(app) {
      * strict when extended. [onStarted] runs once it is saved (Home then makes sure the VPN runs).
      */
     fun blockUntil(endsAt: Long, strict: Boolean, onStarted: () -> Unit) = viewModelScope.launch {
-        val now = System.currentTimeMillis()
+        val now = TrustedClock.now()
         if (endsAt <= now) return@launch
         val settings = container.settings
         val currentEnd = settings.focusEndsAt.first()

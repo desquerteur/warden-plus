@@ -6,6 +6,7 @@ import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
+import com.warden.blocker.time.TrustedClock
 import com.warden.blocker.vpn.VpnController
 import com.warden.blocker.wardenContainer
 import kotlinx.coroutines.flow.first
@@ -19,7 +20,14 @@ class FocusEndWorker(context: Context, params: WorkerParameters) : CoroutineWork
     override suspend fun doWork(): Result {
         val container = applicationContext.wardenContainer
         val endsAt = container.settings.focusEndsAt.first()
-        if (endsAt != 0L && endsAt <= System.currentTimeMillis()) {
+        val now = TrustedClock.now()
+        if (endsAt > now) {
+            // Woken early — the phone's clock was set forward (WorkManager follows it): the
+            // session runs on the real time, so come back when it really ends.
+            schedule(applicationContext, endsAt - now)
+            return Result.success()
+        }
+        if (endsAt != 0L) {
             container.settings.clearFocus()
             container.settings.incrementFocusSessions() // count only sessions that ran to completion
         }

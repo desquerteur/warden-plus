@@ -32,6 +32,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.warden.blocker.time.TrustedClock
 import com.warden.blocker.ui.gray.GrayModeCard
 import com.warden.blocker.ui.owner.OwnerLockedExit
 import com.warden.blocker.ui.tour.RestartGuideCard
@@ -100,7 +101,7 @@ fun SettingsScreen(vm: WardenViewModel, onOpenSetup: () -> Unit, onOpenProtectio
         ActionCard(
             Icons.Outlined.Shield,
             "Protection",
-            protectionSummary(protection, System.currentTimeMillis(), vm::whenText) + "\n" +
+            protectionSummary(protection, TrustedClock.now(), vm::whenText) + "\n" +
                 (if (hasPin) "PIN set." else "No PIN.") + " Also uninstall protection, Settings guard and maximum protection.",
             onClick = onOpenProtection,
             modifier = Modifier.tourTarget(TourIds.SETTINGS_BLOCK_PROTECTION),

@@ -1,8 +1,8 @@
 package com.warden.blocker.data
 
 import com.warden.blocker.block.TimeWindows
+import com.warden.blocker.time.TrustedClock
 import kotlinx.coroutines.flow.Flow
-import java.util.Calendar
 
 /** Single access point for blocklist + schedule + grant persistence. */
 class BlockRepository(private val dao: BlockDao) {
@@ -11,7 +11,7 @@ class BlockRepository(private val dao: BlockDao) {
     val schedules: Flow<List<Schedule>> = dao.observeSchedules()
 
     /** Domains to block right now: enabled, and inside their "from … / until …" span if set. */
-    suspend fun enabledDomains(now: Long = System.currentTimeMillis()): List<String> =
+    suspend fun enabledDomains(now: Long = TrustedClock.now()): List<String> =
         dao.enabledItemsOfType(BlockType.WEBSITE)
             .filter { TimeWindows.inEffect(it, now) }
             .map { it.value.lowercase().removePrefix("www.") }
@@ -23,7 +23,7 @@ class BlockRepository(private val dao: BlockDao) {
      * "from … / until …" span, so blocking decisions let the app through. Use [findApp] to
      * look an entry up regardless of time.
      */
-    suspend fun appItem(packageName: String, now: Long = System.currentTimeMillis()): BlockedItem? =
+    suspend fun appItem(packageName: String, now: Long = TrustedClock.now()): BlockedItem? =
         dao.itemByValue(BlockType.APP, packageName)?.takeIf { TimeWindows.inEffect(it, now) }
 
     suspend fun findApp(packageName: String): BlockedItem? = dao.itemByValue(BlockType.APP, packageName)
@@ -57,7 +57,7 @@ class BlockRepository(private val dao: BlockDao) {
     suspend fun lastGrantAt(itemId: Long): Long? = dao.lastGrantAt(itemId)
 
     suspend fun grantAccess(item: BlockedItem, durationMinutes: Int): AccessGrant {
-        val now = System.currentTimeMillis()
+        val now = TrustedClock.now()
         val grant = AccessGrant(
             itemId = item.id,
             packageName = item.value,
@@ -69,8 +69,5 @@ class BlockRepository(private val dao: BlockDao) {
         return grant
     }
 
-    private fun startOfToday(): Long = Calendar.getInstance().apply {
-        set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0)
-        set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0)
-    }.timeInMillis
+    private fun startOfToday(): Long = TrustedClock.startOfToday()
 }

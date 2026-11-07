@@ -41,7 +41,14 @@ class WindowShieldTest {
     @Test fun blockedAppVisibleWithoutBlockScreenShowsItAgain() {
         val shield = WindowShield()
         shield.shield(untis)
-        assertEquals(Step.ShowBlockScreen(untis), shield.at(1_000, full(launcher, active = true), popup(untis)))
+        assertEquals(Step.ShowBlockScreen(untis), shield.at(1_000, full(untis), popup(chrome, active = true)))
+    }
+
+    @Test fun blockedPopUpOverTheHomeScreenGetsItsWindowButtonPressedFirst() {
+        val shield = WindowShield()
+        shield.shield(untis)
+        // A pop-up isn't covered by the block screen on Samsung: maximize / close it first.
+        assertEquals(Step.PressWindowButton(untis), shield.at(1_000, full(launcher, active = true), popup(untis)))
     }
 
     @Test fun blockScreenCoveringTheAppIsLeftAlone() {
@@ -92,25 +99,23 @@ class WindowShieldTest {
         assertEquals(Step.None, shield.at(1_500, full(untis, active = true)))
     }
 
-    @Test fun windowThatCantBeClosedIsNotHammered() {
+    @Test fun fullScreenAppThatCantBeCoveredIsNotHammered() {
         val shield = WindowShield(maxQuietAttempts = 2)
         shield.shield(untis)
-        // A floating pop-up that neither Home nor the block screen gets rid of.
-        assertEquals(Step.GoHome(untis), shield.at(1_000, popup(untis), full(warden, active = true)))
-        assertEquals(Step.ShowBlockScreen(untis), shield.at(2_000, popup(untis), full(launcher, active = true)))
-        assertEquals(Step.None, shield.at(3_000, popup(untis), full(warden, active = true)))
-        assertEquals(Step.None, shield.at(4_000, popup(untis), full(launcher, active = true)))
+        assertEquals(Step.GoHome(untis), shield.at(1_000, full(untis), popup(warden, active = true)))
+        assertEquals(Step.ShowBlockScreen(untis), shield.at(2_000, full(untis), popup(chrome, active = true)))
+        assertEquals(Step.None, shield.at(3_000, full(untis), popup(warden, active = true)))
         // ...until the user reaches for it again.
-        assertEquals(Step.ShowBlockScreen(untis), shield.at(5_000, popup(untis, active = true), full(launcher)))
+        assertEquals(Step.GoHome(untis), shield.at(5_000, full(untis, active = true), popup(warden)))
     }
 
     @Test fun attemptsStartOverOnceTheAppWasGone() {
         val shield = WindowShield(maxQuietAttempts = 1)
         shield.shield(untis)
-        assertEquals(Step.GoHome(untis), shield.at(1_000, popup(untis), full(warden, active = true)))
-        assertEquals(Step.None, shield.at(2_000, popup(untis), full(warden, active = true)))
+        assertEquals(Step.GoHome(untis), shield.at(1_000, full(untis), popup(warden, active = true)))
+        assertEquals(Step.None, shield.at(2_000, full(untis), popup(warden, active = true)))
         assertEquals(Step.None, shield.at(3_000, full(warden, active = true)))
-        assertEquals(Step.GoHome(untis), shield.at(4_000, popup(untis), full(warden, active = true)))
+        assertEquals(Step.GoHome(untis), shield.at(4_000, full(untis), popup(warden, active = true)))
     }
 
     @Test fun pictureInPictureIsNotAnUse() {
@@ -168,7 +173,8 @@ class WindowShieldTest {
         val shield = WindowShield(sideSettleMs = 0)
         assertEquals(Step.CheckSide(untis), shield.at(1_000, half(chrome, active = true), half(untis)))
         shield.shield(untis) // the service found it blocked and showed the block screen
-        assertEquals(Step.ShowBlockScreen(untis), shield.at(2_000, half(chrome, active = true), half(untis)))
+        // Still in its split half beside Chrome: the floating-window steps take over.
+        assertEquals(Step.PressWindowButton(untis), shield.at(2_000, half(chrome, active = true), half(untis)))
     }
 
     @Test fun focusedWindowIsLeftToTheForegroundGate() {

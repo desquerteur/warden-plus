@@ -1,6 +1,11 @@
 package com.warden.blocker.ui.vpnguard
 
 import android.app.Application
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.warden.blocker.allow.AllowConfig
@@ -52,6 +57,25 @@ class VpnGuardViewModel(app: Application) : AndroidViewModel(app) {
 
     private val _message = MutableStateFlow<String?>(null)
     val message: StateFlow<String?> = _message.asStateFlow()
+
+    /** Installs and removals while the card is open: the VPN app count would stay stale otherwise. */
+    private val packageReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) { refresh() }
+    }
+
+    init {
+        val filter = IntentFilter().apply {
+            addAction(Intent.ACTION_PACKAGE_ADDED)
+            addAction(Intent.ACTION_PACKAGE_REMOVED)
+            addDataScheme("package")
+        }
+        // System broadcasts reach a not-exported receiver; no other app can fake them.
+        runCatching { ContextCompat.registerReceiver(app, packageReceiver, filter, ContextCompat.RECEIVER_NOT_EXPORTED) }
+    }
+
+    override fun onCleared() {
+        runCatching { getApplication<Application>().unregisterReceiver(packageReceiver) }
+    }
 
     /** Re-read the phone's state (on every resume: the user may come back from Settings). */
     fun refresh() = viewModelScope.launch {

@@ -22,6 +22,14 @@ package com.warden.blocker.accessibility
  *  2. Another app is visible in a split / pop-up arrangement without being the focused window →
  *     ask whether it is blocked ([Step.CheckSide]), once it has been visible for [sideSettleMs].
  *
+ * A shielded app in a *floating* window (pop-up, split half) gets more than Home and the block
+ * screen, because on Samsung phones a pop-up floats above both (issue #3, second report): a
+ * ladder of [Remedy]s, one step at a time, each only after the last one had [remedyGapMs] to
+ * work, as long as the window is still there — press the window's own Maximize / Close /
+ * Minimize button ([WindowControls]), Back (only while that window has focus), Home, the block
+ * screen. When none of it helps, [Step.GaveUp] once (the service tells the user), then quiet
+ * until the user reaches for the window again.
+ *
  * Never acts on home screens, Warden+ itself or other critical apps, on picture-in-picture, or on
  * small windows (toasts, popup menus). Plain full-screen use — a widget on the home screen, the
  * Discover page, an app switch still animating — never needs it: then no app window is split.
@@ -35,7 +43,13 @@ class WindowShield(
     private val sideRecheckMs: Long = SIDE_RECHECK_MS,
     private val maxQuietAttempts: Int = MAX_QUIET_ATTEMPTS,
     private val lingerMs: Long = LINGER_MS,
+    private val remedyGapMs: Long = REMEDY_GAP_MS,
+    private val startingMs: Long = STARTING_MS,
+    private val retryMs: Long = RETRY_MS,
 ) {
+
+    /** What is tried against a blocked app's floating window, in this order. */
+    enum class Remedy { WINDOW_BUTTON, BACK, HOME, BLOCK_SCREEN }
 
     /** One visible application window, as the accessibility service sees it. */
     data class AppWindow(
@@ -55,6 +69,12 @@ class WindowShield(
         data class ShowBlockScreen(val pkg: String) : Step
         /** The block screen is up, but [pkg] is still visible beside or over it: go Home. */
         data class GoHome(val pkg: String) : Step
+        /** [pkg] is blocked and floats in a pop-up / split window: press its window button. */
+        data class PressWindowButton(val pkg: String) : Step
+        /** [pkg] is blocked and its floating window has focus: Back. */
+        data class Back(val pkg: String) : Step
+        /** Nothing got rid of [pkg]'s floating window: tell the user (once). */
+        data class GaveUp(val pkg: String) : Step
         /** [pkg] is visible in a split / pop-up window without focus: is it blocked? */
         data class CheckSide(val pkg: String) : Step
         /** Something may need a look once it has settled: assess again at [atMs]. */
@@ -66,17 +86,41 @@ class WindowShield(
         private set
     private var attempts = 0
     private var hiddenSince = 0L
+    private var shieldedAt = 0L
+    // The floating-window ladder for the shielded app.
+    private var rung = 0
+    private var lastRemedyAt = 0L
+    private var noButton = false
+    private var gaveUp = false
     private val firstSeen = HashMap<String, Long>()
     private val allowedAt = HashMap<String, Long>()
 
-    /** The block screen was shown for [pkg]. */
+    /** The block screen was shown for [pkg] (or Home pressed against it) at [now]. */
     @Synchronized
-    fun shield(pkg: String) {
+    fun shield(pkg: String, now: Long = 0L) {
         if (shielded != pkg) {
             shielded = pkg
             attempts = 0
+            resetLadder()
         }
         hiddenSince = 0L
+        shieldedAt = now
+    }
+
+    /** No window button of [pkg]'s floating window was found: skip that step from now on. */
+    @Synchronized
+    fun noWindowButton(pkg: String) {
+        if (shielded == pkg) {
+            noButton = true
+            lastRemedyAt = 0L // nothing was done: go on with the next step right away
+        }
+    }
+
+    private fun resetLadder() {
+        rung = 0
+        lastRemedyAt = 0L
+        noButton = false
+        gaveUp = false
     }
 
     /** [pkg] may be used right now (no block, a grant, schedule over): stop guarding it. */
@@ -85,6 +129,7 @@ class WindowShield(
         if (shielded == pkg) {
             shielded = null
             attempts = 0
+            resetLadder()
         }
         allowedAt[pkg] = now
     }
@@ -117,6 +162,7 @@ class WindowShield(
         }
         if (pkg !in visible) {
             attempts = 0
+            resetLadder()
             if (ownPkg in visible) {
                 hiddenSince = 0L // hidden behind the block screen: as it should be
             } else if (hiddenSince == 0L) {
@@ -129,9 +175,42 @@ class WindowShield(
         }
         hiddenSince = 0L
         val reachedFor = shown.any { it.pkg == pkg && it.active }
+        val ownVisible = ownPkg in visible
+        // A pop-up / split window: the block screen and Home may not cover it (Samsung).
+        if (shown.none { it.pkg == pkg && it.coversScreen }) {
+            return floatingStep(pkg, reachedFor, ownVisible, now)
+        }
+        resetLadder()
         if (attempts >= maxQuietAttempts && !reachedFor) return Step.None
         attempts++
-        return if (ownPkg in visible) Step.GoHome(pkg) else Step.ShowBlockScreen(pkg)
+        return if (ownVisible) Step.GoHome(pkg) else Step.ShowBlockScreen(pkg)
+    }
+
+    /** One more step of the ladder against [pkg]'s floating window (see the class comment). */
+    private fun floatingStep(pkg: String, reachedFor: Boolean, ownVisible: Boolean, now: Long): Step {
+        // A block screen just launched (or Home just pressed) may still cover it: wait for that.
+        if (shieldedAt > 0L && now < shieldedAt + startingMs) return Step.Later(shieldedAt + startingMs)
+        if (lastRemedyAt > 0L && now < lastRemedyAt + remedyGapMs) return Step.Later(lastRemedyAt + remedyGapMs)
+        if (gaveUp) {
+            if (!reachedFor) return Step.None
+            // The user went for it again: start over, but not more often than every [retryMs].
+            if (now < lastRemedyAt + retryMs) return Step.Later(lastRemedyAt + retryMs)
+            resetLadder()
+        }
+        while (rung < LADDER.size) {
+            val remedy = LADDER[rung++]
+            val step = when (remedy) {
+                Remedy.WINDOW_BUTTON -> if (noButton) null else Step.PressWindowButton(pkg)
+                Remedy.BACK -> if (reachedFor) Step.Back(pkg) else null
+                Remedy.HOME -> Step.GoHome(pkg)
+                Remedy.BLOCK_SCREEN -> if (ownVisible) null else Step.ShowBlockScreen(pkg)
+            } ?: continue
+            lastRemedyAt = now
+            return step
+        }
+        gaveUp = true
+        lastRemedyAt = now
+        return Step.GaveUp(pkg)
     }
 
     private fun sideStep(shown: List<AppWindow>, ownPkg: String, isCritical: (String) -> Boolean, now: Long): Step {
@@ -163,6 +242,17 @@ class WindowShield(
         const val SIDE_RECHECK_MS = 5_000L
         const val MAX_QUIET_ATTEMPTS = 2
         const val LINGER_MS = 60_000L
+        const val REMEDY_GAP_MS = 700L
+        const val STARTING_MS = 1_200L
+        const val RETRY_MS = 15_000L
+
+        /**
+         * The window button twice (the first press may only open Samsung's / desktop mode's
+         * caption menu), Back twice (an app may first close a screen of its own), Home, block screen.
+         */
+        val LADDER = listOf(
+            Remedy.WINDOW_BUTTON, Remedy.WINDOW_BUTTON, Remedy.BACK, Remedy.BACK, Remedy.HOME, Remedy.BLOCK_SCREEN,
+        )
 
         /** Windows smaller than this share of the screen are toasts and menus, not an app in use. */
         const val MIN_AREA = 0.08f
@@ -181,5 +271,13 @@ class WindowShield(
 
         /** One shield per process: the service guards, the block screen reports when it's left. */
         val shared = WindowShield()
+
+        /** Set by the accessibility service while it runs: "look at all windows now". */
+        @Volatile var checkRequest: (() -> Unit)? = null
+
+        /** The block screen lost focus (something is over it, e.g. a pop-up): look now. */
+        fun requestCheck() {
+            checkRequest?.invoke()
+        }
     }
 }

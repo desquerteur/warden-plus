@@ -24,6 +24,8 @@ object NotificationIds {
     const val SETTINGS_GUARD = 1010
     /** The clock or time zone was changed by hand (Settings guard). */
     const val CLOCK_CHANGED = 1011
+    /** A blocked app's pop-up window couldn't be closed (window guard, issue #3). */
+    const val WINDOW_STUCK = 1020
     /** "Warden+ x.y.z is available". */
     const val UPDATE = 4201
     /** "New game blocked": this plus a hash of the app's label, so each app gets its own. */
@@ -33,7 +35,7 @@ object NotificationIds {
     /** The fixed ids, for the uniqueness test. */
     val fixed = listOf(
         VPN, ACCESSIBILITY, PROTECTION_WATCH, BLOCK_LOOP, FILTER_PAUSED, VPN_TAKEOVER, VPN_TAKEOVER_SETTINGS,
-        SETTINGS_GUARD, CLOCK_CHANGED, UPDATE,
+        SETTINGS_GUARD, CLOCK_CHANGED, WINDOW_STUCK, UPDATE,
     )
 
     fun newApp(label: String): Int = NEW_APP_BASE + (label.hashCode() and (NEW_APP_RANGE - 1))

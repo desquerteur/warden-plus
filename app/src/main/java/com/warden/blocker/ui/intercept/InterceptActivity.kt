@@ -52,6 +52,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.lifecycleScope
 import com.warden.blocker.accessibility.ForegroundGate
+import com.warden.blocker.accessibility.WindowShield
 import com.warden.blocker.allow.AllowBlockNotice
 import com.warden.blocker.block.LimitReason
 import com.warden.blocker.data.BlockType
@@ -162,6 +163,13 @@ class InterceptActivity : ComponentActivity() {
         super.onResume()
         // Samsung's "pop-up view" and split screen ignore resizeableActivity on big screens.
         if (isInMultiWindowMode || isInPictureInPictureMode) leaveWindowedMode()
+    }
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        // Something took the focus while the block screen is up — on Samsung that can be the
+        // blocked app's own pop-up window floating over it (issue #3): let the window guard look now.
+        if (!hasFocus && !leaving && !isFinishing) WindowShield.requestCheck()
     }
 
     /**

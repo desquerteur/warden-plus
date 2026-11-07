@@ -9,6 +9,7 @@ import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
 import android.util.DisplayMetrics
+import android.util.Log
 import android.view.Display
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityWindowInfo
@@ -76,6 +77,8 @@ class AppBlockAccessibilityService : AccessibilityService() {
         scope.launch { runCatching { wardenContainer.settings.markAccessibilityUsed() } }
         AccessibilityAlert.cancel(this)
         settingsGuard.start()
+        // The block screen lost focus (a pop-up over it, on Samsung): look at all windows now.
+        WindowShield.checkRequest = { handler.post { scheduleWindowCheck(FOCUS_LOST_SETTLE_MS) } }
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
@@ -152,7 +155,7 @@ class AppBlockAccessibilityService : AccessibilityService() {
             is AccessDecision.LimitReached -> launchIntercept(InterceptActivity.KIND_LIMIT, decision.item.id, decision.reason, null)
         }
         // From now on, keep an eye on it in every window, not just the focused one.
-        shield.shield(pkg)
+        shield.shield(pkg, SystemClock.uptimeMillis())
         handler.post { scheduleWindowCheck() }
     }
 
@@ -179,20 +182,28 @@ class AppBlockAccessibilityService : AccessibilityService() {
 
     private fun checkWindows() {
         val now = SystemClock.uptimeMillis()
-        when (val step = shield.assess(appWindows(), packageName, ::isCritical, now)) {
+        val step = shield.assess(appWindows(), packageName, ::isCritical, now)
+        if (step != WindowShield.Step.None && Log.isLoggable(TAG, Log.DEBUG)) Log.d(TAG, "window step $step")
+        when (step) {
             WindowShield.Step.None -> Unit
             is WindowShield.Step.Later -> scheduleWindowCheck((step.atMs - now).coerceAtLeast(50L))
-            is WindowShield.Step.CheckSide -> enforce(step.pkg, goHome = false)
-            is WindowShield.Step.ShowBlockScreen -> enforce(step.pkg, goHome = false)
-            is WindowShield.Step.GoHome -> enforce(step.pkg, goHome = true)
+            is WindowShield.Step.CheckSide -> enforce(step.pkg, Remedy.BLOCK_SCREEN)
+            is WindowShield.Step.ShowBlockScreen -> enforce(step.pkg, Remedy.BLOCK_SCREEN)
+            is WindowShield.Step.GoHome -> enforce(step.pkg, Remedy.HOME)
+            is WindowShield.Step.PressWindowButton -> enforce(step.pkg, Remedy.WINDOW_BUTTON)
+            is WindowShield.Step.Back -> enforce(step.pkg, Remedy.BACK)
+            is WindowShield.Step.GaveUp -> BlockLoopAlert.notifyWindowStuck(this, step.pkg)
         }
     }
 
+    private enum class Remedy { BLOCK_SCREEN, HOME, WINDOW_BUTTON, BACK }
+
     /**
      * [pkg] is visible somewhere without the block screen covering it. Ask again (a grant or the
-     * end of a schedule lets it through), then show the block screen or leave to the home screen.
+     * end of a schedule lets it through), then do [remedy]: show the block screen, leave to the
+     * home screen, press its pop-up window's Maximize / Close button, or Back.
      */
-    private fun enforce(pkg: String, goHome: Boolean) {
+    private fun enforce(pkg: String, remedy: Remedy) {
         scope.launch {
             val decision = wardenContainer.accessController.decideForPackage(pkg)
             withContext(Dispatchers.Main) {
@@ -200,22 +211,74 @@ class AppBlockAccessibilityService : AccessibilityService() {
                     shield.allowed(pkg, SystemClock.uptimeMillis())
                     return@withContext
                 }
+                // Nothing to press: no loop-guard attempt used up, go on with the next step.
+                val button = if (remedy == Remedy.WINDOW_BUTTON) findWindowButton(pkg) else null
+                if (remedy == Remedy.WINDOW_BUTTON && button == null) {
+                    shield.noWindowButton(pkg)
+                    scheduleWindowCheck(50L)
+                    return@withContext
+                }
                 // Own key: if a window can't be got rid of, this pauses only the window guard.
                 if (!passLoopGuard(WINDOW_KEY_PREFIX + pkg, confirmed = true)) return@withContext
-                if (goHome) {
-                    shield.shield(pkg)
-                    gate.noteWentHome(SystemClock.uptimeMillis())
-                    performGlobalAction(GLOBAL_ACTION_HOME)
-                    scheduleWindowCheck()
-                } else if (SystemClock.uptimeMillis() - lastBlockScreenAt < BLOCK_SCREEN_STARTING_MS) {
-                    // A block screen was just launched and may not be on screen yet: look again.
-                    scheduleWindowCheck(BLOCK_SCREEN_STARTING_MS)
-                } else {
-                    showBlockScreen(pkg, decision)
+                when (remedy) {
+                    Remedy.HOME -> {
+                        shield.shield(pkg, SystemClock.uptimeMillis())
+                        gate.noteWentHome(SystemClock.uptimeMillis())
+                        performGlobalAction(GLOBAL_ACTION_HOME)
+                        scheduleWindowCheck(REMEDY_SETTLE_MS)
+                    }
+                    Remedy.WINDOW_BUTTON -> {
+                        val clicked = button?.target?.click() == true
+                        if (Log.isLoggable(TAG, Log.DEBUG)) Log.d(TAG, "pressed ${button?.control} (${button?.label}) for $pkg: $clicked")
+                        if (!clicked) shield.noWindowButton(pkg)
+                        scheduleWindowCheck(if (clicked) REMEDY_SETTLE_MS else 50L)
+                    }
+                    Remedy.BACK -> {
+                        // Only while the pop-up has focus (WindowShield checks), so Back goes to it.
+                        performGlobalAction(GLOBAL_ACTION_BACK)
+                        scheduleWindowCheck(REMEDY_SETTLE_MS)
+                    }
+                    Remedy.BLOCK_SCREEN ->
+                        if (SystemClock.uptimeMillis() - lastBlockScreenAt < BLOCK_SCREEN_STARTING_MS) {
+                            // A block screen was just launched and may not be on screen yet: look again.
+                            scheduleWindowCheck(BLOCK_SCREEN_STARTING_MS)
+                        } else {
+                            showBlockScreen(pkg, decision)
+                        }
                 }
             }
         }
     }
+
+    /**
+     * The Maximize / Close / Minimize button of [pkg]'s pop-up window, searched in its own
+     * window and in System UI's caption windows (see [WindowControls]). Null if there's none.
+     */
+    private fun findWindowButton(pkg: String): WindowControls.Hit? = runCatching {
+        val all = windows // z-order, top first
+        val rootsByWindow = all.map { it.root }
+        val owners = rootsByWindow.map { it?.packageName?.toString() }
+        val targetIndex = all.indices.firstOrNull { i ->
+            all[i].type == AccessibilityWindowInfo.TYPE_APPLICATION && !all[i].isInPictureInPictureMode && owners[i] == pkg
+        } ?: return@runCatching null
+        val r = Rect()
+        all[targetIndex].getBoundsInScreen(r)
+        val box = WindowControls.Box(r.left, r.top, r.right, r.bottom)
+        // The app's own window and the System UI / Samsung caption windows right above it —
+        // never other apps, never another pop-up's caption.
+        val roots = (listOf(targetIndex) + WindowControls.decorationsOf(targetIndex, owners))
+            .mapNotNull { i -> rootsByWindow[i]?.let { A11yControl(it) } }
+        val strip = (CAPTION_STRIP_DP * resources.displayMetrics.density).toInt()
+        val hit = WindowControls.find(roots, box, strip)
+        if (Log.isLoggable(TAG, Log.DEBUG)) {
+            Log.d(TAG, "window button for $pkg at $box: ${hit?.control} ${hit?.label}; windows=" +
+                all.joinToString { w ->
+                    val b = Rect().also { w.getBoundsInScreen(it) }
+                    "${w.type}/${w.root?.packageName}/${b.toShortString()}"
+                })
+        }
+        hit
+    }.getOrNull()
 
     /** All visible app windows (not keyboards, system bars, overlays). Empty if Android can't say. */
     private fun appWindows(): List<WindowShield.AppWindow> = runCatching {
@@ -346,6 +409,7 @@ class AppBlockAccessibilityService : AccessibilityService() {
     override fun onInterrupt() {}
 
     override fun onDestroy() {
+        WindowShield.checkRequest = null
         settingsGuard.stop()
         browserGuard.stop()
         handler.removeCallbacksAndMessages(null)
@@ -365,5 +429,12 @@ class AppBlockAccessibilityService : AccessibilityService() {
         const val WINDOW_MAX_WAIT_MS = 1_500L
         const val WINDOW_KEY_PREFIX = "window:"
         const val BLOCK_SCREEN_STARTING_MS = 1_500L
+        const val FOCUS_LOST_SETTLE_MS = 150L
+        /** Time for a pressed window button / Back / Home to take effect before looking again. */
+        const val REMEDY_SETTLE_MS = 700L
+        /** How far from a pop-up's top edge its caption buttons may sit. */
+        const val CAPTION_STRIP_DP = 72f
+        /** `adb shell setprop log.tag.WardenWindows DEBUG` shows what the window guard does. */
+        const val TAG = "WardenWindows"
     }
 }

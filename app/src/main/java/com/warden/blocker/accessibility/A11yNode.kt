@@ -1,5 +1,6 @@
 package com.warden.blocker.accessibility
 
+import android.graphics.Rect
 import android.view.accessibility.AccessibilityNodeInfo
 import com.warden.blocker.feature.UiNode
 
@@ -10,4 +11,23 @@ class A11yNode(private val info: AccessibilityNodeInfo?) : UiNode {
     override val contentDesc: String? get() = info?.contentDescription?.toString()
     override val childCount: Int get() = info?.childCount ?: 0
     override fun child(index: Int): UiNode? = info?.getChild(index)?.let { A11yNode(it) }
+}
+
+/** Adapts an Android AccessibilityNodeInfo to [WindowControls.ControlNode]. */
+class A11yControl(private val info: AccessibilityNodeInfo) : WindowControls.ControlNode {
+    override val viewId: String? get() = info.viewIdResourceName
+    override val text: String? get() = info.text?.toString()
+    override val desc: String? get() = info.contentDescription?.toString()
+    override val clickable: Boolean get() = info.isClickable && info.isEnabled
+    override val visible: Boolean get() = info.isVisibleToUser
+    override val box: WindowControls.Box
+        get() {
+            val r = Rect()
+            info.getBoundsInScreen(r)
+            return WindowControls.Box(r.left, r.top, r.right, r.bottom)
+        }
+    override val childCount: Int get() = info.childCount
+    override fun child(index: Int): WindowControls.ControlNode? = info.getChild(index)?.let { A11yControl(it) }
+    override fun click(): Boolean =
+        runCatching { info.performAction(AccessibilityNodeInfo.ACTION_CLICK) }.getOrDefault(false)
 }

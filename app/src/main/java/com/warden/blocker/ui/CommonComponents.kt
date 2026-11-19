@@ -428,10 +428,19 @@ internal fun FocusCard(focusEndsAt: Long, strict: Boolean, onStart: (Int, Boolea
                 } else {
                     SupportingText("Force blocking on for a set time — great for deep work.")
                     var strictChoice by remember { mutableStateOf(false) }
+                    var confirmStrict by remember { mutableStateOf<Int?>(null) }
+                    confirmStrict?.let { m ->
+                        IrreversibleConfirmDialog(
+                            what = "A strict focus session of $m min keeps blocking on until the timer ends.",
+                            confirmLabel = "Start strict",
+                            onConfirm = { onStart(m, true) },
+                            onDismiss = { confirmStrict = null },
+                        )
+                    }
                     CheckboxRow("Strict (no early exit)", strictChoice) { strictChoice = it }
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         listOf(25, 50).forEach { m ->
-                            Button(onClick = { onStart(m, strictChoice) }) { Text("$m min") }
+                            Button(onClick = { if (strictChoice) confirmStrict = m else onStart(m, false) }) { Text("$m min") }
                         }
                     }
                 }
@@ -485,3 +494,23 @@ internal fun daysLabel(mask: Int): String {
     return names.filterIndexed { i, _ -> (mask shr i) and 1 == 1 }.joinToString(" ")
 }
 
+
+/**
+ * Asked before something that cannot be undone on purpose (a lock, a strict session): once
+ * confirmed, not even the user can take it back early (#5).
+ */
+@Composable
+fun IrreversibleConfirmDialog(
+    what: String,
+    confirmLabel: String,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("This can't be undone") },
+        text = { Text("$what\n\nOnce started, you can't turn it off or end it early – not even with your PIN. Continue?") },
+        confirmButton = { TextButton(onClick = { onDismiss(); onConfirm() }) { Text(confirmLabel) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+    )
+}

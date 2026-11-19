@@ -4,6 +4,8 @@ import android.app.Notification
 import android.app.PendingIntent
 import android.content.Intent
 import android.net.ConnectivityManager
+import android.net.LinkProperties
+import android.net.Network
 import android.net.VpnService
 import android.os.Build
 import android.os.ParcelFileDescriptor
@@ -87,6 +89,7 @@ class WardenVpnService : VpnService() {
 
         // Capture the real resolvers BEFORE establish() — afterwards the active network is us.
         upstreamDns = systemDnsServers()
+        watchNetwork()
 
         val builder = Builder()
             .setSession("Warden")
@@ -191,7 +194,9 @@ class WardenVpnService : VpnService() {
                     // Only a per-day count, no domain; covers manual entries and hosts lists alike.
                     StatsRecorder.get(this@WardenVpnService).recordDomainBlocked()
                 } else {
-                    forward(packet, parsed, output)
+                    // Off the read loop: one slow lookup must not stall every other query (#6).
+                    val copy = packet.copyOf(read)
+                    scope.launch { forward(copy, parsed, output) }
                 }
             }
         } catch (e: Exception) {
@@ -210,28 +215,60 @@ class WardenVpnService : VpnService() {
      */
     private fun forward(packet: ByteArray, parsed: DnsPacket.Parsed, output: FileOutputStream) {
         val query = packet.copyOfRange(parsed.dnsPayloadOffset, parsed.dnsPayloadOffset + parsed.dnsPayloadLen)
-        val target = upstreamDns.firstOrNull() ?: fallbackDns
+        // Try every resolver of the current network (mobile networks often hand out an IPv6 one
+        // that is slow or dead), then the fallback. Short per-server timeouts keep a dead
+        // resolver from stalling the lookup.
+        val targets = (upstreamDns + fallbackDns).distinct()
+        for (target in targets) {
+            val reply = queryOnce(target, query) ?: continue
+            try {
+                val wrapped = wrapReply(packet, parsed, reply)
+                synchronized(output) { output.write(wrapped) }
+            } catch (e: Exception) {
+                Log.w(TAG, "DNS reply write failed: ${e.javaClass.simpleName}")
+            }
+            return
+        }
+    }
+
+    private fun queryOnce(target: InetAddress, query: ByteArray): ByteArray? {
         var socket: DatagramSocket? = null
-        try {
+        return try {
             socket = DatagramSocket()
             protect(socket)
             socket.connect(target, DnsPacket.DNS_PORT) // only accept replies from this resolver
-            socket.soTimeout = 3000
+            socket.soTimeout = UPSTREAM_TIMEOUT_MS
             socket.send(DatagramPacket(query, query.size))
-
-            val buf = ByteArray(MTU)
+            val buf = ByteArray(4096)
             val replyPacket = DatagramPacket(buf, buf.size)
             socket.receive(replyPacket)
-            val replyLen = replyPacket.length
-            // Transaction-ID must match the query, else it's a spoofed / stray reply — drop it.
-            if (replyLen < 2 || buf[0] != query[0] || buf[1] != query[1]) return
-            output.write(wrapReply(packet, parsed, buf.copyOf(replyLen)))
+            val n = replyPacket.length
+            // Transaction-ID must match the query, else it's a spoofed / stray reply.
+            if (n < 2 || buf[0] != query[0] || buf[1] != query[1]) null else buf.copyOf(n)
         } catch (e: Exception) {
-            // Don't log the domain (privacy); the exception class is enough to diagnose.
             Log.w(TAG, "DNS forward failed: ${e.javaClass.simpleName}")
+            null
         } finally {
             runCatching { socket?.close() }
         }
+    }
+
+    private val networkCallback = object : ConnectivityManager.NetworkCallback() {
+        override fun onLinkPropertiesChanged(network: Network, linkProperties: LinkProperties) {
+            upstreamDns = linkProperties.dnsServers.filterNot { it.isLoopbackAddress }.ifEmpty { upstreamDns }
+        }
+    }
+
+    /** Follow the real network: Wi-Fi <-> mobile switches change the resolvers, and a stale
+     *  one made every lookup time out on mobile data (#6). */
+    private fun watchNetwork() {
+        runCatching {
+            getSystemService(ConnectivityManager::class.java)?.registerDefaultNetworkCallback(networkCallback)
+        }
+    }
+
+    private fun unwatchNetwork() {
+        runCatching { getSystemService(ConnectivityManager::class.java)?.unregisterNetworkCallback(networkCallback) }
     }
 
     /** The device's DNS servers on the underlying network (empty if unavailable). */
@@ -280,6 +317,7 @@ class WardenVpnService : VpnService() {
         _running.value = false
         loopJob?.cancel()
         watchJob?.cancel()
+        unwatchNetwork()
         runCatching { tunnel?.close() }
         tunnel = null
         blocklist = DomainMatcher.EMPTY
@@ -313,6 +351,7 @@ class WardenVpnService : VpnService() {
     override fun onDestroy() {
         _running.value = false
         scope.cancel()
+        unwatchNetwork()
         runCatching { tunnel?.close() }
         wardenContainer.hostsLists.releaseCache()
         super.onDestroy()
@@ -340,6 +379,7 @@ class WardenVpnService : VpnService() {
         // Used only if the OS exposes no resolver (rare); prefer the device's own DNS.
         private const val FALLBACK_DNS = "1.1.1.1"
         private const val MTU = 32767
+        private const val UPSTREAM_TIMEOUT_MS = 1500
         private const val NOTIF_ID = NotificationIds.VPN
     }
 }

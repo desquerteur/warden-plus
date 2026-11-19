@@ -43,6 +43,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.warden.blocker.ui.IrreversibleConfirmDialog
 import com.warden.blocker.time.TrustedClock
 import com.warden.blocker.ui.CardPadding
 import com.warden.blocker.ui.CheckboxRow
@@ -71,6 +72,7 @@ fun BlockUntilCard(
     val running = focusEndsAt > now
     var strict by remember { mutableStateOf(false) }
     var picking by remember { mutableStateOf(false) }
+    var confirmStrictAt by remember { mutableStateOf<Long?>(null) }
 
     Card(Modifier.fillMaxWidth()) {
         AnimatedContent(
@@ -96,7 +98,7 @@ fun BlockUntilCard(
                     // Wraps on narrow screens (320dp fold cover display) instead of cutting buttons off.
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         quickUntilChoices(now, zone, is24Hour).forEach { q ->
-                            OutlinedButton(onClick = { vm.blockUntil(q.at, strict, onStarted) }) { Text(q.label) }
+                            OutlinedButton(onClick = { if (strict) confirmStrictAt = q.at else vm.blockUntil(q.at, false, onStarted) }) { Text(q.label) }
                         }
                         OutlinedButton(onClick = { picking = true }) { Text("Pick date & time…") }
                     }
@@ -105,10 +107,19 @@ fun BlockUntilCard(
         }
     }
 
+
+    confirmStrictAt?.let { at ->
+        IrreversibleConfirmDialog(
+            what = "A strict block until ${dateTimeLabel(at, now, zone, is24Hour)} can't be ended early; the end can only be moved later.",
+            confirmLabel = "Start strict",
+            onConfirm = { vm.blockUntil(at, true, onStarted) },
+            onDismiss = { confirmStrictAt = null },
+        )
+    }
     if (picking) {
         BlockUntilDialog(
             initial = if (running) focusEndsAt else defaultUntil(now),
-            onConfirm = { at -> vm.blockUntil(at, strict, onStarted) },
+            onConfirm = { at -> if (strict && !running) confirmStrictAt = at else vm.blockUntil(at, strict, onStarted) },
             onDismiss = { picking = false },
         )
     }

@@ -137,6 +137,7 @@ fun ProtectionScreen(vm: WardenViewModel, onBack: () -> Unit, onOpenSetup: () ->
     var expanded by remember { mutableStateOf<ProtectionMode?>(null) }
     var askPinFor by remember { mutableStateOf<ProtectionSettings?>(null) }
     var showAdminExplain by remember { mutableStateOf(false) }
+    var confirmLock by remember { mutableStateOf<ProtectionSettings?>(null) }
     var pickDate by remember { mutableStateOf(false) }
     var pickTimeOn by remember { mutableStateOf<LocalDate?>(null) }
     var showSetPin by remember { mutableStateOf(false) }
@@ -144,7 +145,8 @@ fun ProtectionScreen(vm: WardenViewModel, onBack: () -> Unit, onOpenSetup: () ->
 
     val adminLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { resumes++ }
 
-    fun choose(new: ProtectionSettings) {
+    fun choose(new: ProtectionSettings, confirmed: Boolean = false) {
+        if (new.mode == ProtectionMode.LOCKED && !confirmed) { confirmLock = new; return }
         if (new.mode == ProtectionMode.PIN && !hasPin) { askPinFor = new; return }
         vm.setProtection(new)
         expanded = null
@@ -356,6 +358,14 @@ fun ProtectionScreen(vm: WardenViewModel, onBack: () -> Unit, onOpenSetup: () ->
                 }) { Text("Continue") }
             },
             dismissButton = { TextButton(onClick = { showAdminExplain = false }) { Text("Not now") } },
+        )
+    }
+    confirmLock?.let { lock ->
+        IrreversibleConfirmDialog(
+            what = "Locking until ${vm.whenText(lock.lockedUntil)} blocks every weakening of your blocking until then.",
+            confirmLabel = "Lock",
+            onConfirm = { choose(lock, confirmed = true) },
+            onDismiss = { confirmLock = null },
         )
     }
     if (pickDate) {

@@ -1,4 +1,4 @@
-﻿package com.warden.blocker.accessibility
+package com.warden.blocker.accessibility
 
 import android.accessibilityservice.AccessibilityService
 import android.content.Intent

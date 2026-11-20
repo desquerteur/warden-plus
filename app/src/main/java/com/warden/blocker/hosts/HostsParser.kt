@@ -28,7 +28,7 @@ object HostsParser {
 
     /** Emit every valid domain found on [line] to [emit] (may be called several times). */
     fun parseLine(line: String, emit: (String) -> Unit) {
-        var text = line.removePrefix("﻿").trim()
+        var text = line.removePrefix("\uFEFF").trim()
         if (text.isEmpty() || text[0] == '!' || text[0] == '[' || text.startsWith("@@")) return
         text = text.substringBefore('#').trim()
         if (text.isEmpty()) return

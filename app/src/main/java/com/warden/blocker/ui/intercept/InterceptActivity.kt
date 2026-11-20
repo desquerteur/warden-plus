@@ -5,6 +5,7 @@ import android.os.Bundle
 import android.os.SystemClock
 import android.widget.Toast
 import androidx.activity.ComponentActivity
+import androidx.activity.addCallback
 import androidx.activity.compose.setContent
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.Crossfade
@@ -80,6 +81,8 @@ class InterceptActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Back should return home, never silently enter the app.
+        onBackPressedDispatcher.addCallback(this) { goHome() }
         addOnMultiWindowModeChangedListener { if (it.isInMultiWindowMode) leaveWindowedMode() }
         addOnPictureInPictureModeChangedListener { if (it.isInPictureInPictureMode) leaveWindowedMode() }
         // Anti-tapjacking: a malicious overlay must not be able to trick taps on "Continue"
@@ -204,9 +207,6 @@ class InterceptActivity : ComponentActivity() {
         // A pop-up / split task would otherwise linger as an empty window.
         if (removeTask) finishAndRemoveTask() else finish()
     }
-
-    @Deprecated("Back should return home, never silently enter the app")
-    override fun onBackPressed() = goHome()
 
     companion object {
         const val EXTRA_KIND = "kind"

@@ -21,6 +21,8 @@ import kotlinx.coroutines.withContext
 @Composable
 fun AppIcon(packageName: String, fallback: String = "📱", modifier: Modifier = Modifier.size(40.dp)) {
     val context = LocalContext.current
+    // Lint false positive: the producer does assign `value` (after a withContext switch).
+    @Suppress("ProduceStateDoesNotAssignValue")
     val icon by produceState<ImageBitmap?>(initialValue = null, packageName) {
         value = withContext(Dispatchers.Default) { AppsHelper.loadIcon(context, packageName) }
     }
